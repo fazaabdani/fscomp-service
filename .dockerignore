@@ -1,0 +1,14 @@
+.git
+.github
+.next
+node_modules
+.env
+.env.*
+!.env.example
+prisma/data
+backups
+server.log
+server-error.log
+*.zip
+*.db
+*.db-journal

@@ -1,0 +1,21 @@
+services:
+  fs-service:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      TZ: Asia/Jakarta
+      NEXT_PUBLIC_APP_URL: https://servis.fscomp.id
+    volumes:
+      - fs_service_data:/app/prisma/data
+      - fs_service_backups:/app/backups
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  fs_service_data:
+  fs_service_backups:

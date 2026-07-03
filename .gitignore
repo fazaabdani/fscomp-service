@@ -1,0 +1,7 @@
+.env
+.next/
+node_modules/
+prisma/data/
+backups/
+server.log
+server-error.log

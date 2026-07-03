@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         String   @default("TECHNICIAN")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  audits       AuditLog[]
+}
+
+model AppState {
+  key       String   @id
+  value     String
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  amount    Int
+  method    String
+  note      String?
+  createdBy String
+  createdAt DateTime @default(now())
+  @@index([ticketId])
+}
+
+model ChatLog {
+  id        String   @id @default(cuid())
+  ticketId  String
+  phone     String
+  template  String
+  message   String
+  createdBy String
+  createdAt DateTime @default(now())
+  @@index([ticketId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entity     String
+  entityId   String?
+  detail     String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+  @@index([createdAt])
+  @@index([entity, entityId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  ticketId  String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
