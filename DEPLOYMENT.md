@@ -18,6 +18,7 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
 TZ=Asia/Jakarta
 NEXT_PUBLIC_APP_URL=https://servis.fscomp.id
+APP_PORT=3216
 ```
 
 Login sementara: `admin / admin123`. Ganti password setelah sistem dinyatakan stabil.
