@@ -12,7 +12,7 @@ services:
       - fs_service_data:/app/prisma/data
       - fs_service_backups:/app/backups
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
