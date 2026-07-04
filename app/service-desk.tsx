@@ -363,13 +363,14 @@ export default function ServiceDesk() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Status | "Semua">("Semua");
   const [active, setActive] = useState("Proses Servis");
-  const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "scan" | null>(null);
+  const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "handoff" | "scan" | null>(null);
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [printMode, setPrintMode] = useState<
-    "receipt" | "qr" | "accessories" | null
+    "receipt" | "receipt2" | "qr" | "accessories" | null
   >(null);
+  const [handoffDone, setHandoffDone] = useState({ receipt: false, whatsapp: false, qr: false, accessories: false });
   const [shop, setShop] = useState<ShopSettings>(defaultSettings);
   const [services, setServices] = useState<ServiceItem[]>(defaultServices);
   const [staff, setStaff] = useState<Staff[]>(defaultStaff);
@@ -766,7 +767,7 @@ export default function ServiceDesk() {
     const options = `${greeting()} Kak ${ticket.customer},\n\nHasil pengecekan ${ticket.device} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *${money(ticket.estimate)}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak. Terima kasih 🙏`;
     return `${base}?text=${encodeURIComponent(kind === "received" ? received : kind === "cost" ? cost : options)}`;
   }
-  function printTicket(mode: "receipt" | "qr" | "accessories") {
+  function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories") {
     setPrintMode(mode);
     setTimeout(() => {
       window.print();
@@ -852,8 +853,9 @@ export default function ServiceDesk() {
       updatedAt: now.toISOString().slice(0, 10),
     };
     setTickets((old) => [next, ...old]);
-    setModal(null);
     setSelected(next);
+    setHandoffDone({ receipt: false, whatsapp: false, qr: false, accessories: accessoryItems(next.accessories).length === 0 });
+    setModal("handoff");
     notify(`Servis ${id} berhasil dibuat`);
     if (!customers.some((c) => c.phone === phone))
       setCustomers((old) => [
@@ -1307,7 +1309,7 @@ export default function ServiceDesk() {
         <div
           className="modalBackdrop"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setModal(null);
+            if (e.target === e.currentTarget && modal !== "handoff") setModal(null);
           }}
         >
           {modal === "new" && (
@@ -1733,6 +1735,19 @@ export default function ServiceDesk() {
               </div>
             </div>
           )}
+          {modal === "handoff" && selected && (
+            <div className="serviceModal handoffModal">
+              <div className="handoffHero"><span><ClipboardList /></span><div><small>SOP PENERIMAAN WAJIB</small><h2>Servis berhasil diterima</h2><p>{selected.id} · {selected.customer} · {selected.device}</p></div></div>
+              <div className="handoffProgress"><span>{Object.values(handoffDone).filter(Boolean).length}/4 selesai</span><i><b style={{width:`${Object.values(handoffDone).filter(Boolean).length*25}%`}} /></i></div>
+              <div className="handoffSteps">
+                <button className={handoffDone.receipt ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,receipt:true})); printTicket("receipt2"); }}><span>{handoffDone.receipt ? <Check /> : "1"}</span><div><b>Cetak nota 2 rangkap</b><small>1 lembar untuk pelanggan dan 1 lembar untuk arsip toko.</small></div><Printer /></button>
+                <a className={handoffDone.whatsapp ? "done" : ""} target="_blank" href={whatsappUrl(selected,"received")} onClick={() => setHandoffDone((x) => ({...x,whatsapp:true}))}><span>{handoffDone.whatsapp ? <Check /> : "2"}</span><div><b>Kirim konfirmasi WhatsApp</b><small>Pesan ramah berisi nomor servis dan link tracking.</small></div><MessageCircle /></a>
+                <button className={handoffDone.qr ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,qr:true})); printTicket("qr"); }}><span>{handoffDone.qr ? <Check /> : "3"}</span><div><b>Cetak QR barang utama</b><small>Tempelkan label pada perangkat servis.</small></div><QrCode /></button>
+                <button disabled={accessoryItems(selected.accessories).length===0} className={handoffDone.accessories ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,accessories:true})); printTicket("accessories"); }}><span>{handoffDone.accessories ? <Check /> : "4"}</span><div><b>Cetak QR perlengkapan</b><small>{accessoryItems(selected.accessories).length ? `${accessoryItems(selected.accessories).length} label: ${accessoryItems(selected.accessories).join(", ")}` : "Tidak ada perlengkapan tambahan."}</small></div><PackageCheck /></button>
+              </div>
+              <div className="handoffFoot"><button className="skipSop" onClick={() => setModal("detail")}>Lewati SOP kali ini</button><button className="finishSop" disabled={!Object.values(handoffDone).every(Boolean)} onClick={() => setModal("detail")}><CheckCircle2 /> Selesai & buka detail servis</button></div>
+            </div>
+          )}
           {modal === "edit" && selected && (
             <form className="serviceModal wideModal editServiceModal" onSubmit={saveTicketEdit}>
               <div className="modalHead"><div><span>UBAH DATA SERVIS</span><h2>{selected.id}</h2><p>Teliti kembali data sebelum menyimpan.</p></div><button type="button" onClick={() => setModal("detail")}><X /></button></div>
@@ -1878,6 +1893,18 @@ export default function ServiceDesk() {
               </div>
             </>
           )}
+        </div>
+      )}
+      {printMode === "receipt2" && selected && (
+        <div className="servicePrint receipt2">
+          {["PELANGGAN", "ARSIP TOKO"].map((copy) => (
+            <article className="receiptDuplicate" key={copy}>
+              <header><div><strong>{shop.name || "FS COMP"}</strong><small>BUKTI PENERIMAAN SERVIS · {copy}</small></div><b>{selected.id}</b></header>
+              <section><QRCodeSVG value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`} size={92} level="H"/><div><small>PELANGGAN</small><b>{selected.customer}</b><span>{selected.phone}</span><small>PERANGKAT</small><b>{selected.device}</b><span>SN: {selected.serial || "-"}</span></div><div><small>TANGGAL TERIMA</small><b>{selected.receivedAt}</b><span>Penerima: {selected.technician}</span><small>ESTIMASI / DP</small><b>{money(selected.estimate)} / {money(selected.downPayment)}</b></div></section>
+              <div className="receiptProblem"><small>KELUHAN / KERUSAKAN</small><b>{selected.issue}</b><span>Kelengkapan: {selected.accessories}</span></div>
+              <footer><span>Scan QR untuk tracking status servis.</span><span>Tanda tangan pelanggan: __________________</span></footer>
+            </article>
+          ))}
         </div>
       )}
       {printMode === "accessories" && selected && (
