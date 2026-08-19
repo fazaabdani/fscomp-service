@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 export async function GET(request: Request) {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,5 +44,7 @@ export async function POST(request: Request) {
       detail: `${b.ticketId}: ${b.amount}`,
     },
   });
+  pushPaymentToDashboard(p);
+
   return NextResponse.json({ payment: p });
 }
