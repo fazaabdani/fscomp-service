@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySession } from "@/lib/session";
+
+// Node.js runtime (not Edge) so verifySession can use the `crypto` module.
+export const runtime = "nodejs";
 
 export function middleware(req:NextRequest){
   const path=req.nextUrl.pathname;
@@ -7,7 +11,7 @@ export function middleware(req:NextRequest){
   }
   const publicPath=path.startsWith("/login")||path.startsWith("/track")||path.startsWith("/api/auth")||path.startsWith("/api/public")||path==="/api/health"||path.startsWith("/_next")||path==="/icon.svg";
   if(publicPath)return NextResponse.next();
-  if(!req.cookies.get("fs_session")){const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);return NextResponse.redirect(url)}
+  if(!verifySession(req.cookies.get("fs_session")?.value)){const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res}
   return NextResponse.next();
 }
 export const config={matcher:["/((?!favicon.ico).*)"]};

@@ -8,7 +8,16 @@ export type SessionUser = {
   role: string;
   exp: number;
 };
-const secret = () => process.env.SESSION_SECRET || "development-only-secret";
+const secret = () => {
+  const configured = process.env.SESSION_SECRET;
+  if (configured && configured.length >= 16) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET belum diset (minimal 16 karakter). Set env var ini sebelum menjalankan di production.",
+    );
+  }
+  return "development-only-secret";
+};
 const encode = (v: string) => Buffer.from(v).toString("base64url");
 export function signSession(user: Omit<SessionUser, "exp">) {
   const payload = encode(

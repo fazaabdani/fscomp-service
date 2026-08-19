@@ -357,6 +357,81 @@ const ageDays = (date: string) =>
   );
 const ageTone = (days: number) =>
   days <= 3 ? "ageFresh" : days <= 7 ? "ageWatch" : "ageLate";
+// Local calendar date (YYYY-MM-DD) instead of toISOString(), which returns
+// the UTC date and drifts a day off in Asia/Jakarta between 00:00-06:59 WIB.
+const localDateStr = (d: Date = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const normalizePhone = (phone: string) => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("62") ? digits : `62${digits.replace(/^0/, "")}`;
+};
+const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
+// finalCost defaults to 0 until costConfirmed is set, so `finalCost || estimate`
+// wrongly falls back to the estimate for a genuinely free (Rp0) confirmed job.
+const finalPrice = (t: Ticket) =>
+  t.costConfirmed ? (t.finalCost ?? 0) : t.finalCost || t.estimate;
+function mergeById<T extends { id: string }>(
+  serverArr: T[],
+  localArr: T[],
+  stamp: (item: T) => string,
+): T[] {
+  const serverIds = new Set(serverArr.map((s) => s.id));
+  const merged = serverArr.map((s) => {
+    const l = localArr.find((x) => x.id === s.id);
+    if (!l) return s;
+    return stamp(l) >= stamp(s) ? l : s;
+  });
+  const localOnly = localArr.filter((l) => !serverIds.has(l.id));
+  return [...localOnly, ...merged];
+}
+const mergeTickets = (server: Ticket[], local: Ticket[]) =>
+  mergeById(server, local, (t) => t.updatedAt || t.receivedAt || "");
+const mergeCustomers = (server: Customer[], local: Customer[]) =>
+  mergeById(server, local, (c) => c.createdAt || "");
+function useAutosave<T>(
+  key: "tickets" | "shop" | "services" | "staff" | "customers",
+  value: T,
+  ready: boolean,
+  versions: React.MutableRefObject<Record<string, number>>,
+  merge: ((server: T, local: T) => T) | null,
+  apply: (value: T) => void,
+  notify: (message: string) => void,
+) {
+  useEffect(() => {
+    if (!ready) return;
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/state/${key}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            value,
+            expectedVersion: versions.current[key],
+          }),
+        });
+        if (res.status === 409) {
+          const conflict = await res.json();
+          versions.current[key] = conflict.version;
+          const resolved = merge
+            ? merge(conflict.value, value)
+            : conflict.value;
+          apply(resolved);
+          notify(
+            "Ada perubahan dari pengguna lain, data disinkronkan otomatis",
+          );
+          return;
+        }
+        if (res.ok) {
+          const data = await res.json();
+          versions.current[key] = data.version;
+        }
+      } catch {
+        /* offline: local state and localStorage fallback still apply */
+      }
+    }, 500);
+    return () => clearTimeout(id);
+  }, [key, value, ready]);
+}
 
 export default function ServiceDesk() {
   const [tickets, setTickets] = useState<Ticket[]>(seed);
@@ -380,8 +455,11 @@ export default function ServiceDesk() {
   const [technicianFilter, setTechnicianFilter] = useState("Semua Teknisi");
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scanStopRef = useRef<(() => void) | null>(null);
   const serviceFormRef = useRef<HTMLFormElement>(null);
-  const serverReady = useRef(false);
+  const [serverReady, setServerReady] = useState(false);
+  const stateVersions = useRef<Record<string, number>>({});
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (modal === "new") {
@@ -435,13 +513,14 @@ export default function ServiceDesk() {
     Promise.all(
       ["tickets", "shop", "services", "staff", "customers"].map(async (key) => {
         const r = await fetch(`/api/state/${key}`, { cache: "no-store" });
-        if (!r.ok) return [key, null] as const;
+        if (!r.ok) return [key, null, 0] as const;
         const data = await r.json();
-        return [key, data.value] as const;
+        return [key, data.value, data.version as number] as const;
       }),
     )
       .then((values) => {
-        for (const [key, value] of values) {
+        for (const [key, value, version] of values) {
+          stateVersions.current[key] = version;
           if (value) {
             if (key === "tickets") setTickets(value);
             if (key === "shop") setShop(value);
@@ -472,14 +551,18 @@ export default function ServiceDesk() {
             fetch(`/api/state/${key}`, {
               method: "PUT",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ value: fallback }),
-            });
+              body: JSON.stringify({ value: fallback, expectedVersion: 0 }),
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((r) => {
+                if (r) stateVersions.current[key] = r.version;
+              });
           }
         }
-        serverReady.current = true;
+        setServerReady(true);
       })
       .catch(() => {
-        serverReady.current = false;
+        setServerReady(false);
       });
   }, []);
   useEffect(() => {
@@ -497,61 +580,11 @@ export default function ServiceDesk() {
   useEffect(() => {
     localStorage.setItem("fs-service-customers-v1", JSON.stringify(customers));
   }, [customers]);
-  useEffect(() => {
-    if (!serverReady.current) return;
-    const id = setTimeout(() => {
-      fetch("/api/state/tickets", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value: tickets }),
-      });
-    }, 500);
-    return () => clearTimeout(id);
-  }, [tickets]);
-  useEffect(() => {
-    if (!serverReady.current) return;
-    const id = setTimeout(() => {
-      fetch("/api/state/shop", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value: shop }),
-      });
-    }, 500);
-    return () => clearTimeout(id);
-  }, [shop]);
-  useEffect(() => {
-    if (!serverReady.current) return;
-    const id = setTimeout(() => {
-      fetch("/api/state/services", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value: services }),
-      });
-    }, 500);
-    return () => clearTimeout(id);
-  }, [services]);
-  useEffect(() => {
-    if (!serverReady.current) return;
-    const id = setTimeout(() => {
-      fetch("/api/state/staff", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value: staff }),
-      });
-    }, 500);
-    return () => clearTimeout(id);
-  }, [staff]);
-  useEffect(() => {
-    if (!serverReady.current) return;
-    const id = setTimeout(() => {
-      fetch("/api/state/customers", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value: customers }),
-      });
-    }, 500);
-    return () => clearTimeout(id);
-  }, [customers]);
+  useAutosave("tickets", tickets, serverReady, stateVersions, mergeTickets, setTickets, notify);
+  useAutosave("shop", shop, serverReady, stateVersions, null, setShop, notify);
+  useAutosave("services", services, serverReady, stateVersions, null, setServices, notify);
+  useAutosave("staff", staff, serverReady, stateVersions, null, setStaff, notify);
+  useAutosave("customers", customers, serverReady, stateVersions, mergeCustomers, setCustomers, notify);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 2600);
@@ -628,7 +661,7 @@ export default function ServiceDesk() {
     customers: new Set(tickets.map((t) => t.phone)).size,
     revenue: tickets
       .filter((t) => t.status === "Sudah Diambil")
-      .reduce((a, t) => a + (t.finalCost || t.estimate), 0),
+      .reduce((a, t) => a + finalPrice(t), 0),
   };
 
   function notify(message: string) {
@@ -685,7 +718,7 @@ export default function ServiceDesk() {
     setTickets((old) =>
       old.map((t) =>
         t.id === id
-          ? { ...t, status, updatedAt: new Date().toISOString().slice(0, 10) }
+          ? { ...t, status, updatedAt: localDateStr() }
           : t,
       ),
     );
@@ -713,7 +746,7 @@ export default function ServiceDesk() {
     setTickets((old) =>
       old.map((t) =>
         t.id === id
-          ? { ...t, ...patch, updatedAt: new Date().toISOString().slice(0, 10) }
+          ? { ...t, ...patch, updatedAt: localDateStr() }
           : t,
       ),
     );
@@ -759,7 +792,7 @@ export default function ServiceDesk() {
     return hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
   };
   function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options") {
-    const base = `https://wa.me/62${ticket.phone.replace(/^0/, "")}`;
+    const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
     const received = `${greeting()} Kak ${ticket.customer},\n\nTerima kasih sudah mempercayakan servis ${ticket.device} kepada *${shop.name}*. Barang Kakak sudah kami terima dengan nomor servis *${ticket.id}* pada ${new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n${tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Kami akan mengabari kembali saat ada perkembangan. Terima kasih 🙏`;
@@ -801,11 +834,17 @@ export default function ServiceDesk() {
   }
   function submitTicket(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setTimeout(() => {
+      submittingRef.current = false;
+    }, 1000);
     const form = new FormData(e.currentTarget);
     const now = new Date();
     const phone = String(form.get("phone") || "").replace(/\D/g, "");
     const serial = String(form.get("serial") || "-").trim();
     if (phone.length < 9 || phone.length > 15) {
+      submittingRef.current = false;
       notify("Nomor WhatsApp harus 9-15 digit");
       return;
     }
@@ -817,6 +856,7 @@ export default function ServiceDesk() {
           t.status !== "Sudah Diambil",
       )
     ) {
+      submittingRef.current = false;
       notify("Serial number sedang terdaftar pada servis aktif");
       return;
     }
@@ -825,10 +865,17 @@ export default function ServiceDesk() {
         Number(form.get("estimate") || 0) &&
       Number(form.get("estimate") || 0) > 0
     ) {
+      submittingRef.current = false;
       notify("DP tidak boleh melebihi estimasi biaya");
       return;
     }
-    const id = `SRV-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(tickets.length + 17).padStart(3, "0")}`;
+    const datePart = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    let seq = tickets.length + 17;
+    let id = `SRV-${datePart}-${String(seq).padStart(3, "0")}`;
+    while (tickets.some((t) => t.id === id)) {
+      seq += 1;
+      id = `SRV-${datePart}-${String(seq).padStart(3, "0")}`;
+    }
     const next: Ticket = {
       id,
       customer: String(form.get("customer")),
@@ -849,8 +896,8 @@ export default function ServiceDesk() {
       category: String(form.get("category")) as "Toko" | "User",
       address: String(form.get("address") || "-"),
       paymentTermDays: Number(form.get("paymentTermDays") || 0),
-      receivedAt: now.toISOString().slice(0, 10),
-      updatedAt: now.toISOString().slice(0, 10),
+      receivedAt: localDateStr(now),
+      updatedAt: localDateStr(now),
     };
     setTickets((old) => [next, ...old]);
     setSelected(next);
@@ -903,7 +950,7 @@ export default function ServiceDesk() {
       .join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `laporan-servis-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `laporan-servis-${localDateStr()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
     notify("Laporan CSV berhasil diunduh");
@@ -914,8 +961,13 @@ export default function ServiceDesk() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
+      let active = true;
+      scanStopRef.current = () => {
+        active = false;
+        stream.getTracks().forEach((x) => x.stop());
+      };
       setTimeout(async () => {
-        if (!videoRef.current) return;
+        if (!videoRef.current || !active) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
         const Detector = (
@@ -931,14 +983,16 @@ export default function ServiceDesk() {
           );
         const detector = new Detector({ formats: ["qr_code"] });
         const scan = async () => {
-          if (!videoRef.current || modal === null) return;
+          if (!active || !videoRef.current) return;
           const found = await detector.detect(videoRef.current);
           if (found[0]) {
             const ticket = tickets.find((t) =>
               found[0].rawValue.includes(t.id),
             );
             if (ticket) {
+              active = false;
               stream.getTracks().forEach((x) => x.stop());
+              scanStopRef.current = null;
               openDetail(ticket);
               notify(`QR ditemukan: ${ticket.id}`);
               return;
@@ -951,6 +1005,11 @@ export default function ServiceDesk() {
     } catch {
       notify("Izin kamera tidak tersedia. Gunakan pencarian nomor servis.");
     }
+  }
+  function stopScanner() {
+    scanStopRef.current?.();
+    scanStopRef.current = null;
+    setModal(null);
   }
 
   const customerMatches = customers
@@ -994,9 +1053,8 @@ export default function ServiceDesk() {
               {label === "Status Pembayaran" && (
                 <b>
                   {
-                    tickets.filter(
-                      (t) => (t.finalCost || t.estimate) > t.downPayment,
-                    ).length
+                    tickets.filter((t) => finalPrice(t) > t.downPayment)
+                      .length
                   }
                 </b>
               )}
@@ -1042,7 +1100,15 @@ export default function ServiceDesk() {
 
         <main className="serviceContent">
           {active === "Pelanggan" ? (
-            <CustomersPanel tickets={tickets} onOpen={openDetail} />
+            <CustomersPanel
+              tickets={tickets}
+              customers={customers}
+              onChange={(value) => {
+                setCustomers(value);
+                notify("Data pelanggan diperbarui");
+              }}
+              onOpen={openDetail}
+            />
           ) : active === "Status Pembayaran" ? (
             <PaymentsPanel
               tickets={tickets}
@@ -1050,8 +1116,8 @@ export default function ServiceDesk() {
                 patchTicket(
                   t.id,
                   {
-                    finalCost: t.finalCost || t.estimate,
-                    downPayment: t.finalCost || t.estimate,
+                    finalCost: finalPrice(t),
+                    downPayment: finalPrice(t),
                     costConfirmed: true,
                     paymentMethod: t.paymentMethod || "Tunai",
                   },
@@ -1282,7 +1348,7 @@ export default function ServiceDesk() {
                           </small>
                         </span>
                         <span>
-                          <b>{money(t.finalCost || t.estimate)}</b>
+                          <b>{money(finalPrice(t))}</b>
                           <small>DP {money(t.downPayment)}</small>
                         </span>
                         <span>
@@ -1525,11 +1591,7 @@ export default function ServiceDesk() {
                       Sisa
                       <strong>
                         {money(
-                          Math.max(
-                            0,
-                            (selected.finalCost || selected.estimate) -
-                              selected.downPayment,
-                          ),
+                          Math.max(0, finalPrice(selected) - selected.downPayment),
                         )}
                       </strong>
                     </span>
@@ -1798,7 +1860,7 @@ export default function ServiceDesk() {
                   <span>QR SCANNER</span>
                   <h2>Arahkan ke label servis</h2>
                 </div>
-                <button onClick={() => setModal(null)}>
+                <button onClick={stopScanner}>
                   <X />
                 </button>
               </div>
@@ -1946,38 +2008,23 @@ export default function ServiceDesk() {
 
 function CustomersPanel({
   tickets,
+  customers: data,
+  onChange,
   onOpen,
 }: {
   tickets: Ticket[];
+  customers: Customer[];
+  onChange: (customers: Customer[]) => void;
   onOpen: (ticket: Ticket) => void;
 }) {
-  const [data, setData] = useState<Customer[]>(seedCustomers);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState("");
   const pageSize = 15;
-  useEffect(() => {
-    const local = localStorage.getItem("fs-service-customers-v1");
-    if (local)
-      try {
-        setData(JSON.parse(local));
-      } catch {}
-    fetch("/api/state/customers", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((x) => {
-        if (x?.value) setData(x.value);
-      });
-  }, []);
   function persist(next: Customer[]) {
-    setData(next);
-    localStorage.setItem("fs-service-customers-v1", JSON.stringify(next));
-    fetch("/api/state/customers", {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: next }),
-    });
+    onChange(next);
   }
   function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1995,7 +2042,7 @@ function CustomersPanel({
       phone,
       address: String(f.get("address") || "-").trim(),
       rating: Number(f.get("rating") || 0),
-      createdAt: editing?.createdAt || new Date().toISOString().slice(0, 10),
+      createdAt: editing?.createdAt || localDateStr(),
     };
     persist(
       editing
@@ -2016,7 +2063,7 @@ function CustomersPanel({
         c.name,
         c.category,
         c.phone,
-        `62${c.phone.replace(/^0/, "")}`,
+        normalizePhone(c.phone),
         c.address,
         c.rating,
       ]),
@@ -2125,11 +2172,8 @@ function CustomersPanel({
               </span>
               <span>{c.phone}</span>
               <span>
-                <a
-                  target="_blank"
-                  href={`https://wa.me/62${c.phone.replace(/^0/, "")}`}
-                >
-                  <MessageCircle /> 62{c.phone.replace(/^0/, "")}
+                <a target="_blank" href={waLink(c.phone)}>
+                  <MessageCircle /> {normalizePhone(c.phone)}
                 </a>
               </span>
               <span title={c.address}>{c.address}</span>
@@ -2364,10 +2408,7 @@ function LegacyCustomersPanel({
                 </span>
                 <span>
                   <b>{c.phone}</b>
-                  <a
-                    target="_blank"
-                    href={`https://wa.me/62${c.phone.replace(/^0/, "")}`}
-                  >
+                  <a target="_blank" href={waLink(c.phone)}>
                     <MessageCircle size={12} /> Chat WhatsApp
                   </a>
                 </span>
@@ -2418,12 +2459,12 @@ function PaymentsPanel({
 }) {
   const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas">("Semua");
   const rows = tickets.filter((t) => {
-    const total = t.finalCost || t.estimate;
-    const paid = t.downPayment >= total && total > 0;
+    const total = finalPrice(t);
+    const paid = t.downPayment >= total && (total > 0 || t.costConfirmed);
     return mode === "Semua" || (mode === "Lunas" ? paid : !paid);
   });
   const receivable = tickets.reduce(
-    (a, t) => a + Math.max(0, (t.finalCost || t.estimate) - t.downPayment),
+    (a, t) => a + Math.max(0, finalPrice(t) - t.downPayment),
     0,
   );
   return (
@@ -2432,9 +2473,7 @@ function PaymentsPanel({
         <article>
           <small>Total Tagihan</small>
           <strong>
-            {money(
-              tickets.reduce((a, t) => a + (t.finalCost || t.estimate), 0),
-            )}
+            {money(tickets.reduce((a, t) => a + finalPrice(t), 0))}
           </strong>
           <span>Semua transaksi servis</span>
         </article>
@@ -2481,9 +2520,9 @@ function PaymentsPanel({
             <span>Aksi</span>
           </div>
           {rows.map((t) => {
-            const total = t.finalCost || t.estimate;
+            const total = finalPrice(t);
             const due = Math.max(0, total - t.downPayment);
-            const paid = due === 0 && total > 0;
+            const paid = due === 0 && (total > 0 || t.costConfirmed);
             return (
               <div
                 className={`paymentServiceRow ${!paid && ageDays(t.receivedAt) > 7 ? "overdue" : ""}`}
@@ -2787,17 +2826,17 @@ function WarrantyPanel({
               </span>
               <span>
                 <i
-                  className={`statusBadge ${remaining > 0 ? "success" : "neutral"}`}
+                  className={`statusBadge ${remaining >= 0 ? "success" : "neutral"}`}
                 >
                   {!t.warrantyDays
                     ? "Tidak Ada"
-                    : remaining > 0
+                    : remaining >= 0
                       ? `${remaining} Hari Lagi`
                       : "Hangus"}
                 </i>
               </span>
               <span>
-                {remaining > 0 ? (
+                {remaining >= 0 ? (
                   <button onClick={() => onOpen(t)}>Terima Garansi</button>
                 ) : (
                   "-"
@@ -2828,8 +2867,8 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
           r.done++;
         if (t.status === "Sudah Diambil") {
           r.out++;
-          r.revenue += t.finalCost || t.estimate;
-          r.cost += Math.round((t.finalCost || t.estimate) * 0.35);
+          r.revenue += finalPrice(t);
+          r.cost += t.partCost || 0;
         }
         m.set(t.receivedAt, r);
         return m;
