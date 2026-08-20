@@ -16,13 +16,57 @@ function toSafeTicket(t: Record<string, unknown>) {
   };
 }
 
+// In-memory sliding-window limiter: this endpoint is unauthenticated and
+// otherwise guessable (ticket IDs are date + a small sequence number), so
+// without a cap a script can enumerate every real customer's service
+// history. Single-instance deployment only (matches the SQLite constraint
+// already documented for this app) — a multi-instance deploy would need a
+// shared store instead.
+const WINDOW_MS = 60_000;
+const MAX_REQUESTS = 15;
+const hits = new Map<string, number[]>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const recent = (hits.get(key) || []).filter((t) => now - t < WINDOW_MS);
+  recent.push(now);
+  hits.set(key, recent);
+  if (hits.size > 5000) {
+    Array.from(hits.entries()).forEach(([k, times]) => {
+      if (!times.some((t) => now - t < WINDOW_MS)) hits.delete(k);
+    });
+  }
+  return recent.length > MAX_REQUESTS;
+}
+
+function clientKey(request: Request): string {
+  const h = request.headers;
+  return (
+    h.get("cf-connecting-ip") ||
+    h.get("x-real-ip") ||
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown"
+  );
+}
+
 export async function GET(request: Request) {
+  if (isRateLimited(clientKey(request)))
+    return NextResponse.json(
+      { error: "Terlalu banyak percobaan, coba lagi sebentar lagi" },
+      { status: 429 },
+    );
+
   const params = new URL(request.url).searchParams;
   const id = params.get("id")?.trim();
   const phone = params.get("phone")?.trim();
   if (!id && !phone)
     return NextResponse.json(
       { error: "Nomor servis atau nomor WhatsApp wajib diisi" },
+      { status: 400 },
+    );
+  if (phone && phone.replace(/\D/g, "").length < 8)
+    return NextResponse.json(
+      { error: "Nomor WhatsApp tidak valid" },
       { status: 400 },
     );
   const row = await prisma.appState.findUnique({ where: { key: "tickets" } });

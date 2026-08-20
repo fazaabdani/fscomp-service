@@ -70,6 +70,13 @@ type Ticket = {
   finalCost?: number;
   receivedAt: string;
   updatedAt: string;
+  // Date of the last real status transition, used for productivity reports —
+  // kept separate from updatedAt so a trivial edit (a note, a typo fix) to an
+  // old closed ticket doesn't move its "work done" date to today.
+  statusChangedAt?: string;
+  // Full timestamp of the last edit, used only to break ties in same-day
+  // conflict merges (updatedAt is day-granularity, too coarse for that).
+  _touchedAt?: string;
   rating?: number;
   customerConfirmed?: boolean;
   costConfirmed?: boolean;
@@ -113,6 +120,7 @@ type Customer = {
   address: string;
   rating: number;
   createdAt: string;
+  _touchedAt?: string;
 };
 type ShopSettings = {
   name: string;
@@ -382,9 +390,13 @@ function mergeById<T extends { id: string }>(
   return [...localOnly, ...merged];
 }
 const mergeTickets = (server: Ticket[], local: Ticket[]) =>
-  mergeById(server, local, (t) => t.updatedAt || t.receivedAt || "");
+  mergeById(
+    server,
+    local,
+    (t) => t._touchedAt || t.updatedAt || t.receivedAt || "",
+  );
 const mergeCustomers = (server: Customer[], local: Customer[]) =>
-  mergeById(server, local, (c) => c.createdAt || "");
+  mergeById(server, local, (c) => c._touchedAt || c.createdAt || "");
 function useAutosave<T>(
   key: "tickets" | "shop" | "services" | "staff" | "customers",
   value: T,
@@ -594,8 +606,9 @@ export default function ServiceDesk() {
       ) as HTMLAnchorElement | null;
       if (!anchor) return;
       const ticket =
-        selected ||
-        tickets.find((t) => anchor.href.includes(t.phone.replace(/^0/, "")));
+        tickets.find(
+          (t) => t.phone && anchor.href.includes(t.phone.replace(/^0/, "")),
+        ) || selected;
       if (ticket)
         fetch("/api/chat", {
           method: "POST",
@@ -616,6 +629,7 @@ export default function ServiceDesk() {
   useEffect(() => {
     const keys = (e: KeyboardEvent) => {
       if (e.altKey && e.key.toLowerCase() === "n") {
+        if (modal !== null) return;
         e.preventDefault();
         setModal("new");
       }
@@ -629,7 +643,7 @@ export default function ServiceDesk() {
     };
     window.addEventListener("keydown", keys);
     return () => window.removeEventListener("keydown", keys);
-  }, []);
+  }, [modal]);
 
   const visible = useMemo(
     () =>
@@ -715,7 +729,23 @@ export default function ServiceDesk() {
     setTickets((old) =>
       old.map((t) =>
         t.id === id
-          ? { ...t, status, updatedAt: localDateStr() }
+          ? {
+              ...t,
+              status,
+              updatedAt: localDateStr(),
+              statusChangedAt: localDateStr(),
+              _touchedAt: new Date().toISOString(),
+              // Stamp the pickup date the first time a ticket reaches "Sudah
+              // Diambil" via this quick dropdown, since that's the everyday
+              // path (not the rarely-used edit form) and warranty countdown
+              // depends on it staying fixed instead of drifting with updatedAt.
+              ...(status === "Sudah Diambil" && !t.pickedUpAt
+                ? {
+                    pickedUpAt: localDateStr(),
+                    pickedUpTime: new Date().toTimeString().slice(0, 5),
+                  }
+                : {}),
+            }
           : t,
       ),
     );
@@ -743,7 +773,12 @@ export default function ServiceDesk() {
     setTickets((old) =>
       old.map((t) =>
         t.id === id
-          ? { ...t, ...patch, updatedAt: localDateStr() }
+          ? {
+              ...t,
+              ...patch,
+              updatedAt: localDateStr(),
+              _touchedAt: new Date().toISOString(),
+            }
           : t,
       ),
     );
@@ -754,6 +789,7 @@ export default function ServiceDesk() {
     e.preventDefault();
     if (!selected) return;
     const form = new FormData(e.currentTarget);
+    const conditionVal = String(form.get("condition") || "");
     const patch: Partial<Ticket> = {
       receivedAt: String(form.get("receivedAt")),
       receivedTime: String(form.get("receivedTime")),
@@ -764,7 +800,7 @@ export default function ServiceDesk() {
       serial: String(form.get("serial") || "-"),
       accessories: String(form.get("accessories") || "Unit only"),
       issue: String(form.get("issue")),
-      condition: String(form.get("condition")) as Ticket["condition"],
+      ...(conditionVal ? { condition: conditionVal as Ticket["condition"] } : {}),
       serviceAction: String(form.get("serviceAction") || ""),
       technician: String(form.get("technician")),
       partCost: Number(form.get("partCost") || 0),
@@ -895,6 +931,8 @@ export default function ServiceDesk() {
       paymentTermDays: Number(form.get("paymentTermDays") || 0),
       receivedAt: localDateStr(now),
       updatedAt: localDateStr(now),
+      statusChangedAt: localDateStr(now),
+      _touchedAt: now.toISOString(),
     };
     setTickets((old) => [next, ...old]);
     setSelected(next);
@@ -911,6 +949,7 @@ export default function ServiceDesk() {
           address: next.address || "-",
           rating: 0,
           createdAt: next.receivedAt,
+          _touchedAt: now.toISOString(),
         },
         ...old,
       ]);
@@ -928,7 +967,7 @@ export default function ServiceDesk() {
       "DP",
       "Tanggal",
     ];
-    const rows = tickets.map((t) => [
+    const rows = visible.map((t) => [
       t.id,
       t.customer,
       t.phone,
@@ -1107,7 +1146,13 @@ export default function ServiceDesk() {
               onPhoneChanged={(oldPhone, newPhone) => {
                 setTickets((old) =>
                   old.map((t) =>
-                    t.phone === oldPhone ? { ...t, phone: newPhone } : t,
+                    t.phone === oldPhone
+                      ? {
+                          ...t,
+                          phone: newPhone,
+                          _touchedAt: new Date().toISOString(),
+                        }
+                      : t,
                   ),
                 );
                 notify(
@@ -1830,20 +1875,20 @@ export default function ServiceDesk() {
                 <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
                 <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
                 <label className="full">Kerusakan<textarea name="issue" required defaultValue={selected.issue}/></label>
-                <label>Kondisi servis<select name="condition" defaultValue={selected.condition || "Sudah Jadi"}><option>Sudah Jadi</option><option>Tidak Bisa</option><option>Dibatalkan</option></select></label>
+                <label>Kondisi servis<select name="condition" defaultValue={selected.condition || ""}><option value="">Belum ditentukan</option><option>Sudah Jadi</option><option>Tidak Bisa</option><option>Dibatalkan</option></select></label>
                 <label>Teknisi<select name="technician" defaultValue={selected.technician}>{staff.map((person) => <option key={person.id}>{person.name}</option>)}</select></label>
                 <label className="full">Keterangan / tindakan<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
                 <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>
                 <label>Estimasi biaya<input name="estimate" type="number" min="0" defaultValue={selected.estimate}/></label>
                 <label>Biaya servis final<input name="finalCost" type="number" min="0" defaultValue={selected.finalCost || 0}/></label>
-                <label>Tanggal ditangani<input name="handledAt" type="date" defaultValue={selected.handledAt || selected.updatedAt}/></label>
+                <label>Tanggal ditangani<input name="handledAt" type="date" defaultValue={selected.handledAt || ""}/></label>
                 <label>Jam ditangani<input name="handledTime" type="time" defaultValue={selected.handledTime || ""}/></label>
                 <label className="full">Catatan<textarea name="notes" defaultValue={selected.notes}/></label>
                 <label>Tanggal ambil<input name="pickedUpAt" type="date" defaultValue={selected.pickedUpAt || ""}/></label>
                 <label>Jam ambil<input name="pickedUpTime" type="time" defaultValue={selected.pickedUpTime || ""}/></label>
                 <label>Cara pembayaran<select name="paymentMethod" defaultValue={selected.paymentMethod || "Tunai"}><option>Tunai</option><option>Transfer BCA</option><option>Transfer BRI</option><option>Transfer Mandiri</option><option>QRIS</option><option>Tempo</option></select></label>
-                <label>Garansi servis<select name="warrantyDays" defaultValue={selected.warrantyDays || 0}><option value="0">Tidak ada</option><option value="3">3 Hari</option><option value="7">1 Minggu</option><option value="14">2 Minggu</option><option value="30">1 Bulan</option><option value="60">2 Bulan</option><option value="90">3 Bulan</option></select></label>
+                <label>Garansi servis<select name="warrantyDays" defaultValue={selected.warrantyDays || 0}><option value="0">Tidak ada</option><option value="3">3 Hari</option><option value="7">1 Minggu</option><option value="14">2 Minggu</option><option value="30">1 Bulan</option><option value="60">2 Bulan</option><option value="90">3 Bulan</option>{![0,3,7,14,30,60,90].includes(selected.warrantyDays || 0) && <option value={selected.warrantyDays}>{selected.warrantyDays} Hari</option>}</select></label>
                 <label>Pengambil<input name="pickupBy" defaultValue={selected.pickupBy || selected.customer}/></label>
                 <label>Penyerah<input name="handedBy" defaultValue={selected.handedBy || "Admin"}/></label>
               </div>
@@ -2052,6 +2097,7 @@ function CustomersPanel({
       address: String(f.get("address") || "-").trim(),
       rating: Number(f.get("rating") || 0),
       createdAt: editing?.createdAt || localDateStr(),
+      _touchedAt: new Date().toISOString(),
     };
     persist(
       editing
@@ -2210,7 +2256,9 @@ function CustomersPanel({
                     onClick={() =>
                       persist(
                         data.map((x) =>
-                          x.id === c.id ? { ...x, rating: n } : x,
+                          x.id === c.id
+                            ? { ...x, rating: n, _touchedAt: new Date().toISOString() }
+                            : x,
                         ),
                       )
                     }
@@ -2533,9 +2581,14 @@ function PaymentsPanel({
             const total = finalPrice(t);
             const due = Math.max(0, total - t.downPayment);
             const paid = due === 0 && (total > 0 || t.costConfirmed);
+            const termDays =
+              t.paymentMethod === "Tempo" && t.paymentTermDays
+                ? t.paymentTermDays
+                : 7;
+            const isOverdue = !paid && ageDays(t.receivedAt) > termDays;
             return (
               <div
-                className={`paymentServiceRow ${!paid && ageDays(t.receivedAt) > 7 ? "overdue" : ""}`}
+                className={`paymentServiceRow ${isOverdue ? "overdue" : ""}`}
                 key={t.id}
               >
                 <span>
@@ -2554,11 +2607,7 @@ function PaymentsPanel({
                 </span>
                 <span>
                   <i className={`statusBadge ${paid ? "success" : "warning"}`}>
-                    {paid
-                      ? "Lunas"
-                      : ageDays(t.receivedAt) > 7
-                        ? "Jatuh Tempo"
-                        : "Belum Lunas"}
+                    {paid ? "Lunas" : isOverdue ? "Jatuh Tempo" : "Belum Lunas"}
                   </i>
                 </span>
                 <span>
@@ -2959,7 +3008,8 @@ function TechnicianReport({
   tickets: Ticket[];
   staff: Staff[];
 }) {
-  const dates = Array.from(new Set(tickets.map((t) => t.updatedAt)))
+  const workDate = (t: Ticket) => t.statusChangedAt || t.updatedAt;
+  const dates = Array.from(new Set(tickets.map(workDate)))
     .sort()
     .reverse();
   return (
@@ -2988,7 +3038,7 @@ function TechnicianReport({
                 <span key={s.id}>
                   {
                     tickets.filter(
-                      (t) => t.updatedAt === d && t.technician === s.name,
+                      (t) => workDate(t) === d && t.technician === s.name,
                     ).length
                   }{" "}
                   Kali
@@ -3010,6 +3060,7 @@ function SettingsPanel({
   onSave: (shop: ShopSettings) => void;
 }) {
   const [form, setForm] = useState(shop);
+  useEffect(() => setForm(shop), [shop]);
   const field = (key: keyof ShopSettings, value: string | boolean) =>
     setForm((old) => ({ ...old, [key]: value }));
   return (
