@@ -4368,6 +4368,7 @@ textarea {
 }
 .trackCard h1 {
   margin-top: 16px;
+  color: #17243a;
 }
 .trackCard p {
   margin-top: 7px;
@@ -4385,6 +4386,8 @@ textarea {
   padding: 0 12px;
   border: 1px solid #dce2eb;
   border-radius: 10px;
+  background: #fff;
+  color: #17243a;
 }
 .trackCard form button {
   display: flex;
@@ -4413,8 +4416,12 @@ textarea {
   margin-top: 8px;
   color: #738096;
 }
+.trackResult strong {
+  color: #17243a;
+}
 .trackResult h2 {
   margin: 10px 0 4px;
+  color: #17243a;
 }
 .trackResult i {
   width: max-content;
@@ -4444,6 +4451,8 @@ textarea {
 }
 .trackResult dd {
   margin: 0;
+  color: #17243a;
+  font-weight: 700;
   text-align: right;
 }
 .customerPageFull {

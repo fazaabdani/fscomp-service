@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { normalizePhone } from "@/lib/phone";
 import {
   BarChart3,
   Bell,
@@ -361,10 +362,6 @@ const ageTone = (days: number) =>
 // the UTC date and drifts a day off in Asia/Jakarta between 00:00-06:59 WIB.
 const localDateStr = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const normalizePhone = (phone: string) => {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("62") ? digits : `62${digits.replace(/^0/, "")}`;
-};
 const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
 // finalCost defaults to 0 until costConfirmed is set, so `finalCost || estimate`
 // wrongly falls back to the estimate for a genuinely free (Rp0) confirmed job.
