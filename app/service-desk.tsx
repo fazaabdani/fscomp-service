@@ -1971,7 +1971,7 @@ export default function ServiceDesk() {
               <div className="printInfoGrid">
                 <div>
                   <span className="printInfoIcon">
-                    <User size={14} />
+                    <User size={14} color="#fff" />
                   </span>
                   <div>
                     <small>Pelanggan</small>
@@ -1981,7 +1981,7 @@ export default function ServiceDesk() {
                 </div>
                 <div>
                   <span className="printInfoIcon">
-                    <Smartphone size={14} />
+                    <Smartphone size={14} color="#fff" />
                   </span>
                   <div>
                     <small>Perangkat</small>
@@ -1991,7 +1991,7 @@ export default function ServiceDesk() {
                 </div>
                 <div>
                   <span className="printInfoIcon">
-                    <CalendarDays size={14} />
+                    <CalendarDays size={14} color="#fff" />
                   </span>
                   <div>
                     <small>Tanggal Terima</small>
@@ -2001,7 +2001,7 @@ export default function ServiceDesk() {
                 </div>
                 <div>
                   <span className="printInfoIcon">
-                    <CheckCircle2 size={14} />
+                    <CheckCircle2 size={14} color="#fff" />
                   </span>
                   <div>
                     <small>Kelengkapan Diterima</small>
@@ -2019,7 +2019,7 @@ export default function ServiceDesk() {
               </div>
               <div className="printIssueRow">
                 <span className="printInfoIcon">
-                  <Wrench size={14} />
+                  <Wrench size={14} color="#fff" />
                 </span>
                 <div>
                   <small>Keluhan / Kondisi Awal</small>
