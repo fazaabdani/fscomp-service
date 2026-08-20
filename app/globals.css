@@ -3424,7 +3424,172 @@ textarea {
     place-items: center;
     text-align: center;
   }
-  .servicePrint.receipt2{display:grid!important;gap:5mm;padding:5mm}.receiptDuplicate{min-height:126mm;padding:6mm;border:1px dashed #64748b;break-inside:avoid}.receiptDuplicate header{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:4mm;border-bottom:1px solid #cbd5e1}.receiptDuplicate header strong,.receiptDuplicate header small{display:block}.receiptDuplicate header strong{font-size:16pt}.receiptDuplicate header small{margin-top:1mm;color:#64748b;font-size:7pt}.receiptDuplicate header>b{font-size:11pt}.receiptDuplicate>section{display:grid;grid-template-columns:27mm 1fr 1fr;gap:5mm;align-items:center;padding:5mm 0}.receiptDuplicate section div>*{display:block}.receiptDuplicate section small,.receiptProblem small{margin-top:2mm;color:#64748b;font-size:6pt;font-weight:700}.receiptDuplicate section b{margin:1mm 0;font-size:9pt}.receiptDuplicate section span,.receiptProblem span{color:#475569;font-size:7pt}.receiptProblem{min-height:24mm;padding:4mm;border:1px solid #d5dbe5}.receiptProblem>*{display:block}.receiptProblem b{margin:2mm 0;font-size:9pt}.receiptDuplicate footer{display:flex;justify-content:space-between;margin-top:5mm;color:#64748b;font-size:7pt}
+  .servicePrint.receipt2 {
+    display: grid !important;
+    gap: 5mm;
+    padding: 5mm;
+  }
+  .receiptCard {
+    position: relative;
+    min-height: 128mm;
+    padding: 7mm 7mm 7mm 8.5mm;
+    border: 1px solid #e2e8f0;
+    border-radius: 3mm;
+    break-inside: avoid;
+  }
+  .receiptCard::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 1.5mm;
+    background: #5268e9;
+    border-radius: 3mm 0 0 3mm;
+  }
+  .receiptCardHead {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 4mm;
+    margin-bottom: 4mm;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .receiptBrand {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+  }
+  .receiptBrandMark {
+    display: grid;
+    place-items: center;
+    width: 10mm;
+    height: 10mm;
+    border-radius: 2.5mm;
+    background: #5268e9;
+    color: #fff;
+    font-weight: 800;
+    font-size: 9pt;
+  }
+  .receiptBrand strong {
+    display: block;
+    font-size: 12pt;
+    color: #111827;
+  }
+  .receiptBrand small {
+    display: block;
+    margin-top: 0.5mm;
+    color: #64748b;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .receiptCardId {
+    text-align: right;
+  }
+  .receiptCardId small {
+    display: block;
+    color: #64748b;
+    font-size: 6pt;
+    text-transform: uppercase;
+  }
+  .receiptCardId b {
+    display: block;
+    margin-top: 0.5mm;
+    font-size: 11pt;
+    color: #5268e9;
+  }
+  .receiptCardBody {
+    display: flex;
+    gap: 5mm;
+    align-items: flex-start;
+    margin-bottom: 4mm;
+  }
+  .receiptCardGrid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm 5mm;
+  }
+  .receiptCardGrid small {
+    display: block;
+    color: #64748b;
+    font-size: 6pt;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .receiptCardGrid b {
+    display: block;
+    margin-top: 0.5mm;
+    font-size: 9pt;
+    color: #111827;
+  }
+  .receiptCardGrid span {
+    display: block;
+    margin-top: 0.5mm;
+    color: #475569;
+    font-size: 7.5pt;
+  }
+  .receiptIssue {
+    padding: 3.5mm;
+    margin-bottom: 4mm;
+    background: #f8fafc;
+    border-radius: 2mm;
+  }
+  .receiptIssue small {
+    display: block;
+    color: #64748b;
+    font-size: 6pt;
+    text-transform: uppercase;
+  }
+  .receiptIssue p {
+    margin: 1mm 0 0;
+    font-size: 9pt;
+    color: #111827;
+  }
+  .receiptIssue span {
+    display: block;
+    margin-top: 1.5mm;
+    color: #475569;
+    font-size: 7.5pt;
+  }
+  .receiptPay {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2.5mm 3.5mm;
+    margin-bottom: 4mm;
+    border: 1px dashed #cbd5e1;
+    border-radius: 2mm;
+    font-size: 7.5pt;
+  }
+  .receiptPay small {
+    color: #64748b;
+    text-transform: uppercase;
+    font-size: 6pt;
+  }
+  .receiptPay span {
+    color: #111827;
+    font-weight: 700;
+  }
+  .receiptCardFoot {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 7pt;
+    color: #64748b;
+  }
+  .receiptTerms {
+    margin: 3mm 0 0;
+    font-size: 6.5pt;
+    color: #94a3b8;
+    line-height: 1.4;
+  }
+  .receiptContact {
+    display: flex;
+    gap: 4mm;
+    margin-top: 1.5mm;
+    font-size: 6.5pt;
+    color: #64748b;
+  }
   .accessorySheetHead {
     display: flex;
     justify-content: space-between;
@@ -3563,14 +3728,39 @@ textarea {
     gap: 7mm;
     margin: 5mm 0;
     padding: 4mm;
-    background: #f1f5f9;
+    background: #f8fafc;
+    border-radius: 2mm;
     font-size: 9pt;
+  }
+  .printCosts strong {
+    color: #5268e9;
+  }
+  .printPay {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 0 5mm;
+    padding: 3mm 4mm;
+    border: 1px dashed #cbd5e1;
+    border-radius: 2mm;
+    font-size: 8pt;
+  }
+  .printPay small {
+    color: #64748b;
+    text-transform: uppercase;
+    font-size: 7pt;
+  }
+  .printPay span {
+    color: #111827;
+    font-weight: 700;
   }
   .printTerms {
     padding: 3mm;
-    border: 1px dashed #94a3b8;
-    color: #475569;
-    font-size: 8pt;
+    border: 1px dashed #cbd5e1;
+    border-radius: 2mm;
+    color: #64748b;
+    font-size: 7.5pt;
+    line-height: 1.4;
   }
   .printSign {
     display: flex;
@@ -3581,6 +3771,16 @@ textarea {
   }
   .printSign span {
     width: 55mm;
+  }
+  .printContact {
+    display: flex;
+    justify-content: center;
+    gap: 5mm;
+    margin-top: 6mm;
+    padding-top: 3mm;
+    border-top: 1px solid #e2e8f0;
+    color: #64748b;
+    font-size: 7pt;
   }
   @page {
     size: A4 portrait;

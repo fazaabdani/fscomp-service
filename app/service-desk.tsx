@@ -1932,9 +1932,9 @@ export default function ServiceDesk() {
       {(printMode === "receipt" || printMode === "qr") && selected && (
         <div className={`servicePrint ${printMode}`}>
           <div className="printBrand">
-            <span>FS</span>
+            <span>{(shop.name || "FS").slice(0, 2).toUpperCase()}</span>
             <div>
-              <h1>FS SERVICE CENTER</h1>
+              <h1>{shop.name || "FS Service Center"}</h1>
               <p>Tanda Terima Servis Perangkat</p>
             </div>
           </div>
@@ -1958,7 +1958,7 @@ export default function ServiceDesk() {
                 <div>
                   <small>Perangkat</small>
                   <strong>{selected.device}</strong>
-                  <span>SN: {selected.serial}</span>
+                  <span>SN: {selected.serial || "-"}</span>
                 </div>
                 <div>
                   <small>Tanggal Terima</small>
@@ -1987,9 +1987,15 @@ export default function ServiceDesk() {
                   </strong>
                 </span>
               </div>
+              {shop.bank && (
+                <div className="printPay">
+                  <small>Info Pembayaran</small>
+                  <span>{shop.bank}</span>
+                </div>
+              )}
               <div className="printTerms">
-                Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan
-                nomor servis atau QR Code.
+                {shop.terms ||
+                  "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
               </div>
               <div className="printSign">
                 <span>
@@ -2002,8 +2008,13 @@ export default function ServiceDesk() {
                   Penerima
                   <br />
                   <br />
-                  <b>( Admin FS Service )</b>
+                  <b>( {selected.handedBy || "Admin"} )</b>
                 </span>
+              </div>
+              <div className="printContact">
+                {shop.phone && <span>{shop.phone}</span>}
+                {shop.whatsapp && <span>WA {shop.whatsapp}</span>}
+                {shop.address && <span>{shop.address}</span>}
               </div>
             </>
           )}
@@ -2011,12 +2022,74 @@ export default function ServiceDesk() {
       )}
       {printMode === "receipt2" && selected && (
         <div className="servicePrint receipt2">
-          {["PELANGGAN", "ARSIP TOKO"].map((copy) => (
-            <article className="receiptDuplicate" key={copy}>
-              <header><div><strong>{shop.name || "FS COMP"}</strong><small>BUKTI PENERIMAAN SERVIS · {copy}</small></div><b>{selected.id}</b></header>
-              <section><QRCodeSVG value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`} size={92} level="H"/><div><small>PELANGGAN</small><b>{selected.customer}</b><span>{selected.phone}</span><small>PERANGKAT</small><b>{selected.device}</b><span>SN: {selected.serial || "-"}</span></div><div><small>TANGGAL TERIMA</small><b>{selected.receivedAt}</b><span>Penerima: {selected.technician}</span><small>ESTIMASI / DP</small><b>{money(selected.estimate)} / {money(selected.downPayment)}</b></div></section>
-              <div className="receiptProblem"><small>KELUHAN / KERUSAKAN</small><b>{selected.issue}</b><span>Kelengkapan: {selected.accessories}</span></div>
-              <footer><span>Scan QR untuk tracking status servis.</span><span>Tanda tangan pelanggan: __________________</span></footer>
+          {["Untuk Pelanggan", "Arsip Toko"].map((copy) => (
+            <article className="receiptCard" key={copy}>
+              <header className="receiptCardHead">
+                <div className="receiptBrand">
+                  <span className="receiptBrandMark">
+                    {(shop.name || "FS").slice(0, 2).toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{shop.name || "FS COMP"}</strong>
+                    <small>Tanda Terima Servis · {copy}</small>
+                  </div>
+                </div>
+                <div className="receiptCardId">
+                  <small>No. Servis</small>
+                  <b>{selected.id}</b>
+                </div>
+              </header>
+              <section className="receiptCardBody">
+                <QRCodeSVG
+                  value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
+                  size={88}
+                  level="H"
+                />
+                <div className="receiptCardGrid">
+                  <div>
+                    <small>Pelanggan</small>
+                    <b>{selected.customer}</b>
+                    <span>{selected.phone}</span>
+                  </div>
+                  <div>
+                    <small>Perangkat</small>
+                    <b>{selected.device}</b>
+                    <span>SN: {selected.serial || "-"}</span>
+                  </div>
+                  <div>
+                    <small>Tanggal Terima</small>
+                    <b>{selected.receivedAt}</b>
+                    <span>Teknisi: {selected.technician}</span>
+                  </div>
+                  <div>
+                    <small>Estimasi / DP</small>
+                    <b>{money(selected.estimate)}</b>
+                    <span>DP {money(selected.downPayment)}</span>
+                  </div>
+                </div>
+              </section>
+              <div className="receiptIssue">
+                <small>Keluhan / Kerusakan</small>
+                <p>{selected.issue}</p>
+                <span>Kelengkapan: {selected.accessories}</span>
+              </div>
+              {shop.bank && (
+                <div className="receiptPay">
+                  <small>Info Pembayaran</small>
+                  <span>{shop.bank}</span>
+                </div>
+              )}
+              <footer className="receiptCardFoot">
+                <span>Scan QR untuk cek status servis</span>
+                <span>Tanda tangan: ____________________</span>
+              </footer>
+              {shop.terms && <p className="receiptTerms">{shop.terms}</p>}
+              {(shop.phone || shop.address) && (
+                <div className="receiptContact">
+                  {shop.phone && <span>{shop.phone}</span>}
+                  {shop.address && <span>{shop.address}</span>}
+                </div>
+              )}
             </article>
           ))}
         </div>
