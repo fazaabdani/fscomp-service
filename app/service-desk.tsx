@@ -1107,6 +1107,16 @@ export default function ServiceDesk() {
                 setCustomers(value);
                 notify("Data pelanggan diperbarui");
               }}
+              onPhoneChanged={(oldPhone, newPhone) => {
+                setTickets((old) =>
+                  old.map((t) =>
+                    t.phone === oldPhone ? { ...t, phone: newPhone } : t,
+                  ),
+                );
+                notify(
+                  `Nomor WA diperbarui — riwayat servis lama ikut disesuaikan ke ${newPhone}`,
+                );
+              }}
               onOpen={openDetail}
             />
           ) : active === "Status Pembayaran" ? (
@@ -2010,11 +2020,13 @@ function CustomersPanel({
   tickets,
   customers: data,
   onChange,
+  onPhoneChanged,
   onOpen,
 }: {
   tickets: Ticket[];
   customers: Customer[];
   onChange: (customers: Customer[]) => void;
+  onPhoneChanged: (oldPhone: string, newPhone: string) => void;
   onOpen: (ticket: Ticket) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -2049,6 +2061,7 @@ function CustomersPanel({
         ? data.map((c) => (c.id === editing.id ? customer : c))
         : [customer, ...data],
     );
+    if (editing && editing.phone !== phone) onPhoneChanged(editing.phone, phone);
     setFormOpen(false);
     setEditing(null);
   }

@@ -32,7 +32,16 @@ body {
     ),
     linear-gradient(180deg, #08111f 0%, #0b1320 42%, #070b12 100%);
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-inter),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 a {
@@ -962,7 +971,7 @@ textarea {
 
 .qcForm label {
   gap: 3px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.15;
 }
 
@@ -1015,12 +1024,12 @@ textarea {
 
 .qcForm .eyebrow {
   margin-bottom: 4px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .qcForm .infoBox {
   padding: 8px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.35;
 }
 
@@ -1269,7 +1278,7 @@ textarea {
 
 .catalogHeroBadge small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .catalogPublicGrid {
@@ -1822,7 +1831,7 @@ textarea {
 
 .cashierItemHeader {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -2061,13 +2070,13 @@ textarea {
   padding-top: 10px;
   border-top: 1px dashed var(--line);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   text-align: center;
 }
 
 .receiptBankNote strong {
   color: #cfe7ff;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 @media print {
@@ -2165,13 +2174,6 @@ textarea {
   min-height: 100vh;
   background: var(--svc-bg);
   color: var(--svc-text);
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
 }
 .serviceSidebar {
   position: fixed;
@@ -2210,7 +2212,7 @@ textarea {
 .serviceBrand small {
   margin-top: 2px;
   color: #8e9ab1;
-  font-size: 11px;
+  font-size: 13px;
 }
 .mobileClose {
   display: none;
@@ -2256,7 +2258,7 @@ textarea {
   place-items: center;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.16);
-  font-size: 11px;
+  font-size: 13px;
 }
 .sidebarHelp {
   display: grid;
@@ -2275,7 +2277,7 @@ textarea {
 }
 .sidebarHelp small {
   color: #8491a8;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .sidebarUser {
@@ -2298,7 +2300,7 @@ textarea {
 .sidebarUser > span {
   width: 34px;
   height: 34px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .sidebarUser strong,
 .sidebarUser small {
@@ -2310,7 +2312,7 @@ textarea {
 .sidebarUser small {
   margin-top: 2px;
   color: #8390a6;
-  font-size: 10px;
+  font-size: 12px;
 }
 .serviceMain {
   width: calc(100% - 250px);
@@ -2447,7 +2449,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -2519,7 +2521,7 @@ textarea {
 }
 .serviceStats small {
   color: var(--svc-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .serviceStats strong {
   margin: 4px 0;
@@ -2527,7 +2529,7 @@ textarea {
 }
 .serviceStats em {
   color: #9aa4b5;
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
 }
 .serviceStats .moneyStat {
@@ -2557,7 +2559,7 @@ textarea {
 .panelTop p {
   margin-top: 5px;
   color: var(--svc-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .panelTools {
   display: flex;
@@ -2584,7 +2586,7 @@ textarea {
   background: transparent !important;
   color: #263144 !important;
   outline: 0;
-  font-size: 11px;
+  font-size: 13px;
 }
 .panelTools select {
   width: auto;
@@ -2595,14 +2597,14 @@ textarea {
   border-radius: 10px;
   background: #fff;
   color: #647087;
-  font-size: 11px;
+  font-size: 13px;
 }
 .panelTools button {
   min-height: 38px;
   border: 1px solid var(--svc-line);
   background: #f8f9fb;
   color: #647087;
-  font-size: 11px;
+  font-size: 13px;
 }
 .panelTools .copyWorkList {
   display: inline-flex;
@@ -2633,7 +2635,7 @@ textarea {
   min-height: 42px;
   background: #fafbfc;
   color: #8d98aa;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2672,7 +2674,7 @@ textarea {
 .ticketRow b {
   overflow: hidden;
   color: #303b4e;
-  font-size: 11px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2683,7 +2685,7 @@ textarea {
   margin-top: 5px;
   overflow: hidden;
   color: #949fb0;
-  font-size: 9px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2691,12 +2693,12 @@ textarea {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .avatarMini {
   width: 25px;
   height: 25px;
-  font-size: 8px;
+  font-size: 11px;
 }
 .ticketRow > span:last-child {
   color: #a4aec0;
@@ -2707,26 +2709,26 @@ textarea {
   min-height: 25px;
   padding: 0 9px;
   border-radius: 8px;
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 800;
   white-space: nowrap;
 }
 .statusBadge.success {
   background: #e5f8ef;
-  color: #219b68;
+  color: #187a51;
 }
 .statusBadge.warning {
   background: #fff2d8;
-  color: #c9811f;
+  color: #8f5a0d;
 }
 .statusBadge.primary {
   background: #e9ecff;
-  color: #5268e9;
+  color: #3f52c9;
 }
 .statusBadge.neutral {
   background: #eef1f5;
-  color: #748196;
+  color: #5c6779;
 }
 .noData {
   display: grid;
@@ -2740,7 +2742,7 @@ textarea {
   color: #5a6679;
 }
 .noData p {
-  font-size: 11px;
+  font-size: 13px;
 }
 .modalBackdrop {
   position: fixed;
@@ -2774,7 +2776,7 @@ textarea {
 }
 .modalHead span {
   color: #6979de;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.09em;
 }
@@ -2803,7 +2805,7 @@ textarea {
   display: grid;
   gap: 7px;
   color: #667287;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
 }
 .formGridService input,
@@ -2850,7 +2852,7 @@ textarea {
 .suggestionTitle {
   padding: 7px 8px 9px;
   color: #8490a3;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -2880,7 +2882,7 @@ textarea {
   border-radius: 9px;
   background: #e9edff;
   color: #5669df;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
 }
 .customerSuggestions b,
@@ -2889,7 +2891,7 @@ textarea {
 }
 .customerSuggestions b {
   overflow: hidden;
-  font-size: 10px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2897,7 +2899,7 @@ textarea {
   margin-top: 4px;
   overflow: hidden;
   color: #8a95a7;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   text-overflow: ellipsis;
 }
@@ -2906,7 +2908,7 @@ textarea {
   border-radius: 999px;
   background: #e7f7ef;
   color: #238f64;
-  font-size: 7px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 900;
 }
@@ -2914,7 +2916,7 @@ textarea {
   margin: 0;
   padding: 14px 10px;
   color: #7d899b;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
 }
@@ -2957,7 +2959,7 @@ textarea {
 }
 .qrCard small {
   color: #929daf;
-  font-size: 8px;
+  font-size: 11px;
 }
 .detailHero h3 {
   margin: 15px 0 5px;
@@ -2966,7 +2968,7 @@ textarea {
 .detailHero p {
   margin: 0;
   color: #7f8a9e;
-  font-size: 11px;
+  font-size: 13px;
 }
 .detailMoney {
   display: flex;
@@ -2978,7 +2980,7 @@ textarea {
   border-radius: 10px;
   background: #f6f7fb;
   color: #8a95a7;
-  font-size: 9px;
+  font-size: 12px;
 }
 .detailMoney strong {
   display: block;
@@ -3003,11 +3005,11 @@ textarea {
 }
 .detailGrid small {
   color: #929daf;
-  font-size: 9px;
+  font-size: 12px;
 }
 .detailGrid strong {
   margin-top: 5px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .statusControl {
   margin: 18px 24px 0;
@@ -3045,7 +3047,7 @@ textarea {
   bottom: 20px;
   z-index: 3;
   color: #fff;
-  font-size: 11px;
+  font-size: 13px;
 }
 .scanHint {
   display: block;
@@ -3066,7 +3068,7 @@ textarea {
   background: #172033;
   color: #fff;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
-  font-size: 11px;
+  font-size: 13px;
   animation: toastIn 0.25s;
 }
 .serviceToast svg {
@@ -3087,20 +3089,20 @@ textarea {
   margin-top: 5px !important;
   padding: 3px 6px !important;
   border-radius: 6px !important;
-  font-size: 8px !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
 }
 .ageFresh {
   background: #e6f8ef;
-  color: #258f64 !important;
+  color: #1e7a55 !important;
 }
 .ageWatch {
   background: #fff2d9;
-  color: #ba771d !important;
+  color: #845411 !important;
 }
 .ageLate {
   background: #fee8e8;
-  color: #d94d5a !important;
+  color: #c23744 !important;
 }
 .serviceAge {
   display: flex;
@@ -3108,7 +3110,7 @@ textarea {
   gap: 7px;
   margin-top: 12px;
   color: #7b879a;
-  font-size: 11px;
+  font-size: 13px;
 }
 .detailMoney {
   flex-wrap: wrap;
@@ -3152,11 +3154,11 @@ textarea {
   border: 2px solid #dce1e8;
   border-radius: 50%;
   background: #fff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
 }
 .trackingTimeline small {
-  font-size: 7px;
+  font-size: 11px;
   text-align: center;
 }
 .trackingTimeline .done {
@@ -3197,11 +3199,11 @@ textarea {
 }
 .confirmationGrid strong {
   color: #455165;
-  font-size: 10px;
+  font-size: 12px;
 }
 .confirmationGrid small {
   margin-top: 3px;
-  font-size: 8px;
+  font-size: 11px;
 }
 .confirmationGrid button.confirmed {
   border-color: #a9e4cb;
@@ -3221,7 +3223,7 @@ textarea {
   display: grid;
   gap: 5px;
   color: #758197;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
 }
 .serviceControls select,
@@ -3243,7 +3245,7 @@ textarea {
   border: 1px solid var(--svc-line);
   border-radius: 11px;
   color: #687488;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 .ratingBox div {
@@ -3279,7 +3281,7 @@ textarea {
   border-radius: 10px;
   background: #fff;
   color: #687488;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   cursor: pointer;
 }
@@ -3295,7 +3297,7 @@ textarea {
 .chatChoiceModal .modalHead p {
   margin: 6px 0 0;
   color: #8792a4;
-  font-size: 9px;
+  font-size: 12px;
 }
 .editServiceGrid {
   max-height: 64vh;
@@ -3359,7 +3361,7 @@ textarea {
   border-radius: 7px;
   background: #e8faf1;
   color: #16885d;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 850;
   text-decoration: none;
 }
@@ -3367,12 +3369,12 @@ textarea {
   background: #d6f5e6;
 }
 .chatChoices b {
-  font-size: 11px;
+  font-size: 13px;
 }
 .chatChoices small {
   margin-top: 4px;
   color: #8490a3;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.45;
 }
 .actionGrid .accessoryAction {
@@ -3388,11 +3390,11 @@ textarea {
   display: block;
   margin-top: 5px;
   color: #748197;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1.4;
 }
-.handoffModal{width:min(650px,100%);overflow:hidden}.handoffHero{display:flex;align-items:center;gap:14px;padding:24px;background:linear-gradient(135deg,#263d9e,#5968df);color:#fff}.handoffHero>span{display:grid;width:48px;height:48px;place-items:center;border-radius:14px;background:rgba(255,255,255,.16)}.handoffHero svg{width:24px}.handoffHero small{font-size:8px;font-weight:900;letter-spacing:.12em;color:#bfe9dc}.handoffHero h2,.handoffHero p{margin:0}.handoffHero h2{margin-top:5px;font-size:21px}.handoffHero p{margin-top:5px;color:#dce3ff;font-size:10px}.handoffProgress{display:flex;align-items:center;gap:12px;padding:15px 24px;border-bottom:1px solid #e7ebf1;color:#596579;font-size:9px;font-weight:800}.handoffProgress i{flex:1;height:6px;overflow:hidden;border-radius:8px;background:#e9edf3}.handoffProgress b{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#5268e9,#37b989);transition:.25s}.handoffSteps{display:grid;gap:9px;padding:18px 24px}.handoffSteps>button,.handoffSteps>a{display:grid;grid-template-columns:34px 1fr 24px;align-items:center;gap:11px;width:100%;padding:12px;border:1px solid #e0e5ed;border-radius:11px;background:#fff;color:#435066;text-align:left;text-decoration:none;cursor:pointer}.handoffSteps>button:hover,.handoffSteps>a:hover{border-color:#aab5ee;background:#f8f9ff}.handoffSteps>button>span,.handoffSteps>a>span{display:grid;width:31px;height:31px;place-items:center;border-radius:9px;background:#edf0ff;color:#5368e8;font-size:10px;font-weight:900}.handoffSteps>button>span svg,.handoffSteps>a>span svg{width:15px}.handoffSteps b,.handoffSteps small{display:block}.handoffSteps b{font-size:10px}.handoffSteps small{margin-top:4px;color:#8792a4;font-size:8px;line-height:1.4}.handoffSteps>button>svg,.handoffSteps>a>svg{width:18px;color:#8995a8}.handoffSteps .done{border-color:#a9e3cc;background:#effaf5}.handoffSteps .done>span{background:#2eaf7d;color:#fff}.handoffSteps>button:disabled{opacity:.6;cursor:not-allowed}.handoffFoot{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:14px 24px 22px}.skipSop{padding:5px;border:0;background:transparent;color:#a1a9b7;font-size:8px;text-decoration:underline;cursor:pointer}.finishSop{display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border:0;border-radius:9px;background:#5268e9;color:#fff;font-size:9px;font-weight:850}.finishSop:disabled{opacity:.4;cursor:not-allowed}.finishSop svg{width:16px}
+.handoffModal{width:min(650px,100%);overflow:hidden}.handoffHero{display:flex;align-items:center;gap:14px;padding:24px;background:linear-gradient(135deg,#263d9e,#5968df);color:#fff}.handoffHero>span{display:grid;width:48px;height:48px;place-items:center;border-radius:14px;background:rgba(255,255,255,.16)}.handoffHero svg{width:24px}.handoffHero small{font-size:11px;font-weight:900;letter-spacing:.12em;color:#bfe9dc}.handoffHero h2,.handoffHero p{margin:0}.handoffHero h2{margin-top:5px;font-size:21px}.handoffHero p{margin-top:5px;color:#dce3ff;font-size:12px}.handoffProgress{display:flex;align-items:center;gap:12px;padding:15px 24px;border-bottom:1px solid #e7ebf1;color:#596579;font-size:12px;font-weight:800}.handoffProgress i{flex:1;height:6px;overflow:hidden;border-radius:8px;background:#e9edf3}.handoffProgress b{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#5268e9,#37b989);transition:.25s}.handoffSteps{display:grid;gap:9px;padding:18px 24px}.handoffSteps>button,.handoffSteps>a{display:grid;grid-template-columns:34px 1fr 24px;align-items:center;gap:11px;width:100%;padding:12px;border:1px solid #e0e5ed;border-radius:11px;background:#fff;color:#435066;text-align:left;text-decoration:none;cursor:pointer}.handoffSteps>button:hover,.handoffSteps>a:hover{border-color:#aab5ee;background:#f8f9ff}.handoffSteps>button>span,.handoffSteps>a>span{display:grid;width:31px;height:31px;place-items:center;border-radius:9px;background:#edf0ff;color:#5368e8;font-size:12px;font-weight:900}.handoffSteps>button>span svg,.handoffSteps>a>span svg{width:15px}.handoffSteps b,.handoffSteps small{display:block}.handoffSteps b{font-size:12px}.handoffSteps small{margin-top:4px;color:#8792a4;font-size:11px;line-height:1.4}.handoffSteps>button>svg,.handoffSteps>a>svg{width:18px;color:#8995a8}.handoffSteps .done{border-color:#a9e3cc;background:#effaf5}.handoffSteps .done>span{background:#2eaf7d;color:#fff}.handoffSteps>button:disabled{opacity:.6;cursor:not-allowed}.handoffFoot{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:14px 24px 22px}.skipSop{padding:5px;border:0;background:transparent;color:#a1a9b7;font-size:11px;text-decoration:underline;cursor:pointer}.finishSop{display:flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border:0;border-radius:9px;background:#5268e9;color:#fff;font-size:12px;font-weight:850}.finishSop:disabled{opacity:.4;cursor:not-allowed}.finishSop svg{width:16px}
 .servicePrint {
   display: none;
 }
@@ -3620,7 +3622,7 @@ textarea {
   display: block;
   margin-top: 3px;
   color: #dfe4ff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
 }
 .modulePanel {
@@ -3647,7 +3649,7 @@ textarea {
   min-height: 44px;
   background: #f8fafc;
   color: #8a95a7;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -3655,7 +3657,7 @@ textarea {
   min-height: 70px;
   border-top: 1px solid #edf0f4;
   color: #536075;
-  font-size: 10px;
+  font-size: 12px;
 }
 .customerRow > span:first-child {
   display: flex;
@@ -3670,7 +3672,7 @@ textarea {
   border-radius: 10px;
   background: #edf0ff;
   color: #5b6de5;
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 900;
 }
@@ -3683,7 +3685,7 @@ textarea {
   gap: 4px;
   margin-top: 4px;
   color: #1fa86f;
-  font-size: 8px;
+  font-size: 11px;
 }
 .customerRow button {
   display: inline-flex;
@@ -3695,7 +3697,7 @@ textarea {
   border-radius: 8px;
   background: #fff;
   color: #5c697d;
-  font-size: 9px;
+  font-size: 12px;
   cursor: pointer;
 }
 .customerStars {
@@ -3718,14 +3720,14 @@ textarea {
 }
 .paymentStats small {
   color: #8490a3;
-  font-size: 10px;
+  font-size: 12px;
 }
 .paymentStats strong {
   font-size: 22px;
 }
 .paymentStats span {
   color: #9ca6b6;
-  font-size: 9px;
+  font-size: 12px;
 }
 .paymentStats .dangerCard {
   border-color: #f5c6c9;
@@ -3748,7 +3750,7 @@ textarea {
   border-radius: 7px;
   background: transparent;
   color: #7c8798;
-  font-size: 9px;
+  font-size: 12px;
   cursor: pointer;
 }
 .paymentTabs button.active {
@@ -3772,7 +3774,7 @@ textarea {
   min-height: 67px;
   border-top: 1px solid #edf0f4;
   color: #536075;
-  font-size: 9px;
+  font-size: 12px;
 }
 .paymentServiceRow.overdue {
   background: #fff1f2;
@@ -3782,7 +3784,7 @@ textarea {
   border: 0;
   background: transparent;
   color: #5268e9;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -3804,7 +3806,7 @@ textarea {
   border-radius: 7px !important;
   background: #5369e8 !important;
   color: #fff !important;
-  font-size: 8px !important;
+  font-size: 11px !important;
 }
 .settingsPage {
   max-width: 1000px;
@@ -3851,7 +3853,7 @@ textarea {
 .settingsTitle p {
   margin-top: 4px;
   color: #929daf;
-  font-size: 9px;
+  font-size: 12px;
 }
 .settingsGrid {
   display: grid;
@@ -3862,7 +3864,7 @@ textarea {
   display: grid;
   gap: 6px;
   color: #6f7a8e;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
 }
 .settingsGrid .full {
@@ -3899,7 +3901,7 @@ textarea {
   border-radius: 10px;
   background: #eef1f5;
   color: #728096;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   cursor: pointer;
 }
@@ -3987,7 +3989,7 @@ textarea {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -4027,7 +4029,7 @@ textarea {
   min-height: 44px;
   background: #f8fafc;
   color: #8a95a7;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   text-transform: uppercase;
 }
@@ -4035,7 +4037,7 @@ textarea {
   min-height: 62px;
   border-top: 1px solid #edf0f4;
   color: #536075;
-  font-size: 10px;
+  font-size: 12px;
 }
 .simpleDataRow button {
   min-height: 29px;
@@ -4044,7 +4046,7 @@ textarea {
   border-radius: 7px;
   background: #fff;
   color: #5268e9;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -4081,7 +4083,7 @@ textarea {
 .permissionBox p {
   margin-top: 7px;
   color: #7e899b;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .serviceCatalogHero {
@@ -4108,7 +4110,7 @@ textarea {
 }
 .reportSummary small {
   color: #8390a3;
-  font-size: 9px;
+  font-size: 12px;
 }
 .reportSummary strong {
   font-size: 21px;
@@ -4127,7 +4129,7 @@ textarea {
   padding: 13px;
   border-right: 1px solid #edf0f4;
   border-bottom: 1px solid #edf0f4;
-  font-size: 10px;
+  font-size: 12px;
 }
 .techReportHead {
   background: #f8fafc;
@@ -4162,7 +4164,7 @@ textarea {
   border-radius: 9px;
   background: #eef0ff;
   color: #5268e9;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -4219,7 +4221,7 @@ textarea {
   display: grid;
   gap: 7px;
   color: #59657a;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
 }
 .authCard input {
@@ -4254,7 +4256,7 @@ textarea {
   border-radius: 9px;
   background: #feeaea;
   color: #c63d4d;
-  font-size: 10px;
+  font-size: 12px;
 }
 .authPage {
   position: relative;
@@ -4306,13 +4308,13 @@ textarea {
 .loginBrand span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #6d7fff, #62d1b2); }
 .loginBrand svg { width: 20px; }
 .welcomeCopy { margin: auto 0; }
-.welcomeCopy > small { color: #7de0c3; font-size: 9px; font-weight: 900; letter-spacing: 0.14em; }
+.welcomeCopy > small { color: #7de0c3; font-size: 12px; font-weight: 900; letter-spacing: 0.14em; }
 .welcomeCopy h1 { margin: 15px 0 16px; color: #fff !important; font-size: clamp(29px, 3vw, 40px); line-height: 1.16; letter-spacing: -0.035em; }
 .welcomeCopy > p { max-width: 390px; margin: 0; color: #c8d3ec; font-size: 12px; line-height: 1.7; }
 .loginBenefits { display: grid; gap: 11px; margin-top: 28px; }
-.loginBenefits span { display: flex; align-items: center; gap: 9px; color: #e6ecfb; font-size: 10px; }
+.loginBenefits span { display: flex; align-items: center; gap: 9px; color: #e6ecfb; font-size: 12px; }
 .loginBenefits svg { width: 16px; color: #70d9bb; }
-.loginLocation { display: flex; align-items: center; gap: 7px; color: #aebdde; font-size: 9px; }
+.loginLocation { display: flex; align-items: center; gap: 7px; color: #aebdde; font-size: 12px; }
 .loginLocation svg { width: 14px; }
 .loginShell .authCard {
   align-content: center;
@@ -4324,17 +4326,17 @@ textarea {
 }
 .loginShell .authLogo { width: 48px; height: 48px; border-radius: 14px; background: #eef1ff; color: #5368e8; }
 .loginTitle { margin: 3px 0 12px; }
-.loginTitle > small { color: #5368e8; font-size: 8px; font-weight: 900; letter-spacing: 0.13em; }
+.loginTitle > small { color: #5368e8; font-size: 11px; font-weight: 900; letter-spacing: 0.13em; }
 .loginTitle h2 { margin: 8px 0 7px; color: #17243a !important; font-size: 27px; letter-spacing: -0.025em; }
-.loginTitle p { margin: 0 !important; color: #6f7c91 !important; font-size: 11px !important; line-height: 1.55; }
-.loginShell .authCard label { color: #344158; font-size: 10px; }
+.loginTitle p { margin: 0 !important; color: #6f7c91 !important; font-size: 13px !important; line-height: 1.55; }
+.loginShell .authCard label { color: #344158; font-size: 12px; }
 .loginShell .authCard input { min-height: 48px; border: 1px solid #d7deea; background: #f8fafc; color: #17243a; font-size: 12px; }
 .loginShell .authCard input::placeholder { color: #a0aaba; }
 .loginShell .authCard input:focus { border-color: #5368e8; background: #fff; outline: 0; box-shadow: 0 0 0 4px rgba(83, 104, 232, 0.1); }
 .loginShell .authCard button { min-height: 49px; margin-top: 3px; background: linear-gradient(135deg, #435bdc, #6b62e8); font-size: 12px; box-shadow: 0 10px 25px rgba(77, 91, 213, 0.22); }
-.loginSecure { display: flex; align-items: center; justify-content: center; gap: 7px; color: #8b96a8; font-size: 9px; }
+.loginSecure { display: flex; align-items: center; justify-content: center; gap: 7px; color: #8b96a8; font-size: 12px; }
 .loginSecure span { width: 7px; height: 7px; border-radius: 50%; background: #36b987; box-shadow: 0 0 0 4px #e4f7ef; }
-.loginFooter { position: absolute; bottom: 18px; color: #8b96a8; font-size: 8px; }
+.loginFooter { position: absolute; bottom: 18px; color: #8b96a8; font-size: 11px; }
 @media (max-width: 760px) {
   .authPage { padding: 18px; }
   .loginShell { grid-template-columns: 1fr; width: min(460px, 100%); min-height: 0; }
@@ -4370,7 +4372,7 @@ textarea {
 .trackCard p {
   margin-top: 7px;
   color: #7f8a9d;
-  font-size: 11px;
+  font-size: 13px;
 }
 .trackCard form {
   display: flex;
@@ -4420,7 +4422,7 @@ textarea {
   border-radius: 8px;
   background: #d9f4e8;
   color: #16855a;
-  font-size: 10px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 800;
 }
@@ -4435,7 +4437,7 @@ textarea {
   gap: 12px;
   padding-top: 8px;
   border-top: 1px solid #ccecdf;
-  font-size: 10px;
+  font-size: 12px;
 }
 .trackResult dt {
   color: #748095;
@@ -4627,7 +4629,7 @@ textarea {
   background: #4aacec;
   color: #fff;
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -5030,7 +5032,7 @@ textarea {
 
 .labelBody span,
 .labelFooter span:last-child {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .qcMiniGrid {
