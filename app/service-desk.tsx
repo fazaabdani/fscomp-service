@@ -1931,11 +1931,19 @@ export default function ServiceDesk() {
       )}
       {(printMode === "receipt" || printMode === "qr") && selected && (
         <div className={`servicePrint ${printMode}`}>
-          <div className="printBrand">
-            <span>{(shop.name || "FS").slice(0, 2).toUpperCase()}</span>
-            <div>
-              <h1>{shop.name || "FS Service Center"}</h1>
-              <p>Tanda Terima Servis Perangkat</p>
+          <div className="printHeader">
+            <div className="printHeaderBrand">
+              <span className="printLogo">
+                {(shop.name || "FS").slice(0, 2).toUpperCase()}
+              </span>
+              <div>
+                <h1>{shop.name || "FS Service Center"}</h1>
+                <p>Tanda Terima Servis Perangkat</p>
+              </div>
+            </div>
+            <div className="printHeaderId">
+              <small>No. Servis</small>
+              <b>{selected.id}</b>
             </div>
           </div>
           <div className="printQr">
@@ -1944,7 +1952,6 @@ export default function ServiceDesk() {
               size={printMode === "qr" ? 260 : 110}
               level="H"
             />
-            <strong>{selected.id}</strong>
             <small>Scan untuk tracking servis</small>
           </div>
           {printMode === "receipt" && (
@@ -1999,16 +2006,14 @@ export default function ServiceDesk() {
               </div>
               <div className="printSign">
                 <span>
-                  Pelanggan
-                  <br />
-                  <br />
-                  <b>( {selected.customer} )</b>
+                  <em>Pelanggan</em>
+                  <i className="printSignSpace" />
+                  <b>{selected.customer}</b>
                 </span>
                 <span>
-                  Penerima
-                  <br />
-                  <br />
-                  <b>( {selected.handedBy || "Admin"} )</b>
+                  <em>Penerima</em>
+                  <i className="printSignSpace" />
+                  <b>{selected.handedBy || "Admin"}</b>
                 </span>
               </div>
               <div className="printContact">

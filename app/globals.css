@@ -3408,6 +3408,12 @@ textarea {
   .serviceApp:has(.servicePrint) > .serviceToast {
     display: none !important;
   }
+  .servicePrint,
+  .servicePrint * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
   .servicePrint {
     display: block !important;
     width: 190mm;
@@ -3432,26 +3438,19 @@ textarea {
   .receiptCard {
     position: relative;
     min-height: 128mm;
-    padding: 7mm 7mm 7mm 8.5mm;
+    padding: 0 7mm 7mm;
     border: 1px solid #e2e8f0;
     border-radius: 3mm;
+    overflow: hidden;
     break-inside: avoid;
-  }
-  .receiptCard::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 1.5mm;
-    background: #5268e9;
-    border-radius: 3mm 0 0 3mm;
   }
   .receiptCardHead {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding-bottom: 4mm;
-    margin-bottom: 4mm;
-    border-bottom: 1px solid #e2e8f0;
+    margin: 0 -7mm 4mm;
+    padding: 5mm 7mm;
+    background: linear-gradient(135deg, #4c5fe0, #7c6ae8);
   }
   .receiptBrand {
     display: flex;
@@ -3464,7 +3463,8 @@ textarea {
     width: 10mm;
     height: 10mm;
     border-radius: 2.5mm;
-    background: #5268e9;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     color: #fff;
     font-weight: 800;
     font-size: 9pt;
@@ -3472,12 +3472,12 @@ textarea {
   .receiptBrand strong {
     display: block;
     font-size: 12pt;
-    color: #111827;
+    color: #fff;
   }
   .receiptBrand small {
     display: block;
     margin-top: 0.5mm;
-    color: #64748b;
+    color: rgba(255, 255, 255, 0.85);
     font-size: 7pt;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -3487,15 +3487,19 @@ textarea {
   }
   .receiptCardId small {
     display: block;
-    color: #64748b;
+    color: rgba(255, 255, 255, 0.75);
     font-size: 6pt;
     text-transform: uppercase;
   }
   .receiptCardId b {
     display: block;
-    margin-top: 0.5mm;
-    font-size: 11pt;
-    color: #5268e9;
+    margin-top: 1mm;
+    padding: 1mm 2.5mm;
+    border-radius: 1.5mm;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    font-size: 10pt;
+    color: #fff;
   }
   .receiptCardBody {
     display: flex;
@@ -3503,16 +3507,35 @@ textarea {
     align-items: flex-start;
     margin-bottom: 4mm;
   }
+  .receiptCardBody > svg {
+    padding: 2mm;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 2mm;
+  }
   .receiptCardGrid {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 3mm 5mm;
   }
+  .receiptCardGrid > div {
+    position: relative;
+    padding-left: 2.5mm;
+  }
+  .receiptCardGrid > div::before {
+    content: "";
+    position: absolute;
+    inset: 0.5mm auto 0.5mm 0;
+    width: 0.7mm;
+    border-radius: 1mm;
+    background: #c7cef7;
+  }
   .receiptCardGrid small {
     display: block;
-    color: #64748b;
+    color: #5268e9;
     font-size: 6pt;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
@@ -3525,7 +3548,7 @@ textarea {
   .receiptCardGrid span {
     display: block;
     margin-top: 0.5mm;
-    color: #475569;
+    color: #64748b;
     font-size: 7.5pt;
   }
   .receiptIssue {
@@ -3536,8 +3559,9 @@ textarea {
   }
   .receiptIssue small {
     display: block;
-    color: #64748b;
+    color: #5268e9;
     font-size: 6pt;
+    font-weight: 700;
     text-transform: uppercase;
   }
   .receiptIssue p {
@@ -3548,7 +3572,7 @@ textarea {
   .receiptIssue span {
     display: block;
     margin-top: 1.5mm;
-    color: #475569;
+    color: #64748b;
     font-size: 7.5pt;
   }
   .receiptPay {
@@ -3557,12 +3581,14 @@ textarea {
     align-items: center;
     padding: 2.5mm 3.5mm;
     margin-bottom: 4mm;
-    border: 1px dashed #cbd5e1;
+    background: #f0fdf6;
+    border: 1px solid #bbf0d4;
     border-radius: 2mm;
     font-size: 7.5pt;
   }
   .receiptPay small {
-    color: #64748b;
+    color: #16855a;
+    font-weight: 700;
     text-transform: uppercase;
     font-size: 6pt;
   }
@@ -3627,58 +3653,88 @@ textarea {
   .accessoryLabel span { margin-top: 1mm; color: #475569; font-size: 8pt; }
   .accessoryLabel strong { margin-top: 2mm; font-size: 9pt; }
   .accessoryLabel em { margin-top: 1mm; color: #64748b; font-size: 6pt; }
-  .printBrand {
+  .printHeader {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-bottom: 5mm;
-    border-bottom: 1px solid #cbd5e1;
+    justify-content: space-between;
+    gap: 6mm;
+    margin: -8mm -8mm 6mm;
+    padding: 8mm;
+    background: linear-gradient(135deg, #4c5fe0, #7c6ae8);
   }
-  .printBrand > span {
+  .printHeaderBrand {
+    display: flex;
+    align-items: center;
+    gap: 4mm;
+  }
+  .printLogo {
     display: grid;
+    place-items: center;
     width: 14mm;
     height: 14mm;
-    place-items: center;
-    border-radius: 4mm;
-    background: #5268e9;
+    border-radius: 3.5mm;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     color: #fff;
     font-weight: 900;
+    font-size: 11pt;
   }
-  .printBrand h1,
-  .printBrand p {
+  .printHeader h1,
+  .printHeader p {
     margin: 0;
   }
-  .printBrand h1 {
-    font-size: 18pt;
+  .printHeader h1 {
+    font-size: 17pt;
+    color: #fff;
   }
-  .printBrand p {
-    margin-top: 2mm;
-    color: #64748b;
-    font-size: 9pt;
+  .printHeader p {
+    margin-top: 1mm;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 8.5pt;
+  }
+  .printHeaderId {
+    text-align: right;
+  }
+  .printHeaderId small {
+    display: block;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 6.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .printHeaderId b {
+    display: block;
+    margin-top: 1.5mm;
+    padding: 1.5mm 3mm;
+    border-radius: 2mm;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+    font-size: 10.5pt;
   }
   .printQr {
     display: grid;
     float: right;
     place-items: center;
     gap: 2mm;
-    margin: 6mm 0 4mm 7mm;
-  }
-  .printQr strong {
-    font-size: 10pt;
+    margin: 0 0 4mm 7mm;
+    padding: 4mm;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 3mm;
   }
   .printQr small {
     color: #64748b;
     font-size: 7pt;
   }
-  .qr .printBrand {
+  .qr .printHeader {
     display: none;
   }
   .qr .printQr {
     float: none;
     margin: 0;
-  }
-  .qr .printQr strong {
-    font-size: 18pt;
+    border: 0;
+    background: none;
   }
   .qr .printQr small {
     font-size: 10pt;
@@ -3687,13 +3743,23 @@ textarea {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 3mm;
-    padding: 6mm 0;
+    padding: 5mm 0 6mm;
   }
   .printMeta div,
   .printIssue {
-    padding: 4mm;
-    border: 1px solid #cbd5e1;
+    position: relative;
+    padding: 4mm 4mm 4mm 5.5mm;
+    background: #f8fafc;
     border-radius: 2mm;
+  }
+  .printMeta div::before,
+  .printIssue::before {
+    content: "";
+    position: absolute;
+    inset: 3mm auto 3mm 2mm;
+    width: 0.8mm;
+    border-radius: 1mm;
+    background: #5268e9;
   }
   .printMeta small,
   .printMeta strong,
@@ -3705,18 +3771,21 @@ textarea {
   }
   .printMeta small,
   .printIssue small {
-    color: #64748b;
-    font-size: 7pt;
+    color: #5268e9;
+    font-size: 6.5pt;
+    font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
   .printMeta strong,
   .printIssue strong {
-    margin: 2mm 0;
+    margin: 1.5mm 0;
     font-size: 10pt;
+    color: #111827;
   }
   .printMeta span,
   .printIssue span {
-    color: #475569;
+    color: #64748b;
     font-size: 8pt;
   }
   .printIssue {
@@ -3727,26 +3796,28 @@ textarea {
     justify-content: flex-end;
     gap: 7mm;
     margin: 5mm 0;
-    padding: 4mm;
-    background: #f8fafc;
+    padding: 4mm 5mm;
+    background: linear-gradient(135deg, #eef1ff, #f5f2ff);
     border-radius: 2mm;
     font-size: 9pt;
   }
   .printCosts strong {
-    color: #5268e9;
+    color: #4c5fe0;
   }
   .printPay {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin: 0 0 5mm;
-    padding: 3mm 4mm;
-    border: 1px dashed #cbd5e1;
+    padding: 3mm 4.5mm;
+    background: #f0fdf6;
+    border: 1px solid #bbf0d4;
     border-radius: 2mm;
     font-size: 8pt;
   }
   .printPay small {
-    color: #64748b;
+    color: #16855a;
+    font-weight: 700;
     text-transform: uppercase;
     font-size: 7pt;
   }
@@ -3755,22 +3826,43 @@ textarea {
     font-weight: 700;
   }
   .printTerms {
-    padding: 3mm;
-    border: 1px dashed #cbd5e1;
-    border-radius: 2mm;
-    color: #64748b;
-    font-size: 7.5pt;
+    padding: 3mm 4mm;
+    border-left: 0.8mm solid #cbd5e1;
+    color: #94a3b8;
+    font-size: 7pt;
     line-height: 1.4;
   }
   .printSign {
     display: flex;
     justify-content: space-between;
-    margin-top: 12mm;
+    margin-top: 10mm;
     text-align: center;
     font-size: 9pt;
   }
   .printSign span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     width: 55mm;
+  }
+  .printSign em {
+    color: #64748b;
+    font-style: normal;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .printSignSpace {
+    display: block;
+    height: 12mm;
+  }
+  .printSign b {
+    display: block;
+    width: 100%;
+    border-top: 1px solid #cbd5e1;
+    padding-top: 2mm;
+    color: #111827;
+    font-weight: 700;
   }
   .printContact {
     display: flex;
