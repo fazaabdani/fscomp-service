@@ -1061,11 +1061,12 @@ export default function ServiceDesk() {
       <aside className={`serviceSidebar ${menuOpen ? "open" : ""}`}>
         <div className="serviceBrand">
           <span className="serviceLogo">
-            <Wrench size={23} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-mark.png" alt={shop.name || "FS Comp"} />
           </span>
           <div>
-            <strong>FS Service</strong>
-            <small>Repair Management</small>
+            <strong>{shop.name || "FS Comp"}</strong>
+            <small>{shop.description || "Repair Management"}</small>
           </div>
           <button className="mobileClose" onClick={() => setMenuOpen(false)}>
             <X />
@@ -1933,8 +1934,9 @@ export default function ServiceDesk() {
         <div className={`servicePrint ${printMode}`}>
           <div className="printHeader">
             <div className="printHeaderBrand">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <span className="printLogo">
-                {(shop.name || "FS").slice(0, 2).toUpperCase()}
+                <img src="/logo-mark.png" alt="" />
               </span>
               <div>
                 <h1>{shop.name || "FS Service Center"}</h1>
@@ -2031,8 +2033,9 @@ export default function ServiceDesk() {
             <article className="receiptCard" key={copy}>
               <header className="receiptCardHead">
                 <div className="receiptBrand">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <span className="receiptBrandMark">
-                    {(shop.name || "FS").slice(0, 2).toUpperCase()}
+                    <img src="/logo-mark.png" alt="" />
                   </span>
                   <div>
                     <strong>{shop.name || "FS COMP"}</strong>

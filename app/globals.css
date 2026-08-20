@@ -2199,8 +2199,14 @@ textarea {
   height: 44px;
   place-items: center;
   border-radius: 14px;
-  background: linear-gradient(135deg, #697cf5, #8f6ee7);
+  background: #fff;
   box-shadow: 0 10px 25px rgba(100, 116, 240, 0.35);
+  overflow: hidden;
+}
+.serviceLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .serviceBrand strong,
 .serviceBrand small {
@@ -3463,11 +3469,13 @@ textarea {
     width: 10mm;
     height: 10mm;
     border-radius: 2.5mm;
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    color: #fff;
-    font-weight: 800;
-    font-size: 9pt;
+    background: #fff;
+    overflow: hidden;
+  }
+  .receiptBrandMark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .receiptBrand strong {
     display: block;
@@ -3673,11 +3681,13 @@ textarea {
     width: 14mm;
     height: 14mm;
     border-radius: 3.5mm;
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    color: #fff;
-    font-weight: 900;
-    font-size: 11pt;
+    background: #fff;
+    overflow: hidden;
+  }
+  .printLogo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .printHeader h1,
   .printHeader p {
@@ -4496,6 +4506,12 @@ textarea {
   border-radius: 16px;
   background: linear-gradient(135deg, #5268e9, #7867e9);
   color: #fff;
+  overflow: hidden;
+}
+.authLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .authCard h1,
 .authCard p {
@@ -4597,8 +4613,8 @@ textarea {
   color: #fff;
 }
 .loginBrand { display: flex; align-items: center; gap: 11px; font-size: 16px; letter-spacing: 0.06em; }
-.loginBrand span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: linear-gradient(135deg, #6d7fff, #62d1b2); }
-.loginBrand svg { width: 20px; }
+.loginBrand span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 12px; background: #fff; overflow: hidden; }
+.loginBrand span img { width: 100%; height: 100%; object-fit: cover; }
 .welcomeCopy { margin: auto 0; }
 .welcomeCopy > small { color: #7de0c3; font-size: 12px; font-weight: 900; letter-spacing: 0.14em; }
 .welcomeCopy h1 { margin: 15px 0 16px; color: #fff !important; font-size: clamp(29px, 3vw, 40px); line-height: 1.16; letter-spacing: -0.035em; }

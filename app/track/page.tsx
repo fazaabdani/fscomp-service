@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Search, Wrench } from "lucide-react";
+import { CheckCircle2, Search } from "lucide-react";
 
 type TrackTicket = {
   id: string;
@@ -46,8 +46,9 @@ export default function TrackPage() {
   return (
     <main className="trackPage">
       <section className="trackCard">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <span className="authLogo">
-          <Wrench />
+          <img src="/logo-mark.png" alt="FS Comp" />
         </span>
         <h1>Cek Status Servis</h1>
         <p>

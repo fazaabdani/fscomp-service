@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, MapPin, ShieldCheck, Wrench } from "lucide-react";
+import { CheckCircle2, MapPin, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,7 +30,8 @@ export default function LoginPage() {
     <main className="authPage">
       <section className="loginShell">
         <aside className="loginWelcome">
-          <div className="loginBrand"><span><Wrench /></span><b>FS COMP</b></div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div className="loginBrand"><span><img src="/logo-mark.png" alt="FS Comp" /></span><b>FS COMP</b></div>
           <div className="welcomeCopy">
             <small>SISTEM MANAJEMEN SERVIS</small>
             <h1>Servis lebih tertata.<br />Pelanggan lebih percaya.</h1>
