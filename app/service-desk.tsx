@@ -1654,6 +1654,16 @@ export default function ServiceDesk() {
                         )}
                       </strong>
                     </span>
+                    <span>
+                      Modal
+                      <strong>{money(selected.partCost || 0)}</strong>
+                    </span>
+                    <span>
+                      Profit
+                      <strong>
+                        {money(finalPrice(selected) - (selected.partCost || 0))}
+                      </strong>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3134,6 +3144,25 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
       }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cost: number }>())
       .values(),
   ).sort((a, b) => b.date.localeCompare(a.date));
+  const monthRows = Array.from(
+    rows
+      .reduce((m, r) => {
+        const month = r.date.slice(0, 7);
+        const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cost: 0 };
+        x.in += r.in;
+        x.done += r.done;
+        x.out += r.out;
+        x.revenue += r.revenue;
+        x.cost += r.cost;
+        m.set(month, x);
+        return m;
+      }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cost: number }>())
+      .values(),
+  ).sort((a, b) => b.month.localeCompare(a.month));
+  const monthLabel = (ym: string) => {
+    const [y, m] = ym.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+  };
   return (
     <div className="modulePage">
       <section className="reportSummary">
@@ -3163,6 +3192,42 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
             {money(rows.reduce((a, r) => a + r.revenue - r.cost, 0))}
           </strong>
         </article>
+      </section>
+      <section className="ticketPanel modulePanel">
+        <div className="panelTop">
+          <div>
+            <h3>Keuntungan per Bulan</h3>
+            <p>
+              Rekap pemasukan, modal, dan profit setiap bulan dari servis yang
+              sudah diambil.
+            </p>
+          </div>
+        </div>
+        <div className="simpleDataHead reportCols">
+          <span>Bulan</span>
+          <span>Masuk</span>
+          <span>Selesai</span>
+          <span>Keluar</span>
+          <span>Pemasukan</span>
+          <span>Modal</span>
+          <span>Profit</span>
+        </div>
+        {monthRows.length === 0 && (
+          <div className="emptyState">Belum ada data servis.</div>
+        )}
+        {monthRows.map((r) => (
+          <div className="simpleDataRow reportCols" key={r.month}>
+            <span>{monthLabel(r.month)}</span>
+            <span>{r.in} Barang</span>
+            <span>{r.done} Barang</span>
+            <span>{r.out} Barang</span>
+            <span>{money(r.revenue)}</span>
+            <span>{money(r.cost)}</span>
+            <span>
+              <b>{money(r.revenue - r.cost)}</b>
+            </span>
+          </div>
+        ))}
       </section>
       <section className="ticketPanel modulePanel">
         <div className="panelTop">
