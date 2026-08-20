@@ -787,17 +787,17 @@ export default function ServiceDesk() {
     patchTicket(selected.id, patch, `Data servis ${selected.id} berhasil diubah`);
     setModal("detail");
   }
-  const greeting = () => {
-    const hour = new Date().getHours();
-    return hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
-  };
+  const salutation = (name: string) =>
+    `Assalamu'alaikum warahmatullahi wabarakatuh, Kak ${name}`;
+  const closing =
+    "Jazakallahu khoiron 🤲😊";
   function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
-    const received = `${greeting()} Kak ${ticket.customer},\n\nTerima kasih sudah mempercayakan servis ${ticket.device} kepada *${shop.name}*. Barang Kakak sudah kami terima dengan nomor servis *${ticket.id}* pada ${new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n${tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Kami akan mengabari kembali saat ada perkembangan. Terima kasih 🙏`;
-    const cost = `${greeting()} Kak ${ticket.customer},\n\nKami sudah melakukan pengecekan ${ticket.device}. Untuk penanganan *${ticket.serviceAction || ticket.issue}*, estimasi biaya servisnya adalah *${money(ticket.estimate)}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya. Terima kasih 🙏`;
-    const options = `${greeting()} Kak ${ticket.customer},\n\nHasil pengecekan ${ticket.device} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *${money(ticket.estimate)}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak. Terima kasih 🙏`;
+    const received = `${salutation(ticket.customer)},\n\nTerima kasih sudah mempercayakan servis ${ticket.device} kepada *${shop.name}*. Semoga Allah membalas kepercayaan Kakak dengan kebaikan. Barang Kakak sudah kami terima dengan nomor servis *${ticket.id}* pada ${new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n${tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Insya Allah kami akan mengabari kembali saat ada perkembangan.\n\n${closing}`;
+    const cost = `${salutation(ticket.customer)},\n\nKami sudah melakukan pengecekan ${ticket.device}. Untuk penanganan *${ticket.serviceAction || ticket.issue}*, estimasi biaya servisnya adalah *${money(ticket.estimate)}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.\n\n${closing}`;
+    const options = `${salutation(ticket.customer)},\n\nAlhamdulillah, hasil pengecekan ${ticket.device} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *${money(ticket.estimate)}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.\n\n${closing}`;
     return `${base}?text=${encodeURIComponent(kind === "received" ? received : kind === "cost" ? cost : options)}`;
   }
   function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories") {
