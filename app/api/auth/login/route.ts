@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { randomUUID, scryptSync, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { signSession } from "@/lib/session";
+import { isRateLimited, clientKey } from "@/lib/rate-limit";
 
 const hash=(password:string,salt:string)=>scryptSync(password,salt,64).toString("hex");
+// scryptSync is deliberately CPU-heavy; without a cap this unauthenticated
+// endpoint is a cheap credential-stuffing / CPU-exhaustion target.
+const WINDOW_MS=60_000;
+const MAX_REQUESTS=10;
 export async function POST(request:Request){
+  if(isRateLimited("login",clientKey(request),WINDOW_MS,MAX_REQUESTS))return NextResponse.json({error:"Terlalu banyak percobaan, coba lagi sebentar lagi"},{status:429});
   const {username,password}=await request.json();
   if(typeof username!=="string"||typeof password!=="string")return NextResponse.json({error:"Data login tidak valid"},{status:400});
   let user=await prisma.user.findUnique({where:{username}});

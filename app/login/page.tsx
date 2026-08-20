@@ -31,7 +31,7 @@ export default function LoginPage() {
       <section className="loginShell">
         <aside className="loginWelcome">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <div className="loginBrand"><span><img src="/logo-mark.png" alt="FS Comp" /></span><b>FS COMP</b></div>
+          <div className="loginBrand"><span><img src="/logo-mark.png" alt="FS Comp" onError={(e) => { e.currentTarget.style.display = "none"; }} /></span><b>FS COMP</b></div>
           <div className="welcomeCopy">
             <small>SISTEM MANAJEMEN SERVIS</small>
             <h1>Servis lebih tertata.<br />Pelanggan lebih percaya.</h1>

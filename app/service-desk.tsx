@@ -806,7 +806,7 @@ export default function ServiceDesk() {
       serial: String(form.get("serial") || "-"),
       accessories: String(form.get("accessories") || "Unit only"),
       issue: String(form.get("issue")),
-      ...(conditionVal ? { condition: conditionVal as Ticket["condition"] } : {}),
+      condition: conditionVal ? (conditionVal as Ticket["condition"]) : undefined,
       serviceAction: String(form.get("serviceAction") || ""),
       technician: String(form.get("technician")),
       partCost: Number(form.get("partCost") || 0),
@@ -995,7 +995,9 @@ export default function ServiceDesk() {
     a.download = `laporan-servis-${localDateStr()}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-    notify("Laporan CSV berhasil diunduh");
+    notify(
+      `${rows.length} servis diunduh sesuai filter yang aktif saat ini`,
+    );
   }
   async function startScanner() {
     setModal("scan");
@@ -1068,7 +1070,7 @@ export default function ServiceDesk() {
         <div className="serviceBrand">
           <span className="serviceLogo">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-mark.png" alt={shop.name || "FS Comp"} />
+            <img src="/logo-mark.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
           </span>
           <div>
             <strong>{shop.name || "FS Comp"}</strong>
@@ -1153,7 +1155,7 @@ export default function ServiceDesk() {
               onPhoneChanged={(oldPhone, newPhone) => {
                 setTickets((old) =>
                   old.map((t) =>
-                    t.phone === oldPhone
+                    normalizePhone(t.phone) === normalizePhone(oldPhone)
                       ? {
                           ...t,
                           phone: newPhone,
@@ -1950,7 +1952,7 @@ export default function ServiceDesk() {
         <div className={`servicePrint ${printMode}`}>
           <div className="printHeader">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} />
+            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
             <div className="printHeaderDivider" />
             <div className="printHeaderId">
               <small>Tanda Terima Servis</small>
@@ -2164,7 +2166,7 @@ export default function ServiceDesk() {
                 <div className="receiptBrand">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <span className="receiptBrandMark">
-                    <img src="/logo-mark.png" alt="" />
+                    <img src="/logo-mark.png" alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   </span>
                   <div>
                     <strong>{shop.name || "FS COMP"}</strong>
@@ -3120,45 +3122,53 @@ function WarrantyPanel({
 }
 
 function ServiceReport({ tickets }: { tickets: Ticket[] }) {
-  const rows = Array.from(
-    tickets
-      .reduce((m, t) => {
-        const r = m.get(t.receivedAt) || {
-          date: t.receivedAt,
-          in: 0,
-          done: 0,
-          out: 0,
-          revenue: 0,
-          cost: 0,
-        };
-        r.in++;
-        if (t.status === "Bisa Diambil" || t.status === "Sudah Diambil")
-          r.done++;
-        if (t.status === "Sudah Diambil") {
-          r.out++;
-          r.revenue += finalPrice(t);
-          r.cost += t.partCost || 0;
-        }
-        m.set(t.receivedAt, r);
-        return m;
-      }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cost: number }>())
-      .values(),
-  ).sort((a, b) => b.date.localeCompare(a.date));
-  const monthRows = Array.from(
-    rows
-      .reduce((m, r) => {
-        const month = r.date.slice(0, 7);
-        const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cost: 0 };
-        x.in += r.in;
-        x.done += r.done;
-        x.out += r.out;
-        x.revenue += r.revenue;
-        x.cost += r.cost;
-        m.set(month, x);
-        return m;
-      }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cost: number }>())
-      .values(),
-  ).sort((a, b) => b.month.localeCompare(a.month));
+  const rows = useMemo(
+    () =>
+      Array.from(
+        tickets
+          .reduce((m, t) => {
+            const r = m.get(t.receivedAt) || {
+              date: t.receivedAt,
+              in: 0,
+              done: 0,
+              out: 0,
+              revenue: 0,
+              cost: 0,
+            };
+            r.in++;
+            if (t.status === "Bisa Diambil" || t.status === "Sudah Diambil")
+              r.done++;
+            if (t.status === "Sudah Diambil") {
+              r.out++;
+              r.revenue += finalPrice(t);
+              r.cost += t.partCost || 0;
+            }
+            m.set(t.receivedAt, r);
+            return m;
+          }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cost: number }>())
+          .values(),
+      ).sort((a, b) => b.date.localeCompare(a.date)),
+    [tickets],
+  );
+  const monthRows = useMemo(
+    () =>
+      Array.from(
+        rows
+          .reduce((m, r) => {
+            const month = r.date.slice(0, 7);
+            const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cost: 0 };
+            x.in += r.in;
+            x.done += r.done;
+            x.out += r.out;
+            x.revenue += r.revenue;
+            x.cost += r.cost;
+            m.set(month, x);
+            return m;
+          }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cost: number }>())
+          .values(),
+      ).sort((a, b) => b.month.localeCompare(a.month)),
+    [rows],
+  );
   const monthLabel = (ym: string) => {
     const [y, m] = ym.split("-").map(Number);
     return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
@@ -3325,9 +3335,17 @@ function SettingsPanel({
   onSave: (shop: ShopSettings) => void;
 }) {
   const [form, setForm] = useState(shop);
-  useEffect(() => setForm(shop), [shop]);
-  const field = (key: keyof ShopSettings, value: string | boolean) =>
+  // Skip re-syncing from the shop prop while the user has unsaved edits,
+  // so a cross-tab conflict-merge (useAutosave's setShop on a 409) can't
+  // silently wipe out what they're typing.
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (!dirty.current) setForm(shop);
+  }, [shop]);
+  const field = (key: keyof ShopSettings, value: string | boolean) => {
+    dirty.current = true;
     setForm((old) => ({ ...old, [key]: value }));
+  };
   return (
     <div className="modulePage settingsPage">
       <section className="moduleHero settingsHero">
@@ -3347,6 +3365,7 @@ function SettingsPanel({
         className="settingsForm"
         onSubmit={(e) => {
           e.preventDefault();
+          dirty.current = false;
           onSave(form);
         }}
       >

@@ -48,7 +48,7 @@ export default function TrackPage() {
       <section className="trackCard">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <span className="authLogo">
-          <img src="/logo-mark.png" alt="FS Comp" />
+          <img src="/logo-mark.png" alt="FS Comp" onError={(e) => { e.currentTarget.style.display = "none"; }} />
         </span>
         <h1>Cek Status Servis</h1>
         <p>

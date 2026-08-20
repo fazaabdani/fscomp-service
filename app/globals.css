@@ -3610,7 +3610,7 @@ textarea {
     justify-content: space-between;
     align-items: flex-end;
     font-size: 7pt;
-    color: #64748b;
+    color: #101c47;
   }
   .receiptTerms {
     margin: 3mm 0 0;
@@ -3994,9 +3994,17 @@ textarea {
     color: rgba(255, 255, 255, 0.7);
     font-size: 6pt;
   }
-  @page {
+  .servicePrint.receipt,
+  .servicePrint.receipt2 {
+    page: notaLandscape;
+  }
+  @page notaLandscape {
     size: A4 landscape;
     margin: 6mm;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
   }
 }
 .modulePage {
