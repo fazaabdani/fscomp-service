@@ -37,6 +37,12 @@ import {
   RotateCcw,
   Shield,
   Banknote,
+  User,
+  Phone,
+  MapPin,
+  Globe,
+  Wallet,
+  Landmark,
 } from "lucide-react";
 
 type Status =
@@ -1933,95 +1939,208 @@ export default function ServiceDesk() {
       {(printMode === "receipt" || printMode === "qr") && selected && (
         <div className={`servicePrint ${printMode}`}>
           <div className="printHeader">
-            <div className="printHeaderBrand">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <span className="printLogo">
-                <img src="/logo-mark.png" alt="" />
-              </span>
-              <div>
-                <h1>{shop.name || "FS Service Center"}</h1>
-                <p>Tanda Terima Servis Perangkat</p>
-              </div>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} />
+            <div className="printHeaderDivider" />
             <div className="printHeaderId">
-              <small>No. Servis</small>
+              <small>Tanda Terima Servis</small>
+              <em>Service ID</em>
               <b>{selected.id}</b>
+              <span>
+                Tanggal Cetak:{" "}
+                {new Date().toLocaleDateString("id-ID", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
             </div>
-          </div>
-          <div className="printQr">
-            <QRCodeSVG
-              value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
-              size={printMode === "qr" ? 260 : 110}
-              level="H"
-            />
-            <small>Scan untuk tracking servis</small>
+            <div className="printQr">
+              <QRCodeSVG
+                value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
+                size={printMode === "qr" ? 260 : 86}
+                level="H"
+              />
+              <small>
+                <Smartphone size={10} /> Scan untuk tracking servis
+              </small>
+            </div>
           </div>
           {printMode === "receipt" && (
             <>
-              <div className="printMeta">
+              <div className="printInfoGrid">
                 <div>
-                  <small>Pelanggan</small>
-                  <strong>{selected.customer}</strong>
-                  <span>{selected.phone}</span>
+                  <span className="printInfoIcon">
+                    <User size={14} />
+                  </span>
+                  <div>
+                    <small>Pelanggan</small>
+                    <strong>{selected.customer}</strong>
+                    <span>{selected.phone}</span>
+                  </div>
                 </div>
                 <div>
-                  <small>Perangkat</small>
-                  <strong>{selected.device}</strong>
-                  <span>SN: {selected.serial || "-"}</span>
+                  <span className="printInfoIcon">
+                    <Smartphone size={14} />
+                  </span>
+                  <div>
+                    <small>Perangkat</small>
+                    <strong>{selected.device}</strong>
+                    <span>SN: {selected.serial || "-"}</span>
+                  </div>
                 </div>
                 <div>
-                  <small>Tanggal Terima</small>
-                  <strong>{selected.receivedAt}</strong>
-                  <span>Teknisi: {selected.technician}</span>
+                  <span className="printInfoIcon">
+                    <CalendarDays size={14} />
+                  </span>
+                  <div>
+                    <small>Tanggal Terima</small>
+                    <strong>{selected.receivedAt}</strong>
+                    <span>Teknisi: {selected.technician}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="printIssue">
-                <small>Keluhan / Kerusakan</small>
-                <strong>{selected.issue}</strong>
-                <span>Kelengkapan: {selected.accessories}</span>
-              </div>
-              <div className="printCosts">
-                <span>
-                  Estimasi <strong>{money(selected.estimate)}</strong>
-                </span>
-                <span>
-                  DP <strong>{money(selected.downPayment)}</strong>
-                </span>
-                <span>
-                  Sisa estimasi{" "}
-                  <strong>
-                    {money(
-                      Math.max(0, selected.estimate - selected.downPayment),
+                <div>
+                  <span className="printInfoIcon">
+                    <CheckCircle2 size={14} />
+                  </span>
+                  <div>
+                    <small>Kelengkapan Diterima</small>
+                    {accessoryItems(selected.accessories).length ? (
+                      <ul>
+                        {accessoryItems(selected.accessories).map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span>Unit only</span>
                     )}
-                  </strong>
-                </span>
-              </div>
-              {shop.bank && (
-                <div className="printPay">
-                  <small>Info Pembayaran</small>
-                  <span>{shop.bank}</span>
+                  </div>
                 </div>
-              )}
-              <div className="printTerms">
-                {shop.terms ||
-                  "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
               </div>
-              <div className="printSign">
-                <span>
-                  <em>Pelanggan</em>
-                  <i className="printSignSpace" />
-                  <b>{selected.customer}</b>
+              <div className="printIssueRow">
+                <span className="printInfoIcon">
+                  <Wrench size={14} />
                 </span>
-                <span>
-                  <em>Penerima</em>
-                  <i className="printSignSpace" />
-                  <b>{selected.handedBy || "Admin"}</b>
-                </span>
+                <div>
+                  <small>Keluhan / Kondisi Awal</small>
+                  <strong>{selected.issue}</strong>
+                  {selected.notes && (
+                    <>
+                      <em>Catatan Tambahan</em>
+                      <span>{selected.notes}</span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="printContact">
-                {shop.phone && <span>{shop.phone}</span>}
-                {shop.whatsapp && <span>WA {shop.whatsapp}</span>}
-                {shop.address && <span>{shop.address}</span>}
+              <div className="printSummaryRow">
+                <div className="printSummary">
+                  <div className="printSummaryHead">Ringkasan Servis</div>
+                  <div className="printSummaryGrid">
+                    <div>
+                      <FileText size={13} />
+                      <small>Estimasi Biaya</small>
+                      <b>
+                        {selected.estimate
+                          ? money(selected.estimate)
+                          : "Belum diestimasi"}
+                      </b>
+                    </div>
+                    <div>
+                      <Wallet size={13} />
+                      <small>DP (Uang Muka)</small>
+                      <b>{money(selected.downPayment)}</b>
+                    </div>
+                    <div>
+                      <Banknote size={13} />
+                      <small>Sisa Pembayaran</small>
+                      <b>
+                        {money(
+                          Math.max(
+                            0,
+                            selected.estimate - selected.downPayment,
+                          ),
+                        )}
+                      </b>
+                    </div>
+                  </div>
+                  {shop.bank && (
+                    <div className="printPayNote">
+                      <Landmark size={13} />
+                      <div>
+                        <b>Info Pembayaran</b>
+                        <span>
+                          Konfirmasi pembayaran harap menyertakan nomor
+                          Service ID pada keterangan.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {shop.bank && (
+                  <div className="printBankCard">
+                    <div className="printBankHead">Rekening Transaksi</div>
+                    {shop.bank
+                      .split("\n")
+                      .map((l) => l.trim())
+                      .filter(Boolean)
+                      .map((line) => (
+                        <div className="printBankRow" key={line}>
+                          <Landmark size={12} />
+                          <span>{line}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+              <div className="printTermsRow">
+                <div className="printTermsBox">
+                  <ShieldCheck size={14} />
+                  <div>
+                    <small>Ketentuan Servis</small>
+                    <p>
+                      {shop.terms ||
+                        "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
+                    </p>
+                  </div>
+                </div>
+                <div className="printSign">
+                  <span>
+                    <em>Pelanggan</em>
+                    <i className="printSignSpace" />
+                    <b>{selected.customer}</b>
+                  </span>
+                  <span>
+                    <em>Petugas {shop.name || "FS Comp"}</em>
+                    <i className="printSignSpace" />
+                    <b>{selected.handedBy || "Admin"}</b>
+                  </span>
+                </div>
+              </div>
+              <div className="printFooter">
+                <div className="printFooterContact">
+                  {shop.phone && (
+                    <span>
+                      <Phone size={11} /> {shop.phone}
+                    </span>
+                  )}
+                  {shop.whatsapp && (
+                    <span>
+                      <MessageCircle size={11} /> {shop.whatsapp}
+                    </span>
+                  )}
+                  {shop.address && (
+                    <span>
+                      <MapPin size={11} /> {shop.address}
+                    </span>
+                  )}
+                  <span>
+                    <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
+                  </span>
+                </div>
+                <div className="printFooterBrand">
+                  <b>{(shop.name || "FS Comp").toUpperCase()}</b>
+                  <small>Service &amp; Technology Center</small>
+                </div>
               </div>
             </>
           )}

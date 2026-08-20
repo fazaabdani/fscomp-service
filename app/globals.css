@@ -3456,7 +3456,7 @@ textarea {
     justify-content: space-between;
     margin: 0 -7mm 4mm;
     padding: 5mm 7mm;
-    background: linear-gradient(135deg, #4c5fe0, #7c6ae8);
+    background: #101c47;
   }
   .receiptBrand {
     display: flex;
@@ -3537,11 +3537,11 @@ textarea {
     inset: 0.5mm auto 0.5mm 0;
     width: 0.7mm;
     border-radius: 1mm;
-    background: #c7cef7;
+    background: #a9bdf5;
   }
   .receiptCardGrid small {
     display: block;
-    color: #5268e9;
+    color: #1d4fd8;
     font-size: 6pt;
     font-weight: 700;
     text-transform: uppercase;
@@ -3567,7 +3567,7 @@ textarea {
   }
   .receiptIssue small {
     display: block;
-    color: #5268e9;
+    color: #1d4fd8;
     font-size: 6pt;
     font-weight: 700;
     text-transform: uppercase;
@@ -3661,191 +3661,270 @@ textarea {
   .accessoryLabel span { margin-top: 1mm; color: #475569; font-size: 8pt; }
   .accessoryLabel strong { margin-top: 2mm; font-size: 9pt; }
   .accessoryLabel em { margin-top: 1mm; color: #64748b; font-size: 6pt; }
+  /* Navy/blue "tanda terima" theme — matches the shop's provided design ref */
   .printHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6mm;
-    margin: -8mm -8mm 6mm;
-    padding: 8mm;
-    background: linear-gradient(135deg, #4c5fe0, #7c6ae8);
-  }
-  .printHeaderBrand {
-    display: flex;
-    align-items: center;
-    gap: 4mm;
-  }
-  .printLogo {
     display: grid;
-    place-items: center;
-    width: 14mm;
-    height: 14mm;
-    border-radius: 3.5mm;
-    background: #fff;
-    overflow: hidden;
+    grid-template-columns: auto 1px 1fr auto;
+    align-items: center;
+    gap: 5mm;
+    margin: -8mm -8mm 6mm;
+    padding: 6mm 8mm;
+    border-bottom: 1.2mm solid #101c47;
   }
-  .printLogo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  .printLogoFull {
+    height: 15mm;
+    width: auto;
   }
-  .printHeader h1,
-  .printHeader p {
-    margin: 0;
-  }
-  .printHeader h1 {
-    font-size: 17pt;
-    color: #fff;
-  }
-  .printHeader p {
-    margin-top: 1mm;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 8.5pt;
-  }
-  .printHeaderId {
-    text-align: right;
+  .printHeaderDivider {
+    align-self: stretch;
+    width: 1px;
+    background: #e2e8f0;
   }
   .printHeaderId small {
     display: block;
-    color: rgba(255, 255, 255, 0.75);
+    color: #1d4fd8;
+    font-weight: 700;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .printHeaderId em {
+    display: block;
+    margin-top: 2mm;
+    color: #94a3b8;
+    font-style: normal;
     font-size: 6.5pt;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
   .printHeaderId b {
     display: block;
+    margin-top: 0.5mm;
+    padding-bottom: 1mm;
+    border-bottom: 0.6mm solid #1d4fd8;
+    color: #101c47;
+    font-size: 13pt;
+  }
+  .printHeaderId span {
+    display: block;
     margin-top: 1.5mm;
-    padding: 1.5mm 3mm;
-    border-radius: 2mm;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.16);
-    color: #fff;
-    font-size: 10.5pt;
+    color: #64748b;
+    font-size: 6.5pt;
   }
   .printQr {
     display: grid;
-    float: right;
     place-items: center;
-    gap: 2mm;
-    margin: 0 0 4mm 7mm;
-    padding: 4mm;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 3mm;
+    gap: 1.5mm;
+    padding: 2.5mm;
+    border: 1px solid #1d4fd8;
+    border-radius: 2mm;
   }
   .printQr small {
+    display: flex;
+    align-items: center;
+    gap: 1mm;
     color: #64748b;
-    font-size: 7pt;
+    font-size: 6pt;
+    text-align: center;
   }
   .qr .printHeader {
     display: none;
   }
   .qr .printQr {
-    float: none;
-    margin: 0;
+    margin: 0 auto;
     border: 0;
-    background: none;
   }
   .qr .printQr small {
     font-size: 10pt;
   }
-  .printMeta {
+  .printInfoGrid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 3mm;
-    padding: 5mm 0 6mm;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4mm;
+    padding: 5mm 0;
+    border-bottom: 1px solid #e2e8f0;
   }
-  .printMeta div,
-  .printIssue {
-    position: relative;
-    padding: 4mm 4mm 4mm 5.5mm;
-    background: #f8fafc;
-    border-radius: 2mm;
+  .printInfoGrid > div,
+  .printIssueRow {
+    display: flex;
+    gap: 2.5mm;
+    align-items: flex-start;
   }
-  .printMeta div::before,
-  .printIssue::before {
-    content: "";
-    position: absolute;
-    inset: 3mm auto 3mm 2mm;
-    width: 0.8mm;
-    border-radius: 1mm;
-    background: #5268e9;
+  .printInfoIcon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 7mm;
+    height: 7mm;
+    border-radius: 1.8mm;
+    background: #1d4fd8;
+    color: #fff;
   }
-  .printMeta small,
-  .printMeta strong,
-  .printMeta span,
-  .printIssue small,
-  .printIssue strong,
-  .printIssue span {
+  .printInfoGrid small,
+  .printIssueRow small {
     display: block;
-  }
-  .printMeta small,
-  .printIssue small {
-    color: #5268e9;
-    font-size: 6.5pt;
+    color: #1d4fd8;
     font-weight: 700;
+    font-size: 6.3pt;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .printInfoGrid strong,
+  .printIssueRow strong {
+    display: block;
+    margin-top: 1mm;
+    font-size: 9pt;
+    color: #111827;
+  }
+  .printInfoGrid span,
+  .printIssueRow span {
+    display: block;
+    margin-top: 0.5mm;
+    color: #64748b;
+    font-size: 7.5pt;
+  }
+  .printInfoGrid ul {
+    margin: 1mm 0 0;
+    padding: 0 0 0 3mm;
+    font-size: 7.5pt;
+    color: #111827;
+  }
+  .printIssueRow {
+    padding: 5mm 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .printIssueRow em {
+    display: block;
+    margin-top: 2mm;
+    color: #1d4fd8;
+    font-style: normal;
+    font-weight: 700;
+    font-size: 6.3pt;
+    text-transform: uppercase;
+  }
+  .printSummaryRow {
+    display: flex;
+    gap: 4mm;
+    padding: 5mm 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .printSummary {
+    flex: 1.6;
+    border: 1px solid #e2e8f0;
+    border-radius: 2mm;
+    overflow: hidden;
+  }
+  .printSummaryHead {
+    padding: 2.5mm 4mm;
+    background: #101c47;
+    color: #fff;
+    font-weight: 700;
+    font-size: 8pt;
     text-transform: uppercase;
     letter-spacing: 0.03em;
   }
-  .printMeta strong,
-  .printIssue strong {
-    margin: 1.5mm 0;
-    font-size: 10pt;
-    color: #111827;
+  .printSummaryGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3mm;
+    padding: 4mm;
   }
-  .printMeta span,
-  .printIssue span {
+  .printSummaryGrid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 1mm;
+    color: #1d4fd8;
+  }
+  .printSummaryGrid small {
     color: #64748b;
-    font-size: 8pt;
-  }
-  .printIssue {
-    min-height: 24mm;
-  }
-  .printCosts {
-    display: flex;
-    justify-content: flex-end;
-    gap: 7mm;
-    margin: 5mm 0;
-    padding: 4mm 5mm;
-    background: linear-gradient(135deg, #eef1ff, #f5f2ff);
-    border-radius: 2mm;
-    font-size: 9pt;
-  }
-  .printCosts strong {
-    color: #4c5fe0;
-  }
-  .printPay {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0 0 5mm;
-    padding: 3mm 4.5mm;
-    background: #f0fdf6;
-    border: 1px solid #bbf0d4;
-    border-radius: 2mm;
-    font-size: 8pt;
-  }
-  .printPay small {
-    color: #16855a;
-    font-weight: 700;
+    font-size: 6.5pt;
     text-transform: uppercase;
-    font-size: 7pt;
   }
-  .printPay span {
-    color: #111827;
-    font-weight: 700;
+  .printSummaryGrid b {
+    padding-top: 1mm;
+    border-top: 0.5mm solid #dbe3fb;
+    color: #101c47;
+    font-size: 9.5pt;
   }
-  .printTerms {
-    padding: 3mm 4mm;
-    border-left: 0.8mm solid #cbd5e1;
-    color: #94a3b8;
+  .printPayNote {
+    display: flex;
+    gap: 2.5mm;
+    align-items: flex-start;
+    margin: 0 4mm 4mm;
+    padding: 2.5mm 3.5mm;
+    background: #eef2ff;
+    border-radius: 2mm;
+    color: #1d4fd8;
+  }
+  .printPayNote b {
+    display: block;
     font-size: 7pt;
+    text-transform: uppercase;
+  }
+  .printPayNote span {
+    display: block;
+    margin-top: 0.5mm;
+    color: #475569;
+    font-size: 6.5pt;
     line-height: 1.4;
+  }
+  .printBankCard {
+    flex: 1;
+    padding: 3mm;
+    border: 1px solid #e2e8f0;
+    border-radius: 2mm;
+  }
+  .printBankHead {
+    margin-bottom: 2mm;
+    color: #1d4fd8;
+    font-weight: 700;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .printBankRow {
+    display: flex;
+    gap: 2mm;
+    align-items: center;
+    padding: 1.8mm 0;
+    border-top: 1px solid #f1f5f9;
+    color: #1d4fd8;
+  }
+  .printBankRow:first-of-type {
+    border-top: 0;
+  }
+  .printBankRow span {
+    color: #111827;
+    font-size: 7pt;
+    font-weight: 600;
+  }
+  .printTermsRow {
+    display: flex;
+    gap: 5mm;
+    padding: 5mm 0;
+  }
+  .printTermsBox {
+    flex: 1;
+    display: flex;
+    gap: 2.5mm;
+    color: #1d4fd8;
+  }
+  .printTermsBox small {
+    display: block;
+    color: #1d4fd8;
+    font-weight: 700;
+    font-size: 6.5pt;
+    text-transform: uppercase;
+  }
+  .printTermsBox p {
+    margin: 1mm 0 0;
+    color: #64748b;
+    font-size: 6.5pt;
+    line-height: 1.5;
   }
   .printSign {
     display: flex;
-    justify-content: space-between;
-    margin-top: 10mm;
+    gap: 6mm;
     text-align: center;
     font-size: 9pt;
   }
@@ -3853,18 +3932,18 @@ textarea {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 55mm;
+    width: 42mm;
   }
   .printSign em {
     color: #64748b;
     font-style: normal;
-    font-size: 7pt;
+    font-size: 6.5pt;
     text-transform: uppercase;
     letter-spacing: 0.03em;
   }
   .printSignSpace {
     display: block;
-    height: 12mm;
+    height: 10mm;
   }
   .printSign b {
     display: block;
@@ -3873,16 +3952,43 @@ textarea {
     padding-top: 2mm;
     color: #111827;
     font-weight: 700;
+    font-size: 8.5pt;
   }
-  .printContact {
+  .printFooter {
     display: flex;
-    justify-content: center;
-    gap: 5mm;
-    margin-top: 6mm;
-    padding-top: 3mm;
-    border-top: 1px solid #e2e8f0;
-    color: #64748b;
-    font-size: 7pt;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4mm;
+    margin: 4mm -8mm -8mm;
+    padding: 4mm 8mm;
+    background: #101c47;
+    color: #fff;
+  }
+  .printFooterContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4mm;
+    font-size: 6.5pt;
+  }
+  .printFooterContact span {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.2mm;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .printFooterBrand {
+    text-align: right;
+  }
+  .printFooterBrand b {
+    display: block;
+    font-size: 8pt;
+    letter-spacing: 0.02em;
+  }
+  .printFooterBrand small {
+    display: block;
+    margin-top: 0.5mm;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 6pt;
   }
   @page {
     size: A4 portrait;
