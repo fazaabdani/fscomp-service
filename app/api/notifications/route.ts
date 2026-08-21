@@ -4,8 +4,7 @@ import { currentSession } from "@/lib/session";
 export async function GET() {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const row = await prisma.appState.findUnique({ where: { key: "tickets" } });
-  const tickets = row ? JSON.parse(row.value) : [];
+  const tickets = await prisma.ticket.findMany();
   const now = Date.now();
   const alerts = [] as Array<{ type: string; title: string; ticketId: string }>;
   for (const t of tickets) {

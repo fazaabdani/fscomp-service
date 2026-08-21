@@ -5,3 +5,6 @@ prisma/data/
 backups/
 server.log
 server-error.log
+tsconfig.tsbuildinfo
+.claude/
+prod-backups/

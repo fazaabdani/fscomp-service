@@ -26,6 +26,87 @@ model AppState {
   updatedAt DateTime @updatedAt
 }
 
+model Ticket {
+  id                String   @id
+  customer          String
+  phone             String
+  device            String
+  brand             String
+  serial            String   @default("-")
+  issue             String
+  accessories       String   @default("Unit only")
+  technician        String
+  status            String
+  estimate          Int      @default(0)
+  downPayment       Int      @default(0)
+  finalCost         Int?
+  receivedAt        String
+  receivedTime      String?
+  updatedAt         String
+  statusChangedAt   String?
+  rating            Int?
+  customerConfirmed Boolean  @default(false)
+  costConfirmed     Boolean  @default(false)
+  category          String?
+  address           String?
+  condition         String?
+  serviceAction     String?
+  paymentMethod     String?
+  paymentTermDays   Int?
+  warrantyDays      Int?
+  pickedUpAt        String?
+  pickedUpTime      String?
+  handledAt         String?
+  handledTime       String?
+  notes             String?
+  partCost          Int?
+  pickupBy          String?
+  handedBy          String?
+  version           Int      @default(1)
+  createdAt         DateTime @default(now())
+  dbUpdatedAt       DateTime @updatedAt
+  @@index([status])
+  @@index([phone])
+  @@index([serial])
+}
+
+model Customer {
+  id          String   @id
+  name        String
+  category    String
+  phone       String
+  address     String
+  rating      Int      @default(0)
+  createdAt   String
+  version     Int      @default(1)
+  dbUpdatedAt DateTime @updatedAt
+  @@index([phone])
+}
+
+model ServiceItem {
+  id           String @id
+  name         String
+  partCost     Int
+  shopPrice    Int
+  userPrice    Int
+  warrantyDays Int
+  version      Int    @default(1)
+}
+
+model ShopSettings {
+  id          String   @id @default("default")
+  name        String
+  phone       String
+  whatsapp    String
+  address     String
+  description String
+  terms       String
+  bank        String
+  lockEnabled Boolean  @default(false)
+  version     Int      @default(1)
+  dbUpdatedAt DateTime @updatedAt
+}
+
 model Payment {
   id        String   @id @default(cuid())
   ticketId  String

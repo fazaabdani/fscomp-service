@@ -43,16 +43,8 @@ export async function GET(request: Request) {
       { error: "Nomor WhatsApp tidak valid" },
       { status: 400 },
     );
-  const row = await prisma.appState.findUnique({ where: { key: "tickets" } });
-  if (!row)
-    return NextResponse.json(
-      { error: "Data servis belum tersedia" },
-      { status: 404 },
-    );
-  const tickets = JSON.parse(row.value) as Array<Record<string, unknown>>;
-
   if (id) {
-    const ticket = tickets.find((t) => t.id === id);
+    const ticket = await prisma.ticket.findUnique({ where: { id } });
     if (!ticket)
       return NextResponse.json(
         { error: "Nomor servis tidak ditemukan" },
@@ -61,10 +53,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ tickets: [toSafeTicket(ticket)] });
   }
 
+  // Phone isn't normalized in storage (entered as typed at intake), so an
+  // exact WHERE match would miss "0812..." vs "62812..." variants — pull a
+  // bounded candidate set by raw digits, then normalize-compare in memory.
+  const digits = phone!.replace(/\D/g, "");
   const target = normalizePhone(phone!);
-  const matches = tickets
-    .filter((t) => normalizePhone(String(t.phone || "")) === target)
-    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+  const candidates = await prisma.ticket.findMany({
+    where: { phone: { contains: digits.slice(-8) } },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+  });
+  const matches = candidates
+    .filter((t) => normalizePhone(t.phone) === target)
     .slice(0, 20)
     .map(toSafeTicket);
   if (!matches.length)

@@ -102,6 +102,7 @@ type Ticket = {
   partCost?: number;
   pickupBy?: string;
   handedBy?: string;
+  version?: number;
 };
 type ServiceItem = {
   id: string;
@@ -110,6 +111,7 @@ type ServiceItem = {
   shopPrice: number;
   userPrice: number;
   warrantyDays: number;
+  version?: number;
 };
 type Staff = {
   id: string;
@@ -134,6 +136,7 @@ type Customer = {
   rating: number;
   createdAt: string;
   _touchedAt?: string;
+  version?: number;
 };
 type ShopSettings = {
   name: string;
@@ -602,127 +605,6 @@ function ServiceReceiptBody({
     </>
   );
 }
-function mergeById<T extends { id: string }>(
-  serverArr: T[],
-  localArr: T[],
-  stamp: (item: T) => string,
-): T[] {
-  const serverIds = new Set(serverArr.map((s) => s.id));
-  const merged = serverArr.map((s) => {
-    const l = localArr.find((x) => x.id === s.id);
-    if (!l) return s;
-    return stamp(l) >= stamp(s) ? l : s;
-  });
-  const localOnly = localArr.filter((l) => !serverIds.has(l.id));
-  return [...localOnly, ...merged];
-}
-const mergeTickets = (server: Ticket[], local: Ticket[]) =>
-  mergeById(
-    server,
-    local,
-    (t) => t._touchedAt || t.updatedAt || t.receivedAt || "",
-  );
-const mergeCustomers = (server: Customer[], local: Customer[]) =>
-  mergeById(server, local, (c) => c._touchedAt || c.createdAt || "");
-function useAutosave<T>(
-  key: "tickets" | "shop" | "services" | "customers",
-  value: T,
-  ready: boolean,
-  versions: React.MutableRefObject<Record<string, number>>,
-  merge: ((server: T, local: T) => T) | null,
-  apply: (value: T) => void,
-  notify: (message: string) => void,
-) {
-  // The first render after `ready` flips true carries the value we just
-  // loaded FROM the server — writing it straight back would bump the
-  // version and log an audit entry for a no-op on every page load/refresh.
-  const skipNext = useRef(true);
-  // Holds whatever hasn't been confirmed saved yet, so a refresh/tab-close
-  // in the middle of the 500ms debounce (e.g. right after creating a
-  // ticket) can still be flushed instead of silently lost — see the
-  // visibilitychange/pagehide effect below.
-  const pendingRef = useRef<T | null>(null);
-  useEffect(() => {
-    if (!ready) return;
-    if (skipNext.current) {
-      skipNext.current = false;
-      return;
-    }
-    pendingRef.current = value;
-    const id = setTimeout(async () => {
-      pendingRef.current = null;
-      try {
-        const res = await fetch(`/api/state/${key}`, {
-          method: "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            value,
-            expectedVersion: versions.current[key],
-          }),
-        });
-        if (res.status === 409) {
-          const conflict = await res.json();
-          versions.current[key] = conflict.version;
-          const resolved = merge
-            ? merge(conflict.value, value)
-            : conflict.value;
-          apply(resolved);
-          notify(
-            "Ada perubahan dari pengguna lain, data disinkronkan otomatis",
-          );
-          return;
-        }
-        if (res.ok) {
-          const data = await res.json();
-          versions.current[key] = data.version;
-        } else {
-          const body = await res.json().catch(() => null);
-          notify(
-            body?.error
-              ? `Gagal menyimpan: ${body.error}`
-              : "Gagal menyimpan perubahan ke server",
-          );
-        }
-      } catch {
-        /* offline: local state and localStorage fallback still apply */
-      }
-    }, 150);
-    return () => clearTimeout(id);
-  }, [key, value, ready]);
-  useEffect(() => {
-    const flush = () => {
-      if (pendingRef.current === null) return;
-      const body = JSON.stringify({
-        value: pendingRef.current,
-        expectedVersion: versions.current[key],
-      });
-      // Browsers cap keepalive request bodies at ~64KB — a large "tickets"
-      // array won't fit, so there's nothing to gain by trying (it would
-      // just fail silently). This still covers shop/services/customers,
-      // and the 150ms debounce above is what protects the tickets key.
-      if (body.length > 60_000) return;
-      // keepalive lets this fetch survive the page unloading before it
-      // finishes — a plain fetch would otherwise get cancelled mid-flight.
-      fetch(`/api/state/${key}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body,
-        keepalive: true,
-      }).catch(() => {});
-      pendingRef.current = null;
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") flush();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("pagehide", flush);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("pagehide", flush);
-    };
-  }, [key, versions]);
-}
-
 export default function ServiceDesk() {
   const [tickets, setTickets] = useState<Ticket[]>(seed);
   const [query, setQuery] = useState("");
@@ -766,7 +648,6 @@ export default function ServiceDesk() {
   const scanStopRef = useRef<(() => void) | null>(null);
   const serviceFormRef = useRef<HTMLFormElement>(null);
   const [serverReady, setServerReady] = useState(false);
-  const stateVersions = useRef<Record<string, number>>({});
   const submittingRef = useRef(false);
   const paymentInFlightRef = useRef<Set<string>>(new Set());
 
@@ -778,6 +659,10 @@ export default function ServiceDesk() {
   }, [modal]);
 
   useEffect(() => {
+    // Local cache only, for instant paint + a display fallback if the
+    // network fetch below fails — tickets/customers/services/shop are no
+    // longer autosaved back through this cache; the real tables are the
+    // single source of truth.
     const saved = localStorage.getItem("fs-service-tickets-v1");
     if (saved)
       try {
@@ -818,61 +703,17 @@ export default function ServiceDesk() {
     fetch("/api/auth/me", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => data && setCurrentUser(data.user));
-    Promise.all(
-      ["tickets", "shop", "services", "customers"].map(async (key) => {
-        const r = await fetch(`/api/state/${key}`, { cache: "no-store" });
-        if (!r.ok) return [key, null, 0] as const;
-        const data = await r.json();
-        return [key, data.value, data.version as number] as const;
-      }),
-    )
-      .then((values) => {
-        for (const [key, value, version] of values) {
-          stateVersions.current[key] = version;
-          if (value) {
-            if (key === "tickets") setTickets(value);
-            if (key === "shop") setShop(value);
-            if (key === "services") setServices(value);
-            if (key === "customers") setCustomers(value);
-          } else {
-            const fallback =
-              key === "tickets"
-                ? saved
-                  ? JSON.parse(saved)
-                  : seed
-                : key === "shop"
-                  ? savedShop
-                    ? JSON.parse(savedShop)
-                    : defaultSettings
-                  : key === "services"
-                    ? savedServices
-                      ? JSON.parse(savedServices)
-                      : defaultServices
-                    : savedCustomers
-                      ? JSON.parse(savedCustomers)
-                      : seedCustomers;
-            if (key === "tickets") setTickets(fallback);
-            if (key === "shop") setShop(fallback);
-            if (key === "services") setServices(fallback);
-            if (key === "customers") setCustomers(fallback);
-            // Never auto-write placeholder/demo data to a production
-            // server — an empty production DB should stay empty until an
-            // admin enters real data, not get silently seeded with
-            // sample tickets/customers that look real. Local dev keeps
-            // the old convenience of a self-seeding first run.
-            if (process.env.NODE_ENV !== "production") {
-              fetch(`/api/state/${key}`, {
-                method: "PUT",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ value: fallback, expectedVersion: 0 }),
-              })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((r) => {
-                  if (r) stateVersions.current[key] = r.version;
-                });
-            }
-          }
-        }
+    Promise.all([
+      fetch("/api/tickets", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/customers", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/services", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/shop", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([ticketsRes, customersRes, servicesRes, shopRes]) => {
+        if (ticketsRes) setTickets(ticketsRes.tickets);
+        if (customersRes) setCustomers(customersRes.customers);
+        if (servicesRes && servicesRes.services.length) setServices(servicesRes.services);
+        if (shopRes?.shop) setShop(shopRes.shop);
         setServerReady(true);
       })
       .catch(() => {
@@ -891,10 +732,6 @@ export default function ServiceDesk() {
   useEffect(() => {
     localStorage.setItem("fs-service-customers-v1", JSON.stringify(customers));
   }, [customers]);
-  useAutosave("tickets", tickets, serverReady, stateVersions, mergeTickets, setTickets, notify);
-  useAutosave("shop", shop, serverReady, stateVersions, null, setShop, notify);
-  useAutosave("services", services, serverReady, stateVersions, null, setServices, notify);
-  useAutosave("customers", customers, serverReady, stateVersions, mergeCustomers, setCustomers, notify);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 2600);
@@ -979,27 +816,6 @@ export default function ServiceDesk() {
   function notify(message: string) {
     setToast(message);
   }
-  // Best-effort immediate save for a just-created record, bypassing the
-  // autosave debounce — a brand-new ticket/customer otherwise only exists
-  // client-side for up to 150ms before being persisted, which is enough
-  // time for an impatient refresh right after "Terima Servis" to lose it.
-  // The regular debounced autosave still runs afterward as normal; on a
-  // race between the two, whichever version wins is still a correct save.
-  async function flushKeyNow(key: "tickets" | "customers", value: unknown) {
-    try {
-      const res = await fetch(`/api/state/${key}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ value, expectedVersion: stateVersions.current[key] }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        stateVersions.current[key] = data.version;
-      }
-    } catch {
-      /* the debounced autosave (and its pagehide flush) will retry */
-    }
-  }
   async function recordPayment(
     ticketId: string,
     amount: number,
@@ -1081,35 +897,27 @@ export default function ServiceDesk() {
     setModal("detail");
   }
   function updateStatus(id: string, status: Status) {
-    setTickets((old) =>
-      old.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status,
-              updatedAt: localDateStr(),
-              statusChangedAt: localDateStr(),
-              _touchedAt: new Date().toISOString(),
-              // Stamp the pickup date the first time a ticket reaches "Sudah
-              // Diambil" via this quick dropdown, since that's the everyday
-              // path (not the rarely-used edit form) and warranty countdown
-              // depends on it staying fixed instead of drifting with updatedAt.
-              ...(status === "Sudah Diambil" && !t.pickedUpAt
-                ? {
-                    pickedUpAt: localDateStr(),
-                    pickedUpTime: new Date().toTimeString().slice(0, 5),
-                  }
-                : {}),
-            }
-          : t,
-      ),
-    );
-    setSelected((old) => (old?.id === id ? { ...old, status } : old));
-    notify(`Status diperbarui: ${status}`);
-  }
-  function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
     const before = tickets.find((t) => t.id === id);
-    if (before && patch.downPayment !== undefined && patch.downPayment !== before.downPayment) {
+    const patch: Partial<Ticket> = {
+      status,
+      statusChangedAt: localDateStr(),
+      // Stamp the pickup date the first time a ticket reaches "Sudah
+      // Diambil" via this quick dropdown, since that's the everyday
+      // path (not the rarely-used edit form) and warranty countdown
+      // depends on it staying fixed instead of drifting with updatedAt.
+      ...(status === "Sudah Diambil" && before && !before.pickedUpAt
+        ? {
+            pickedUpAt: localDateStr(),
+            pickedUpTime: new Date().toTimeString().slice(0, 5),
+          }
+        : {}),
+    };
+    patchTicket(id, patch, `Status diperbarui: ${status}`);
+  }
+  async function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
+    const before = tickets.find((t) => t.id === id);
+    if (!before) return;
+    if (patch.downPayment !== undefined && patch.downPayment !== before.downPayment) {
       const delta = patch.downPayment - before.downPayment;
       recordPayment(
         id,
@@ -1118,20 +926,29 @@ export default function ServiceDesk() {
         delta > 0 ? message : `Koreksi turun DP — ${message}`,
       );
     }
-    setTickets((old) =>
-      old.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              ...patch,
-              updatedAt: localDateStr(),
-              _touchedAt: new Date().toISOString(),
-            }
-          : t,
-      ),
-    );
-    setSelected((old) => (old?.id === id ? { ...old, ...patch } : old));
+    const updatedAt = localDateStr();
+    const fullPatch = { ...patch, updatedAt };
+    setTickets((old) => old.map((t) => (t.id === id ? { ...t, ...fullPatch } : t)));
+    setSelected((old) => (old?.id === id ? { ...old, ...fullPatch } : old));
     notify(message);
+    const res = await fetch(`/api/tickets/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...fullPatch, expectedVersion: before.version }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.status === 409 && data?.ticket) {
+      setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
+      setSelected((old) => (old?.id === id ? data.ticket : old));
+      notify("Tiket ini baru saja diubah pengguna lain — ulangi perubahan Anda");
+      return;
+    }
+    if (res.ok && data?.ticket) {
+      setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
+      setSelected((old) => (old?.id === id ? data.ticket : old));
+    } else if (!res.ok) {
+      notify(data?.error ? `Gagal menyimpan: ${data.error}` : "Gagal menyimpan perubahan ke server");
+    }
   }
   function saveTicketEdit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -1210,15 +1027,11 @@ export default function ServiceDesk() {
     await navigator.clipboard.writeText(url);
     notify("Link tracking berhasil disalin");
   }
-  function submitTicket(e: React.FormEvent<HTMLFormElement>) {
+  async function submitTicket(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
-    setTimeout(() => {
-      submittingRef.current = false;
-    }, 1000);
     const form = new FormData(e.currentTarget);
-    const now = new Date();
     const phone = String(form.get("phone") || "").replace(/\D/g, "");
     const serial = String(form.get("serial") || "-").trim();
     if (phone.length < 9 || phone.length > 15) {
@@ -1247,70 +1060,53 @@ export default function ServiceDesk() {
       notify("DP tidak boleh melebihi estimasi biaya");
       return;
     }
-    const datePart = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    // Derived from the clock, not tickets.length — two people creating a
-    // ticket around the same moment on different devices both compute
-    // tickets.length against their own possibly-stale local copy, so a
-    // counter-based id can collide across sessions in a way this
-    // session's own `tickets` array has no way to detect. Milliseconds
-    // make an actual collision practically impossible; the loop below is
-    // just a fallback for the local session's own array.
-    let seq = now.getTime() % 100000;
-    let id = `SRV-${datePart}-${String(seq).padStart(5, "0")}`;
-    while (tickets.some((t) => t.id === id)) {
-      seq += 1;
-      id = `SRV-${datePart}-${String(seq).padStart(5, "0")}`;
+    const res = await fetch("/api/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customer: String(form.get("customer")),
+        phone,
+        device: String(form.get("device")),
+        brand: String(form.get("brand")),
+        serial,
+        issue: String(form.get("issue")),
+        accessories: String(form.get("accessories") || "Unit only"),
+        technician: String(form.get("technician")),
+        estimate: Number(form.get("estimate") || 0),
+        downPayment: Number(form.get("downPayment") || 0),
+        category: String(form.get("category")),
+        address: String(form.get("address") || "-"),
+        paymentTermDays: Number(form.get("paymentTermDays") || 0),
+      }),
+    });
+    submittingRef.current = false;
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ticket) {
+      notify(data?.error || "Gagal membuat servis, coba lagi");
+      return;
     }
-    const next: Ticket = {
-      id,
-      customer: String(form.get("customer")),
-      phone,
-      device: String(form.get("device")),
-      brand: String(form.get("brand")),
-      serial,
-      issue: String(form.get("issue")),
-      accessories: String(form.get("accessories") || "Unit only"),
-      technician: String(form.get("technician")),
-      status: "Belum Cek",
-      estimate: Number(form.get("estimate") || 0),
-      downPayment: Number(form.get("downPayment") || 0),
-      finalCost: 0,
-      rating: 0,
-      customerConfirmed: false,
-      costConfirmed: false,
-      category: String(form.get("category")) as "Toko" | "User",
-      address: String(form.get("address") || "-"),
-      paymentTermDays: Number(form.get("paymentTermDays") || 0),
-      receivedAt: localDateStr(now),
-      updatedAt: localDateStr(now),
-      statusChangedAt: localDateStr(now),
-      _touchedAt: now.toISOString(),
-    };
-    const nextTickets = [next, ...tickets];
-    setTickets(nextTickets);
-    flushKeyNow("tickets", nextTickets);
+    const next: Ticket = data.ticket;
+    setTickets((old) => [next, ...old]);
     setSelected(next);
     setHandoffDone({ receipt: false, whatsapp: false, qr: false, accessories: accessoryItems(next.accessories).length === 0 });
     setModal("handoff");
-    notify(`Servis ${id} berhasil dibuat`);
+    notify(`Servis ${next.id} berhasil dibuat`);
     if (next.downPayment > 0)
-      recordPayment(id, next.downPayment, "Tunai", `DP awal saat servis ${id} diterima`);
+      recordPayment(next.id, next.downPayment, "Tunai", `DP awal saat servis ${next.id} diterima`);
     if (!customers.some((c) => c.phone === phone)) {
-      const nextCustomers = [
-        {
-          id: `C-${Date.now()}`,
+      const cRes = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
           name: next.customer,
           category: next.category || "User",
           phone,
           address: next.address || "-",
-          rating: 0,
           createdAt: next.receivedAt,
-          _touchedAt: now.toISOString(),
-        },
-        ...customers,
-      ];
-      setCustomers(nextCustomers);
-      flushKeyNow("customers", nextCustomers);
+        }),
+      });
+      const cData = await cRes.json().catch(() => null);
+      if (cRes.ok && cData?.customer) setCustomers((old) => [cData.customer, ...old]);
     }
   }
   function exportCsv() {
@@ -1514,25 +1310,58 @@ export default function ServiceDesk() {
             <CustomersPanel
               tickets={tickets}
               customers={customers}
-              onChange={(value) => {
-                setCustomers(value);
+              onCreate={async (input) => {
+                const res = await fetch("/api/customers", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(input),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data?.customer) {
+                  notify(data?.error || "Gagal membuat pelanggan");
+                  return null;
+                }
+                setCustomers((old) => [data.customer, ...old]);
+                notify("Data pelanggan ditambahkan");
+                return data.customer;
+              }}
+              onUpdate={async (id, patch) => {
+                const res = await fetch(`/api/customers/${id}`, {
+                  method: "PATCH",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(patch),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data?.customer) {
+                  notify(data?.error || "Gagal mengubah pelanggan");
+                  return null;
+                }
+                setCustomers((old) => old.map((c) => (c.id === id ? data.customer : c)));
                 notify("Data pelanggan diperbarui");
+                return data.customer;
+              }}
+              onDelete={async (customer) => {
+                const res = await fetch(`/api/customers/${customer.id}`, { method: "DELETE" });
+                if (!res.ok) {
+                  const data = await res.json().catch(() => null);
+                  notify(data?.error || "Gagal menghapus pelanggan");
+                  return false;
+                }
+                setCustomers((old) => old.filter((c) => c.id !== customer.id));
+                notify("Pelanggan dihapus");
+                return true;
               }}
               onPhoneChanged={(oldPhone, newPhone) => {
-                setTickets((old) =>
-                  old.map((t) =>
-                    normalizePhone(t.phone) === normalizePhone(oldPhone)
-                      ? {
-                          ...t,
-                          phone: newPhone,
-                          _touchedAt: new Date().toISOString(),
-                        }
-                      : t,
-                  ),
+                const affected = tickets.filter(
+                  (t) => normalizePhone(t.phone) === normalizePhone(oldPhone),
                 );
-                notify(
-                  `Nomor WA diperbarui — riwayat servis lama ikut disesuaikan ke ${newPhone}`,
+                affected.forEach((t) =>
+                  patchTicket(t.id, { phone: newPhone }, `Nomor WA ${t.id} disesuaikan`),
                 );
+                if (affected.length)
+                  notify(
+                    `Nomor WA diperbarui — ${affected.length} riwayat servis lama ikut disesuaikan ke ${newPhone}`,
+                  );
               }}
               onOpen={openDetail}
             />
@@ -1556,9 +1385,20 @@ export default function ServiceDesk() {
           ) : active === "Profil Toko" ? (
             <SettingsPanel
               shop={shop}
-              onSave={(value) => {
+              onSave={async (value) => {
                 setShop(value);
-                notify("Profil toko berhasil disimpan");
+                const res = await fetch("/api/shop", {
+                  method: "PATCH",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(value),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data?.shop) {
+                  setShop(data.shop);
+                  notify("Profil toko berhasil disimpan");
+                } else {
+                  notify(data?.error || "Gagal menyimpan profil toko");
+                }
               }}
             />
           ) : active === "Akun" ? (
@@ -1571,9 +1411,31 @@ export default function ServiceDesk() {
           ) : active === "Jasa Servis" ? (
             <ServicesPanel
               services={services}
-              onChange={(value) => {
-                setServices(value);
-                notify("Data jasa servis diperbarui");
+              onCreate={async (input) => {
+                const res = await fetch("/api/services", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(input),
+                });
+                const data = await res.json().catch(() => null);
+                if (!res.ok || !data?.service) {
+                  notify(data?.error || "Gagal membuat jasa servis");
+                  return null;
+                }
+                setServices((old) => [...old, data.service]);
+                notify("Data jasa servis ditambahkan");
+                return data.service;
+              }}
+              onDelete={async (item) => {
+                const res = await fetch(`/api/services/${item.id}`, { method: "DELETE" });
+                if (!res.ok) {
+                  const data = await res.json().catch(() => null);
+                  notify(data?.error || "Gagal menghapus jasa servis");
+                  return false;
+                }
+                setServices((old) => old.filter((s) => s.id !== item.id));
+                notify("Jasa servis dihapus");
+                return true;
               }}
             />
           ) : active === "Status Garansi" ? (
@@ -2587,13 +2449,23 @@ export default function ServiceDesk() {
 function CustomersPanel({
   tickets,
   customers: data,
-  onChange,
+  onCreate,
+  onUpdate,
+  onDelete,
   onPhoneChanged,
   onOpen,
 }: {
   tickets: Ticket[];
   customers: Customer[];
-  onChange: (customers: Customer[]) => void;
+  onCreate: (input: {
+    name: string;
+    category: Customer["category"];
+    phone: string;
+    address: string;
+    rating: number;
+  }) => Promise<Customer | null>;
+  onUpdate: (id: string, patch: Partial<Customer>) => Promise<Customer | null>;
+  onDelete: (customer: Customer) => Promise<boolean>;
   onPhoneChanged: (oldPhone: string, newPhone: string) => void;
   onOpen: (ticket: Ticket) => void;
 }) {
@@ -2602,11 +2474,9 @@ function CustomersPanel({
   const [editing, setEditing] = useState<Customer | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const pageSize = 15;
-  function persist(next: Customer[]) {
-    onChange(next);
-  }
-  function save(e: React.FormEvent<HTMLFormElement>) {
+  async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     const f = new FormData(e.currentTarget);
@@ -2615,28 +2485,24 @@ function CustomersPanel({
       return setError("Nomor telepon harus 9-15 digit");
     if (data.some((c) => c.phone === phone && c.id !== editing?.id))
       return setError("Nomor telepon sudah terdaftar");
-    const customer: Customer = {
-      id: editing?.id || `C-${Date.now()}`,
+    setBusy(true);
+    const input = {
       name: String(f.get("name")).trim(),
       category: String(f.get("category")) as Customer["category"],
       phone,
       address: String(f.get("address") || "-").trim(),
       rating: Number(f.get("rating") || 0),
-      createdAt: editing?.createdAt || localDateStr(),
-      _touchedAt: new Date().toISOString(),
     };
-    persist(
-      editing
-        ? data.map((c) => (c.id === editing.id ? customer : c))
-        : [customer, ...data],
-    );
+    const result = editing ? await onUpdate(editing.id, input) : await onCreate(input);
+    setBusy(false);
+    if (!result) return setError("Gagal menyimpan pelanggan, coba lagi");
     if (editing && editing.phone !== phone) onPhoneChanged(editing.phone, phone);
     setFormOpen(false);
     setEditing(null);
   }
-  function remove(customer: Customer) {
+  async function remove(customer: Customer) {
     if (tickets.some((t) => t.phone === customer.phone)) return;
-    persist(data.filter((c) => c.id !== customer.id));
+    await onDelete(customer);
   }
   function exportCustomers() {
     const rows = [
@@ -2779,15 +2645,7 @@ function CustomersPanel({
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
-                    onClick={() =>
-                      persist(
-                        data.map((x) =>
-                          x.id === c.id
-                            ? { ...x, rating: n, _touchedAt: new Date().toISOString() }
-                            : x,
-                        ),
-                      )
-                    }
+                    onClick={() => onUpdate(c.id, { rating: n })}
                     aria-label={`${n} bintang`}
                   >
                     <Star fill={c.rating >= n ? "currentColor" : "none"} />
@@ -2897,8 +2755,8 @@ function CustomersPanel({
               >
                 Batal
               </button>
-              <button className="newButton">
-                <CheckCircle2 /> Simpan Pelanggan
+              <button className="newButton" disabled={busy}>
+                <CheckCircle2 /> {busy ? "Menyimpan..." : "Simpan Pelanggan"}
               </button>
             </div>
           </form>
@@ -3349,27 +3207,34 @@ function AccountsPanel({
 
 function ServicesPanel({
   services,
-  onChange,
+  onCreate,
+  onDelete,
 }: {
   services: ServiceItem[];
-  onChange: (items: ServiceItem[]) => void;
+  onCreate: (input: {
+    name: string;
+    partCost: number;
+    shopPrice: number;
+    userPrice: number;
+    warrantyDays: number;
+  }) => Promise<ServiceItem | null>;
+  onDelete: (item: ServiceItem) => Promise<boolean>;
 }) {
   const [show, setShow] = useState(false);
-  function add(e: React.FormEvent<HTMLFormElement>) {
+  const [busy, setBusy] = useState(false);
+  async function add(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    onChange([
-      ...services,
-      {
-        id: `JS-${Date.now()}`,
-        name: String(f.get("name")),
-        partCost: Number(f.get("partCost")),
-        shopPrice: Number(f.get("shopPrice")),
-        userPrice: Number(f.get("userPrice")),
-        warrantyDays: Number(f.get("warrantyDays")),
-      },
-    ]);
-    setShow(false);
+    setBusy(true);
+    const result = await onCreate({
+      name: String(f.get("name")),
+      partCost: Number(f.get("partCost")),
+      shopPrice: Number(f.get("shopPrice")),
+      userPrice: Number(f.get("userPrice")),
+      warrantyDays: Number(f.get("warrantyDays")),
+    });
+    setBusy(false);
+    if (result) setShow(false);
   }
   return (
     <div className="modulePage">
@@ -3413,7 +3278,7 @@ function ServicesPanel({
             <option value="30">1 Bulan</option>
             <option value="90">3 Bulan</option>
           </select>
-          <button className="newButton">Simpan</button>
+          <button className="newButton" disabled={busy}>{busy ? "Menyimpan..." : "Simpan"}</button>
         </form>
       )}
       <section className="ticketPanel modulePanel">
@@ -3437,9 +3302,7 @@ function ServicesPanel({
               {s.warrantyDays ? `${s.warrantyDays} Hari` : "Tidak Ada"}
             </span>
             <span>
-              <button
-                onClick={() => onChange(services.filter((x) => x.id !== s.id))}
-              >
+              <button onClick={() => onDelete(s)}>
                 Hapus
               </button>
             </span>
