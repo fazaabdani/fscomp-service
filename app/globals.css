@@ -3809,7 +3809,7 @@ textarea {
   .printSummaryRow {
     display: flex;
     gap: 4mm;
-    padding: 4mm 0;
+    padding: 3mm 0;
     border-bottom: 1px solid #e2e8f0;
   }
   .printSummary {
@@ -3905,7 +3905,7 @@ textarea {
   .printTermsRow {
     display: flex;
     gap: 5mm;
-    padding: 3mm 0;
+    padding: 2mm 0;
   }
   .printTermsBox {
     flex: 1;
@@ -3995,7 +3995,8 @@ textarea {
     font-size: 6pt;
   }
   .servicePrint.receipt,
-  .servicePrint.receipt2 {
+  .servicePrint.receipt2,
+  .servicePrint.paid {
     page: notaLandscape;
   }
   @page notaLandscape {

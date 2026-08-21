@@ -458,7 +458,7 @@ export default function ServiceDesk() {
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [printMode, setPrintMode] = useState<
-    "receipt" | "receipt2" | "qr" | "accessories" | null
+    "receipt" | "receipt2" | "qr" | "accessories" | "paid" | null
   >(null);
   const [handoffDone, setHandoffDone] = useState({ receipt: false, whatsapp: false, qr: false, accessories: false });
   const [shop, setShop] = useState<ShopSettings>(defaultSettings);
@@ -839,7 +839,7 @@ export default function ServiceDesk() {
     const options = `${salutation(ticket.customer)},\n\nAlhamdulillah, hasil pengecekan ${ticket.device} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *${money(ticket.estimate)}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.\n\n${closing}`;
     return `${base}?text=${encodeURIComponent(kind === "received" ? received : kind === "cost" ? cost : options)}`;
   }
-  function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories") {
+  function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories" | "paid") {
     setPrintMode(mode);
     setTimeout(() => {
       window.print();
@@ -1843,6 +1843,12 @@ export default function ServiceDesk() {
                 >
                   <Printer size={17} /> Print tanda terima
                 </button>
+                <button
+                  className="ghost"
+                  onClick={() => printTicket("paid")}
+                >
+                  <Banknote size={17} /> Print nota lunas
+                </button>
                 <button className="ghost" onClick={() => printTicket("qr")}>
                   <QrCode size={17} /> Print QR
                 </button>
@@ -2156,6 +2162,202 @@ export default function ServiceDesk() {
               </div>
             </>
           )}
+        </div>
+      )}
+      {printMode === "paid" && selected && (
+        <div className="servicePrint paid">
+          <div className="printHeader">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+            <div className="printHeaderDivider" />
+            <div className="printHeaderId">
+              <small>Nota Lunas Pembayaran</small>
+              <em>Service ID</em>
+              <b>{selected.id}</b>
+              <span>
+                Tanggal Cetak:{" "}
+                {new Date().toLocaleDateString("id-ID", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </span>
+            </div>
+            <div className="printQr">
+              <QRCodeSVG
+                value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
+                size={70}
+                level="H"
+              />
+              <small>
+                <Smartphone size={10} /> Scan untuk tracking servis
+              </small>
+            </div>
+          </div>
+          <div className="printInfoGrid">
+            <div>
+              <span className="printInfoIcon">
+                <User size={14} color="#fff" />
+              </span>
+              <div>
+                <small>Pelanggan</small>
+                <strong>{selected.customer}</strong>
+                <span>{selected.phone}</span>
+              </div>
+            </div>
+            <div>
+              <span className="printInfoIcon">
+                <Smartphone size={14} color="#fff" />
+              </span>
+              <div>
+                <small>Perangkat</small>
+                <strong>{selected.device}</strong>
+                <span>SN: {selected.serial || "-"}</span>
+              </div>
+            </div>
+            <div>
+              <span className="printInfoIcon">
+                <CalendarDays size={14} color="#fff" />
+              </span>
+              <div>
+                <small>Tanggal Ambil</small>
+                <strong>{selected.pickedUpAt || localDateStr()}</strong>
+                <span>Petugas: {selected.handedBy || "Admin"}</span>
+              </div>
+            </div>
+            <div>
+              <span className="printInfoIcon">
+                <CircleDollarSign size={14} color="#fff" />
+              </span>
+              <div>
+                <small>Metode Pembayaran</small>
+                <strong>{selected.paymentMethod || "Tunai"}</strong>
+                <span>Status: Lunas</span>
+              </div>
+            </div>
+          </div>
+          <div className="printSummaryRow">
+            <div className="printSummary">
+              <div className="printSummaryHead">Ringkasan Pembayaran</div>
+              <div className="printSummaryGrid">
+                <div>
+                  <FileText size={13} />
+                  <small>Biaya Final</small>
+                  <b>{money(finalPrice(selected))}</b>
+                </div>
+                <div>
+                  <Wallet size={13} />
+                  <small>DP (Sudah Dibayar)</small>
+                  <b>{money(selected.downPayment)}</b>
+                </div>
+                <div>
+                  <Banknote size={13} />
+                  <small>Pelunasan (Sekarang)</small>
+                  <b>
+                    {money(
+                      Math.max(
+                        0,
+                        finalPrice(selected) - selected.downPayment,
+                      ),
+                    )}
+                  </b>
+                </div>
+              </div>
+              <div className="printPayNote">
+                <CircleDollarSign size={13} />
+                <div>
+                  <b>Status Pembayaran</b>
+                  <span>
+                    LUNAS — {money(finalPrice(selected))} telah diterima
+                    secara penuh.
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="printBankCard">
+              <div className="printBankHead">Garansi Servis</div>
+              {selected.warrantyDays ? (
+                <>
+                  <div className="printBankRow">
+                    <ShieldCheck size={12} />
+                    <span>{selected.warrantyDays} hari sejak pengambilan</span>
+                  </div>
+                  <div className="printBankRow">
+                    <ShieldCheck size={12} />
+                    <span>
+                      Berlaku sampai{" "}
+                      {new Date(
+                        new Date(
+                          `${selected.pickedUpAt || localDateStr()}T00:00:00`,
+                        ).getTime() +
+                          selected.warrantyDays * 86400000,
+                      ).toLocaleDateString("id-ID", {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="printBankRow">
+                  <ShieldCheck size={12} />
+                  <span>Tidak ada garansi untuk servis ini</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="printTermsRow">
+            <div className="printTermsBox">
+              <ShieldCheck size={14} />
+              <div>
+                <small>Ketentuan Garansi</small>
+                <p>
+                  {selected.warrantyDays
+                    ? "Garansi hanya untuk keluhan yang sama, tidak mencakup kerusakan baru akibat kelalaian pemakaian."
+                    : "Servis ini tanpa garansi. Simpan nota ini sebagai bukti pembayaran."}
+                </p>
+              </div>
+            </div>
+            <div className="printSign">
+              <span>
+                <em>Diserahkan oleh</em>
+                <i className="printSignSpace" />
+                <b>{selected.handedBy || "Admin"}</b>
+              </span>
+              <span>
+                <em>Diterima oleh</em>
+                <i className="printSignSpace" />
+                <b>{selected.pickupBy || selected.customer}</b>
+              </span>
+            </div>
+          </div>
+          <div className="printFooter">
+            <div className="printFooterContact">
+              {shop.phone && (
+                <span>
+                  <Phone size={11} /> {shop.phone}
+                </span>
+              )}
+              {shop.whatsapp && (
+                <span>
+                  <MessageCircle size={11} /> {shop.whatsapp}
+                </span>
+              )}
+              {shop.address && (
+                <span>
+                  <MapPin size={11} /> {shop.address}
+                </span>
+              )}
+              <span>
+                <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
+              </span>
+            </div>
+            <div className="printFooterBrand">
+              <b>{(shop.name || "FS Comp").toUpperCase()}</b>
+              <small>Service &amp; Technology Center</small>
+            </div>
+          </div>
         </div>
       )}
       {printMode === "receipt2" && selected && (
