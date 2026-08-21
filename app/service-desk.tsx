@@ -43,6 +43,7 @@ import {
   Globe,
   Wallet,
   Landmark,
+  LogOut,
 } from "lucide-react";
 
 type Status =
@@ -649,7 +650,6 @@ export default function ServiceDesk() {
   const serviceFormRef = useRef<HTMLFormElement>(null);
   const [serverReady, setServerReady] = useState(false);
   const submittingRef = useRef(false);
-  const paymentInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (modal === "new") {
@@ -701,18 +701,30 @@ export default function ServiceDesk() {
       } catch {}
     refreshUsers();
     fetch("/api/auth/me", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        // The session cookie can outlive an account being deactivated (the
+        // server re-checks on every request, but a page already open in the
+        // browser only notices when its next fetch comes back 401) — force
+        // it back to /login immediately instead of sitting on stale cached
+        // data with a dead session.
+        if (r.status === 401) { forceLogout(); return null; }
+        return r.ok ? r.json() : null;
+      })
       .then((data) => data && setCurrentUser(data.user));
     Promise.all([
-      fetch("/api/tickets", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/customers", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/services", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
-      fetch("/api/shop", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/tickets", { cache: "no-store" }),
+      fetch("/api/customers", { cache: "no-store" }),
+      fetch("/api/services", { cache: "no-store" }),
+      fetch("/api/shop", { cache: "no-store" }),
     ])
-      .then(([ticketsRes, customersRes, servicesRes, shopRes]) => {
+      .then(async (responses) => {
+        if (responses.some((r) => r.status === 401)) { forceLogout(); return; }
+        const [ticketsRes, customersRes, servicesRes, shopRes] = await Promise.all(
+          responses.map((r) => (r.ok ? r.json() : null)),
+        );
         if (ticketsRes) setTickets(ticketsRes.tickets);
         if (customersRes) setCustomers(customersRes.customers);
-        if (servicesRes && servicesRes.services.length) setServices(servicesRes.services);
+        if (servicesRes) setServices(servicesRes.services);
         if (shopRes?.shop) setShop(shopRes.shop);
         setServerReady(true);
       })
@@ -816,38 +828,16 @@ export default function ServiceDesk() {
   function notify(message: string) {
     setToast(message);
   }
-  async function recordPayment(
-    ticketId: string,
-    amount: number,
-    method: string,
-    note: string,
-  ) {
-    if (!amount) return;
-    // Guards against the common "impatient double click" duplicate — not a
-    // real server-side idempotency key, but cheap and covers the everyday
-    // case without a schema change.
-    const guardKey = `${ticketId}:${amount}:${method}`;
-    if (paymentInFlightRef.current.has(guardKey)) return;
-    paymentInFlightRef.current.add(guardKey);
-    try {
-      const res = await fetch("/api/payments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ticketId, amount, method, note }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        notify(
-          body?.error
-            ? `Pembayaran gagal tercatat: ${body.error}`
-            : "Pembayaran gagal tercatat di server",
-        );
-      }
-    } catch {
-      notify("Pembayaran gagal tercatat — periksa koneksi lalu cek ulang");
-    } finally {
-      paymentInFlightRef.current.delete(guardKey);
-    }
+  function forceLogout() {
+    localStorage.removeItem("fs-service-tickets-v1");
+    localStorage.removeItem("fs-service-settings-v1");
+    localStorage.removeItem("fs-service-catalog-v1");
+    localStorage.removeItem("fs-service-customers-v1");
+    window.location.href = "/login";
+  }
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    forceLogout();
   }
   function toggleJob(id: string) {
     setSelectedJobs((current) => {
@@ -917,24 +907,25 @@ export default function ServiceDesk() {
   async function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
     const before = tickets.find((t) => t.id === id);
     if (!before) return;
-    if (patch.downPayment !== undefined && patch.downPayment !== before.downPayment) {
-      const delta = patch.downPayment - before.downPayment;
-      recordPayment(
-        id,
-        delta,
-        patch.paymentMethod || before.paymentMethod || "Tunai",
-        delta > 0 ? message : `Koreksi turun DP — ${message}`,
-      );
-    }
     const updatedAt = localDateStr();
     const fullPatch = { ...patch, updatedAt };
     setTickets((old) => old.map((t) => (t.id === id ? { ...t, ...fullPatch } : t)));
     setSelected((old) => (old?.id === id ? { ...old, ...fullPatch } : old));
     notify(message);
+    // If downPayment changes, the server creates the matching ledger entry
+    // in the same transaction as the ticket update (see PATCH /api/tickets/[id])
+    // — the client no longer calls /api/payments separately, so the two can
+    // never fall out of sync from a lost or failed second request.
     const res = await fetch(`/api/tickets/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...fullPatch, expectedVersion: before.version }),
+      body: JSON.stringify({
+        ...fullPatch,
+        expectedVersion: before.version,
+        paymentNote: patch.downPayment !== undefined && patch.downPayment !== before.downPayment
+          ? (patch.downPayment > before.downPayment ? message : `Koreksi turun DP — ${message}`)
+          : undefined,
+      }),
     });
     const data = await res.json().catch(() => null);
     if (res.status === 409 && data?.ticket) {
@@ -1091,8 +1082,8 @@ export default function ServiceDesk() {
     setHandoffDone({ receipt: false, whatsapp: false, qr: false, accessories: accessoryItems(next.accessories).length === 0 });
     setModal("handoff");
     notify(`Servis ${next.id} berhasil dibuat`);
-    if (next.downPayment > 0)
-      recordPayment(next.id, next.downPayment, "Tunai", `DP awal saat servis ${next.id} diterima`);
+    // The opening DP payment is created server-side in the same transaction
+    // as the ticket (see POST /api/tickets) — nothing to record here.
     if (!customers.some((c) => c.phone === phone)) {
       const cRes = await fetch("/api/customers", {
         method: "POST",
@@ -1234,7 +1225,7 @@ export default function ServiceDesk() {
             .filter(
               ([, label]) =>
                 currentUser?.role === "ADMIN" ||
-                !["Profil Toko", "Akun", "Jasa Servis"].includes(label),
+                !["Profil Toko", "Akun", "Jasa Servis", "Laporan Servis", "Laporan Teknisi"].includes(label),
             )
             .map(([Icon, label]) => (
             <button
@@ -1279,6 +1270,9 @@ export default function ServiceDesk() {
             <strong>{currentUser?.name || "Memuat..."}</strong>
             <small>{currentUser?.role === "ADMIN" ? "Administrator" : "Teknisi/Pegawai"}</small>
           </div>
+          <button className="iconCircle" onClick={logout} aria-label="Keluar" title="Keluar">
+            <LogOut size={16} />
+          </button>
         </div>
       </aside>
 
@@ -1310,6 +1304,7 @@ export default function ServiceDesk() {
             <CustomersPanel
               tickets={tickets}
               customers={customers}
+              isAdmin={currentUser?.role === "ADMIN"}
               onCreate={async (input) => {
                 const res = await fetch("/api/customers", {
                   method: "POST",
@@ -2453,6 +2448,7 @@ export default function ServiceDesk() {
 function CustomersPanel({
   tickets,
   customers: data,
+  isAdmin,
   onCreate,
   onUpdate,
   onDelete,
@@ -2461,6 +2457,7 @@ function CustomersPanel({
 }: {
   tickets: Ticket[];
   customers: Customer[];
+  isAdmin: boolean;
   onCreate: (input: {
     name: string;
     category: Customer["category"];
@@ -2483,6 +2480,7 @@ function CustomersPanel({
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    if (editing && !isAdmin) return setError("Hanya Admin yang dapat mengubah data pelanggan");
     const f = new FormData(e.currentTarget);
     const phone = String(f.get("phone") || "").replace(/\D/g, "");
     if (phone.length < 9 || phone.length > 15)
@@ -2505,6 +2503,7 @@ function CustomersPanel({
     setEditing(null);
   }
   async function remove(customer: Customer) {
+    if (!isAdmin) return;
     if (tickets.some((t) => t.phone === customer.phone)) return;
     await onDelete(customer);
   }
@@ -2649,7 +2648,8 @@ function CustomersPanel({
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
-                    onClick={() => onUpdate(c.id, { rating: n })}
+                    disabled={!isAdmin}
+                    onClick={() => isAdmin && onUpdate(c.id, { rating: n })}
                     aria-label={`${n} bintang`}
                   >
                     <Star fill={c.rating >= n ? "currentColor" : "none"} />
@@ -2657,21 +2657,27 @@ function CustomersPanel({
                 ))}
               </span>
               <span className="customerChoices">
-                <button
-                  onClick={() => {
-                    setEditing(c);
-                    setFormOpen(true);
-                  }}
-                >
-                  Ubah
-                </button>
-                <button
-                  className="deleteCustomer"
-                  disabled={history.length > 0}
-                  onClick={() => remove(c)}
-                >
-                  {history.length ? "Tidak Dapat Dihapus" : "Hapus"}
-                </button>
+                {isAdmin ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditing(c);
+                        setFormOpen(true);
+                      }}
+                    >
+                      Ubah
+                    </button>
+                    <button
+                      className="deleteCustomer"
+                      disabled={history.length > 0}
+                      onClick={() => remove(c)}
+                    >
+                      {history.length ? "Tidak Dapat Dihapus" : "Hapus"}
+                    </button>
+                  </>
+                ) : (
+                  <small>Hanya Admin</small>
+                )}
               </span>
             </div>
           );
@@ -3199,9 +3205,11 @@ function AccountsPanel({
         <div className="permissionBox">
           <h3>Hak Akses dan Kewenangan</h3>
           <p>
-            Admin dapat mengubah profil, akun, pelanggan, jasa, pembayaran, dan
-            laporan. Teknisi/Pegawai dapat menerima servis, memperbarui proses,
-            dan menghubungi pelanggan.
+            Admin dapat mengubah profil toko, akun, jasa servis, mengedit atau
+            menghapus data pelanggan, mencatat pembayaran langsung di luar
+            tiket, dan melihat laporan. Teknisi/Pegawai dapat menerima servis
+            (termasuk mencatat DP dan pelanggan baru), memperbarui proses,
+            serta menghubungi pelanggan.
           </p>
         </div>
       </section>

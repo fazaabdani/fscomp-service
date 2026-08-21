@@ -12,6 +12,11 @@ export async function PATCH(
   const session = await currentSession();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN")
+    return NextResponse.json(
+      { error: "Hanya Admin yang dapat mengubah data pelanggan" },
+      { status: 403 },
+    );
   const body = await request.json().catch(() => null);
   if (!body)
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
@@ -60,6 +65,11 @@ export async function DELETE(
   const session = await currentSession();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN")
+    return NextResponse.json(
+      { error: "Hanya Admin yang dapat menghapus data pelanggan" },
+      { status: 403 },
+    );
   const existing = await prisma.customer.findUnique({ where: { id } });
   if (!existing)
     return NextResponse.json({ error: "Pelanggan tidak ditemukan" }, { status: 404 });

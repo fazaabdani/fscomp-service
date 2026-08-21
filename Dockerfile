@@ -20,4 +20,4 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/scripts ./scripts
 EXPOSE 3000
-CMD ["sh","-c","./node_modules/.bin/prisma db push --skip-generate && npm run start -- -H 0.0.0.0"]
+CMD ["sh","-c","./node_modules/.bin/prisma db push --skip-generate && node scripts/migrate-to-tables.mjs && npm run start -- -H 0.0.0.0"]

@@ -6,6 +6,11 @@ import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 export async function GET(request: Request) {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (u.role !== "ADMIN")
+    return NextResponse.json(
+      { error: "Hanya Admin yang dapat melihat riwayat pembayaran" },
+      { status: 403 },
+    );
   const ticketId = new URL(request.url).searchParams.get("ticketId");
   return NextResponse.json({
     payments: await prisma.payment.findMany({
@@ -18,6 +23,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Routine DP entries go through POST/PATCH /api/tickets, which create the
+  // matching Payment row in the same transaction as the ticket change — see
+  // those routes. This endpoint is now only for direct/manual ledger entries
+  // outside a ticket's normal flow, so it's restricted to Admin.
+  if (u.role !== "ADMIN")
+    return NextResponse.json(
+      { error: "Hanya Admin yang dapat mencatat pembayaran langsung" },
+      { status: 403 },
+    );
   const b = await request.json();
   // Negative amounts are allowed: a DP correction (technician lowers an
   // over-entered DP) needs a matching reversal so the ledger sum stays
@@ -27,6 +41,9 @@ export async function POST(request: Request) {
       { error: "Pembayaran tidak valid" },
       { status: 400 },
     );
+  const ticket = await prisma.ticket.findUnique({ where: { id: b.ticketId } });
+  if (!ticket)
+    return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
   const p = await prisma.payment.create({
     data: {
       id: randomUUID(),
