@@ -412,13 +412,20 @@ function useAutosave<T>(
   // loaded FROM the server — writing it straight back would bump the
   // version and log an audit entry for a no-op on every page load/refresh.
   const skipNext = useRef(true);
+  // Holds whatever hasn't been confirmed saved yet, so a refresh/tab-close
+  // in the middle of the 500ms debounce (e.g. right after creating a
+  // ticket) can still be flushed instead of silently lost — see the
+  // visibilitychange/pagehide effect below.
+  const pendingRef = useRef<T | null>(null);
   useEffect(() => {
     if (!ready) return;
     if (skipNext.current) {
       skipNext.current = false;
       return;
     }
+    pendingRef.current = value;
     const id = setTimeout(async () => {
+      pendingRef.current = null;
       try {
         const res = await fetch(`/api/state/${key}`, {
           method: "PUT",
@@ -454,9 +461,41 @@ function useAutosave<T>(
       } catch {
         /* offline: local state and localStorage fallback still apply */
       }
-    }, 500);
+    }, 150);
     return () => clearTimeout(id);
   }, [key, value, ready]);
+  useEffect(() => {
+    const flush = () => {
+      if (pendingRef.current === null) return;
+      const body = JSON.stringify({
+        value: pendingRef.current,
+        expectedVersion: versions.current[key],
+      });
+      // Browsers cap keepalive request bodies at ~64KB — a large "tickets"
+      // array won't fit, so there's nothing to gain by trying (it would
+      // just fail silently). This still covers shop/services/customers,
+      // and the 150ms debounce above is what protects the tickets key.
+      if (body.length > 60_000) return;
+      // keepalive lets this fetch survive the page unloading before it
+      // finishes — a plain fetch would otherwise get cancelled mid-flight.
+      fetch(`/api/state/${key}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+      pendingRef.current = null;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [key, versions]);
 }
 
 export default function ServiceDesk() {
@@ -714,6 +753,27 @@ export default function ServiceDesk() {
 
   function notify(message: string) {
     setToast(message);
+  }
+  // Best-effort immediate save for a just-created record, bypassing the
+  // autosave debounce — a brand-new ticket/customer otherwise only exists
+  // client-side for up to 150ms before being persisted, which is enough
+  // time for an impatient refresh right after "Terima Servis" to lose it.
+  // The regular debounced autosave still runs afterward as normal; on a
+  // race between the two, whichever version wins is still a correct save.
+  async function flushKeyNow(key: "tickets" | "customers", value: unknown) {
+    try {
+      const res = await fetch(`/api/state/${key}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value, expectedVersion: stateVersions.current[key] }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        stateVersions.current[key] = data.version;
+      }
+    } catch {
+      /* the debounced autosave (and its pagehide flush) will retry */
+    }
   }
   async function recordPayment(
     ticketId: string,
@@ -1001,15 +1061,17 @@ export default function ServiceDesk() {
       statusChangedAt: localDateStr(now),
       _touchedAt: now.toISOString(),
     };
-    setTickets((old) => [next, ...old]);
+    const nextTickets = [next, ...tickets];
+    setTickets(nextTickets);
+    flushKeyNow("tickets", nextTickets);
     setSelected(next);
     setHandoffDone({ receipt: false, whatsapp: false, qr: false, accessories: accessoryItems(next.accessories).length === 0 });
     setModal("handoff");
     notify(`Servis ${id} berhasil dibuat`);
     if (next.downPayment > 0)
       recordPayment(id, next.downPayment, "Tunai", `DP awal saat servis ${id} diterima`);
-    if (!customers.some((c) => c.phone === phone))
-      setCustomers((old) => [
+    if (!customers.some((c) => c.phone === phone)) {
+      const nextCustomers = [
         {
           id: `C-${Date.now()}`,
           name: next.customer,
@@ -1020,8 +1082,11 @@ export default function ServiceDesk() {
           createdAt: next.receivedAt,
           _touchedAt: now.toISOString(),
         },
-        ...old,
-      ]);
+        ...customers,
+      ];
+      setCustomers(nextCustomers);
+      flushKeyNow("customers", nextCustomers);
+    }
   }
   function exportCsv() {
     const head = [

@@ -3437,10 +3437,9 @@ textarea {
     text-align: center;
   }
   .servicePrint.receipt2 {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr;
-    gap: 6mm;
-    padding: 5mm;
+    display: block !important;
+    width: 200mm;
+    padding: 4mm;
   }
   .receiptCard {
     position: relative;
@@ -3450,6 +3449,10 @@ textarea {
     border-radius: 3mm;
     overflow: hidden;
     break-inside: avoid;
+  }
+  .receiptCard:first-child {
+    break-after: page;
+    page-break-after: always;
   }
   .receiptCardHead {
     display: flex;
@@ -3995,9 +3998,15 @@ textarea {
     font-size: 6pt;
   }
   .servicePrint.receipt,
-  .servicePrint.receipt2,
   .servicePrint.paid {
     page: notaLandscape;
+  }
+  .servicePrint.receipt2 {
+    page: notaA5Landscape;
+  }
+  @page notaA5Landscape {
+    size: A5 landscape;
+    margin: 4mm;
   }
   @page notaLandscape {
     size: A4 landscape;
