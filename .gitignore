@@ -8,3 +8,4 @@ server-error.log
 tsconfig.tsbuildinfo
 .claude/
 prod-backups/
+.tmp-preview/

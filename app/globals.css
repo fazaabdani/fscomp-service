@@ -3932,7 +3932,8 @@ textarea {
   }
   .servicePrint.receipt,
   .servicePrint.paid {
-    page: notaLandscape;
+    width: 190mm;
+    page: notaPortraitReceipt;
   }
   .servicePrint.receipt2 {
     page: notaA5Landscape;
@@ -3941,13 +3942,185 @@ textarea {
     size: A5 landscape;
     margin: 4mm;
   }
-  @page notaLandscape {
-    size: A4 landscape;
-    margin: 6mm;
+  @page notaPortraitReceipt {
+    size: A4 portrait;
+    margin: 10mm;
   }
   @page {
     size: A4 portrait;
     margin: 8mm;
+  }
+  /* Tanda Terima Servis (single) & Nota Lunas print on A4 portrait so the
+     receipt fills the page regardless of whether the print dialog is left
+     on its (usually portrait) default — no longer depends on the user
+     remembering to pick Landscape. Overrides are scoped to
+     .servicePrint.receipt/.paid specifically so the A5 dual-copy nota
+     (.receiptCopyPage.compact, still landscape) is unaffected. */
+  .servicePrint.receipt .printLogoFull,
+  .servicePrint.paid .printLogoFull {
+    height: 14mm;
+  }
+  .servicePrint.receipt .printHeaderId small,
+  .servicePrint.paid .printHeaderId small {
+    font-size: 9.5pt;
+  }
+  .servicePrint.receipt .printHeaderId em,
+  .servicePrint.paid .printHeaderId em {
+    margin-top: 2.5mm;
+    font-size: 7.5pt;
+  }
+  .servicePrint.receipt .printHeaderId b,
+  .servicePrint.paid .printHeaderId b {
+    font-size: 15pt;
+  }
+  .servicePrint.receipt .printHeaderId span,
+  .servicePrint.paid .printHeaderId span {
+    font-size: 7.5pt;
+  }
+  .servicePrint.receipt .printQr svg,
+  .servicePrint.paid .printQr svg {
+    width: 64px;
+    height: 64px;
+  }
+  .servicePrint.receipt .printQr small,
+  .servicePrint.paid .printQr small {
+    font-size: 6.5pt;
+  }
+  .servicePrint.receipt .printInfoGrid,
+  .servicePrint.paid .printInfoGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5mm 6mm;
+    padding: 5mm 0;
+  }
+  .servicePrint.receipt .printInfoGrid small,
+  .servicePrint.paid .printInfoGrid small,
+  .servicePrint.receipt .printIssueRow small,
+  .servicePrint.paid .printIssueRow small {
+    font-size: 7pt;
+  }
+  .servicePrint.receipt .printInfoGrid strong,
+  .servicePrint.paid .printInfoGrid strong,
+  .servicePrint.receipt .printIssueRow strong,
+  .servicePrint.paid .printIssueRow strong {
+    font-size: 11pt;
+  }
+  .servicePrint.receipt .printInfoGrid span,
+  .servicePrint.paid .printInfoGrid span,
+  .servicePrint.receipt .printIssueRow span,
+  .servicePrint.paid .printIssueRow span,
+  .servicePrint.receipt .printInfoGrid ul,
+  .servicePrint.paid .printInfoGrid ul {
+    font-size: 9pt;
+  }
+  .servicePrint.receipt .printIssueRow,
+  .servicePrint.paid .printIssueRow {
+    padding: 5mm 0;
+  }
+  .servicePrint.receipt .printIssueRow em,
+  .servicePrint.paid .printIssueRow em {
+    font-size: 7pt;
+  }
+  .servicePrint.receipt .printSummaryRow,
+  .servicePrint.paid .printSummaryRow {
+    flex-direction: column;
+    gap: 4mm;
+    padding: 5mm 0;
+  }
+  .servicePrint.receipt .printSummaryHead,
+  .servicePrint.paid .printSummaryHead {
+    padding: 3mm 5mm;
+    font-size: 9pt;
+  }
+  .servicePrint.receipt .printSummaryGrid,
+  .servicePrint.paid .printSummaryGrid {
+    gap: 4mm;
+    padding: 5mm;
+  }
+  .servicePrint.receipt .printSummaryGrid small,
+  .servicePrint.paid .printSummaryGrid small {
+    font-size: 7.5pt;
+  }
+  .servicePrint.receipt .printSummaryGrid b,
+  .servicePrint.paid .printSummaryGrid b {
+    font-size: 13pt;
+  }
+  .servicePrint.receipt .printPayNote,
+  .servicePrint.paid .printPayNote {
+    margin: 0 5mm 4mm;
+    padding: 3mm 4mm;
+  }
+  .servicePrint.receipt .printPayNote b,
+  .servicePrint.paid .printPayNote b {
+    font-size: 8.5pt;
+  }
+  .servicePrint.receipt .printPayNote span,
+  .servicePrint.paid .printPayNote span {
+    font-size: 8pt;
+  }
+  .servicePrint.receipt .printBankCard,
+  .servicePrint.paid .printBankCard {
+    padding: 4mm 5mm;
+  }
+  .servicePrint.receipt .printBankHead,
+  .servicePrint.paid .printBankHead {
+    font-size: 8pt;
+    margin-bottom: 2mm;
+  }
+  .servicePrint.receipt .printBankRow,
+  .servicePrint.paid .printBankRow {
+    padding: 1.8mm 0;
+  }
+  .servicePrint.receipt .printBankRow span,
+  .servicePrint.paid .printBankRow span {
+    font-size: 8.5pt;
+  }
+  .servicePrint.receipt .printTermsRow,
+  .servicePrint.paid .printTermsRow {
+    flex-direction: column;
+    gap: 4mm;
+    padding: 4mm 0;
+  }
+  .servicePrint.receipt .printTermsBox small,
+  .servicePrint.paid .printTermsBox small {
+    font-size: 8pt;
+  }
+  .servicePrint.receipt .printTermsBox p,
+  .servicePrint.paid .printTermsBox p {
+    font-size: 8pt;
+  }
+  .servicePrint.receipt .printSign,
+  .servicePrint.paid .printSign {
+    justify-content: space-between;
+    font-size: 10.5pt;
+  }
+  .servicePrint.receipt .printSign span,
+  .servicePrint.paid .printSign span {
+    width: 55mm;
+  }
+  .servicePrint.receipt .printSign em,
+  .servicePrint.paid .printSign em {
+    font-size: 7.5pt;
+  }
+  .servicePrint.receipt .printSignSpace,
+  .servicePrint.paid .printSignSpace {
+    height: 10mm;
+  }
+  .servicePrint.receipt .printSign b,
+  .servicePrint.paid .printSign b {
+    font-size: 10pt;
+  }
+  .servicePrint.receipt .printFooterContact,
+  .servicePrint.paid .printFooterContact {
+    font-size: 7.5pt;
+    gap: 5mm;
+  }
+  .servicePrint.receipt .printFooterBrand b,
+  .servicePrint.paid .printFooterBrand b {
+    font-size: 9.5pt;
+  }
+  .servicePrint.receipt .printFooterBrand small,
+  .servicePrint.paid .printFooterBrand small {
+    font-size: 7pt;
   }
 }
 .modulePage {
