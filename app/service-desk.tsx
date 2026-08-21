@@ -377,6 +377,231 @@ const finalPrice = (t: Ticket) =>
 // a paid-in-full receipt for a ticket that hasn't really been settled.
 const isFullyPaid = (t: Ticket) =>
   t.costConfirmed && Math.max(0, finalPrice(t) - t.downPayment) === 0;
+function accessoryItems(value: string) {
+  return value
+    .split(/[,+;\n]/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .filter((x) => !/^(-|tidak ada|unit only)$/i.test(x));
+}
+// Shared "Tanda Terima Servis" body — used both for the single A4-landscape
+// receipt and (twice, once per page) for the A5-landscape dual-copy nota,
+// so the two can't visually drift apart the way they did before.
+function ServiceReceiptBody({
+  ticket,
+  shop,
+  copyLabel,
+  compact,
+}: {
+  ticket: Ticket;
+  shop: ShopSettings;
+  copyLabel?: string;
+  compact?: boolean;
+}) {
+  return (
+    <>
+      <div className="printHeader">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        <div className="printHeaderDivider" />
+        <div className="printHeaderId">
+          <small>Tanda Terima Servis{copyLabel ? ` · ${copyLabel}` : ""}</small>
+          <em>Service ID</em>
+          <b>{ticket.id}</b>
+          {!compact && (
+            <span>
+              Tanggal Cetak:{" "}
+              {new Date().toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+              })}
+            </span>
+          )}
+        </div>
+        <div className="printQr">
+          <QRCodeSVG
+            value={`${location.origin}/track?id=${encodeURIComponent(ticket.id)}`}
+            size={86}
+            level="H"
+          />
+          {!compact && (
+            <small>
+              <Smartphone size={10} /> Scan untuk tracking servis
+            </small>
+          )}
+        </div>
+      </div>
+      <div className="printInfoGrid">
+        <div>
+          <span className="printInfoIcon">
+            <User size={14} color="#fff" />
+          </span>
+          <div>
+            <small>Pelanggan</small>
+            <strong>{ticket.customer}</strong>
+            <span>{ticket.phone}</span>
+          </div>
+        </div>
+        <div>
+          <span className="printInfoIcon">
+            <Smartphone size={14} color="#fff" />
+          </span>
+          <div>
+            <small>Perangkat</small>
+            <strong>{ticket.device}</strong>
+            <span>SN: {ticket.serial || "-"}</span>
+          </div>
+        </div>
+        <div>
+          <span className="printInfoIcon">
+            <CalendarDays size={14} color="#fff" />
+          </span>
+          <div>
+            <small>Tanggal Terima</small>
+            <strong>{ticket.receivedAt}</strong>
+            <span>Teknisi: {ticket.technician}</span>
+          </div>
+        </div>
+        <div>
+          <span className="printInfoIcon">
+            <CheckCircle2 size={14} color="#fff" />
+          </span>
+          <div>
+            <small>Kelengkapan Diterima</small>
+            {accessoryItems(ticket.accessories).length ? (
+              compact ? (
+                <span>{accessoryItems(ticket.accessories).join(", ")}</span>
+              ) : (
+                <ul>
+                  {accessoryItems(ticket.accessories).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )
+            ) : (
+              <span>Unit only</span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="printIssueRow">
+        <span className="printInfoIcon">
+          <Wrench size={14} color="#fff" />
+        </span>
+        <div>
+          <small>Keluhan / Kondisi Awal</small>
+          <strong>{ticket.issue}</strong>
+          {ticket.notes && (
+            <>
+              <em>Catatan Tambahan</em>
+              <span>{ticket.notes}</span>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="printSummaryRow">
+        <div className="printSummary">
+          <div className="printSummaryHead">Ringkasan Servis</div>
+          <div className="printSummaryGrid">
+            <div>
+              <FileText size={13} />
+              <small>Estimasi Biaya</small>
+              <b>{ticket.estimate ? money(ticket.estimate) : "Belum diestimasi"}</b>
+            </div>
+            <div>
+              <Wallet size={13} />
+              <small>DP (Uang Muka)</small>
+              <b>{money(ticket.downPayment)}</b>
+            </div>
+            <div>
+              <Banknote size={13} />
+              <small>Sisa Pembayaran</small>
+              <b>{money(Math.max(0, ticket.estimate - ticket.downPayment))}</b>
+            </div>
+          </div>
+          {shop.bank && !compact && (
+            <div className="printPayNote">
+              <Landmark size={13} />
+              <div>
+                <b>Info Pembayaran</b>
+                <span>
+                  Konfirmasi pembayaran harap menyertakan nomor Service ID
+                  pada keterangan.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+        {shop.bank && (
+          <div className="printBankCard">
+            <div className="printBankHead">Rekening Transaksi</div>
+            {shop.bank
+              .split("\n")
+              .map((l) => l.trim())
+              .filter(Boolean)
+              .map((line) => (
+                <div className="printBankRow" key={line}>
+                  <Landmark size={12} />
+                  <span>{line}</span>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+      <div className="printTermsRow">
+        <div className="printTermsBox">
+          <ShieldCheck size={14} />
+          <div>
+            <small>Ketentuan Servis</small>
+            <p>
+              {shop.terms ||
+                "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
+            </p>
+          </div>
+        </div>
+        <div className="printSign">
+          <span>
+            <em>Pelanggan</em>
+            <i className="printSignSpace" />
+            <b>{ticket.customer}</b>
+          </span>
+          <span>
+            <em>Petugas {shop.name || "FS Comp"}</em>
+            <i className="printSignSpace" />
+            <b>{ticket.handedBy || "Admin"}</b>
+          </span>
+        </div>
+      </div>
+      <div className="printFooter">
+        <div className="printFooterContact">
+          {shop.phone && (
+            <span>
+              <Phone size={11} /> {shop.phone}
+            </span>
+          )}
+          {shop.whatsapp && (
+            <span>
+              <MessageCircle size={11} /> {shop.whatsapp}
+            </span>
+          )}
+          {shop.address && (
+            <span>
+              <MapPin size={11} /> {shop.address}
+            </span>
+          )}
+          <span>
+            <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
+          </span>
+        </div>
+        <div className="printFooterBrand">
+          <b>{(shop.name || "FS Comp").toUpperCase()}</b>
+          <small>Service &amp; Technology Center</small>
+        </div>
+      </div>
+    </>
+  );
+}
 function mergeById<T extends { id: string }>(
   serverArr: T[],
   localArr: T[],
@@ -966,13 +1191,6 @@ export default function ServiceDesk() {
       window.print();
       setPrintMode(null);
     }, 120);
-  }
-  function accessoryItems(value: string) {
-    return value
-      .split(/[,+;\n]/)
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .filter((x) => !/^(-|tidak ada|unit only)$/i.test(x));
   }
   function chooseCustomer(customer: Customer) {
     setCustomerQuery(customer.name);
@@ -2096,29 +2314,18 @@ export default function ServiceDesk() {
           )}
         </div>
       )}
-      {(printMode === "receipt" || printMode === "qr") && selected && (
-        <div className={`servicePrint ${printMode}`}>
+      {printMode === "receipt" && selected && (
+        <div className="servicePrint receipt">
+          <ServiceReceiptBody ticket={selected} shop={shop} />
+        </div>
+      )}
+      {printMode === "qr" && selected && (
+        <div className="servicePrint qr">
           <div className="printHeader">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-            <div className="printHeaderDivider" />
-            <div className="printHeaderId">
-              <small>Tanda Terima Servis</small>
-              <em>Service ID</em>
-              <b>{selected.id}</b>
-              <span>
-                Tanggal Cetak:{" "}
-                {new Date().toLocaleDateString("id-ID", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
             <div className="printQr">
               <QRCodeSVG
                 value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
-                size={printMode === "qr" ? 260 : 86}
+                size={260}
                 level="H"
               />
               <small>
@@ -2126,184 +2333,6 @@ export default function ServiceDesk() {
               </small>
             </div>
           </div>
-          {printMode === "receipt" && (
-            <>
-              <div className="printInfoGrid">
-                <div>
-                  <span className="printInfoIcon">
-                    <User size={14} color="#fff" />
-                  </span>
-                  <div>
-                    <small>Pelanggan</small>
-                    <strong>{selected.customer}</strong>
-                    <span>{selected.phone}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="printInfoIcon">
-                    <Smartphone size={14} color="#fff" />
-                  </span>
-                  <div>
-                    <small>Perangkat</small>
-                    <strong>{selected.device}</strong>
-                    <span>SN: {selected.serial || "-"}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="printInfoIcon">
-                    <CalendarDays size={14} color="#fff" />
-                  </span>
-                  <div>
-                    <small>Tanggal Terima</small>
-                    <strong>{selected.receivedAt}</strong>
-                    <span>Teknisi: {selected.technician}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="printInfoIcon">
-                    <CheckCircle2 size={14} color="#fff" />
-                  </span>
-                  <div>
-                    <small>Kelengkapan Diterima</small>
-                    {accessoryItems(selected.accessories).length ? (
-                      <ul>
-                        {accessoryItems(selected.accessories).map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span>Unit only</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="printIssueRow">
-                <span className="printInfoIcon">
-                  <Wrench size={14} color="#fff" />
-                </span>
-                <div>
-                  <small>Keluhan / Kondisi Awal</small>
-                  <strong>{selected.issue}</strong>
-                  {selected.notes && (
-                    <>
-                      <em>Catatan Tambahan</em>
-                      <span>{selected.notes}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="printSummaryRow">
-                <div className="printSummary">
-                  <div className="printSummaryHead">Ringkasan Servis</div>
-                  <div className="printSummaryGrid">
-                    <div>
-                      <FileText size={13} />
-                      <small>Estimasi Biaya</small>
-                      <b>
-                        {selected.estimate
-                          ? money(selected.estimate)
-                          : "Belum diestimasi"}
-                      </b>
-                    </div>
-                    <div>
-                      <Wallet size={13} />
-                      <small>DP (Uang Muka)</small>
-                      <b>{money(selected.downPayment)}</b>
-                    </div>
-                    <div>
-                      <Banknote size={13} />
-                      <small>Sisa Pembayaran</small>
-                      <b>
-                        {money(
-                          Math.max(
-                            0,
-                            selected.estimate - selected.downPayment,
-                          ),
-                        )}
-                      </b>
-                    </div>
-                  </div>
-                  {shop.bank && (
-                    <div className="printPayNote">
-                      <Landmark size={13} />
-                      <div>
-                        <b>Info Pembayaran</b>
-                        <span>
-                          Konfirmasi pembayaran harap menyertakan nomor
-                          Service ID pada keterangan.
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {shop.bank && (
-                  <div className="printBankCard">
-                    <div className="printBankHead">Rekening Transaksi</div>
-                    {shop.bank
-                      .split("\n")
-                      .map((l) => l.trim())
-                      .filter(Boolean)
-                      .map((line) => (
-                        <div className="printBankRow" key={line}>
-                          <Landmark size={12} />
-                          <span>{line}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-              <div className="printTermsRow">
-                <div className="printTermsBox">
-                  <ShieldCheck size={14} />
-                  <div>
-                    <small>Ketentuan Servis</small>
-                    <p>
-                      {shop.terms ||
-                        "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
-                    </p>
-                  </div>
-                </div>
-                <div className="printSign">
-                  <span>
-                    <em>Pelanggan</em>
-                    <i className="printSignSpace" />
-                    <b>{selected.customer}</b>
-                  </span>
-                  <span>
-                    <em>Petugas {shop.name || "FS Comp"}</em>
-                    <i className="printSignSpace" />
-                    <b>{selected.handedBy || "Admin"}</b>
-                  </span>
-                </div>
-              </div>
-              <div className="printFooter">
-                <div className="printFooterContact">
-                  {shop.phone && (
-                    <span>
-                      <Phone size={11} /> {shop.phone}
-                    </span>
-                  )}
-                  {shop.whatsapp && (
-                    <span>
-                      <MessageCircle size={11} /> {shop.whatsapp}
-                    </span>
-                  )}
-                  {shop.address && (
-                    <span>
-                      <MapPin size={11} /> {shop.address}
-                    </span>
-                  )}
-                  <span>
-                    <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
-                  </span>
-                </div>
-                <div className="printFooterBrand">
-                  <b>{(shop.name || "FS Comp").toUpperCase()}</b>
-                  <small>Service &amp; Technology Center</small>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       )}
       {printMode === "paid" && selected && (
@@ -2505,75 +2534,9 @@ export default function ServiceDesk() {
       {printMode === "receipt2" && selected && (
         <div className="servicePrint receipt2">
           {["Untuk Pelanggan", "Arsip Toko"].map((copy) => (
-            <article className="receiptCard" key={copy}>
-              <header className="receiptCardHead">
-                <div className="receiptBrand">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <span className="receiptBrandMark">
-                    <img src="/logo-mark.png" alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                  </span>
-                  <div>
-                    <strong>{shop.name || "FS COMP"}</strong>
-                    <small>Tanda Terima Servis · {copy}</small>
-                  </div>
-                </div>
-                <div className="receiptCardId">
-                  <small>No. Servis</small>
-                  <b>{selected.id}</b>
-                </div>
-              </header>
-              <section className="receiptCardBody">
-                <QRCodeSVG
-                  value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
-                  size={88}
-                  level="H"
-                />
-                <div className="receiptCardGrid">
-                  <div>
-                    <small>Pelanggan</small>
-                    <b>{selected.customer}</b>
-                    <span>{selected.phone}</span>
-                  </div>
-                  <div>
-                    <small>Perangkat</small>
-                    <b>{selected.device}</b>
-                    <span>SN: {selected.serial || "-"}</span>
-                  </div>
-                  <div>
-                    <small>Tanggal Terima</small>
-                    <b>{selected.receivedAt}</b>
-                    <span>Teknisi: {selected.technician}</span>
-                  </div>
-                  <div>
-                    <small>Estimasi / DP</small>
-                    <b>{money(selected.estimate)}</b>
-                    <span>DP {money(selected.downPayment)}</span>
-                  </div>
-                </div>
-              </section>
-              <div className="receiptIssue">
-                <small>Keluhan / Kerusakan</small>
-                <p>{selected.issue}</p>
-                <span>Kelengkapan: {selected.accessories}</span>
-              </div>
-              {shop.bank && (
-                <div className="receiptPay">
-                  <small>Info Pembayaran</small>
-                  <span>{shop.bank}</span>
-                </div>
-              )}
-              <footer className="receiptCardFoot">
-                <span>Scan QR untuk cek status servis</span>
-                <span>Tanda tangan: ____________________</span>
-              </footer>
-              {shop.terms && <p className="receiptTerms">{shop.terms}</p>}
-              {(shop.phone || shop.address) && (
-                <div className="receiptContact">
-                  {shop.phone && <span>{shop.phone}</span>}
-                  {shop.address && <span>{shop.address}</span>}
-                </div>
-              )}
-            </article>
+            <div className="receiptCopyPage compact" key={copy}>
+              <ServiceReceiptBody ticket={selected} shop={shop} copyLabel={copy} compact />
+            </div>
           ))}
         </div>
       )}

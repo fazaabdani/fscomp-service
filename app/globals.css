@@ -3439,194 +3439,118 @@ textarea {
   .servicePrint.receipt2 {
     display: block !important;
     width: 200mm;
-    padding: 4mm;
+    padding: 0;
   }
-  .receiptCard {
-    position: relative;
-    min-height: 128mm;
-    padding: 0 7mm 7mm;
-    border: 1px solid #e2e8f0;
-    border-radius: 3mm;
-    overflow: hidden;
-    break-inside: avoid;
+  .receiptCopyPage {
+    padding: 3mm;
   }
-  .receiptCard:first-child {
+  .receiptCopyPage:first-child {
     break-after: page;
     page-break-after: always;
   }
-  .receiptCardHead {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin: 0 -7mm 4mm;
-    padding: 5mm 7mm;
-    background: #101c47;
-  }
-  .receiptBrand {
-    display: flex;
-    align-items: center;
+  .receiptCopyPage.compact .printHeader {
+    margin: -3mm -3mm 2mm;
+    padding: 2mm 3mm;
     gap: 3mm;
   }
-  .receiptBrandMark {
-    display: grid;
-    place-items: center;
-    width: 10mm;
-    height: 10mm;
-    border-radius: 2.5mm;
-    background: #fff;
-    overflow: hidden;
+  .receiptCopyPage.compact .printLogoFull {
+    height: 8mm;
   }
-  .receiptBrandMark img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .receiptBrand strong {
-    display: block;
-    font-size: 12pt;
-    color: #fff;
-  }
-  .receiptBrand small {
-    display: block;
-    margin-top: 0.5mm;
-    color: rgba(255, 255, 255, 0.85);
+  .receiptCopyPage.compact .printHeaderId small {
     font-size: 7pt;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
   }
-  .receiptCardId {
-    text-align: right;
+  .receiptCopyPage.compact .printHeaderId em {
+    display: none;
   }
-  .receiptCardId small {
-    display: block;
-    color: rgba(255, 255, 255, 0.75);
-    font-size: 6pt;
-    text-transform: uppercase;
-  }
-  .receiptCardId b {
-    display: block;
-    margin-top: 1mm;
-    padding: 1mm 2.5mm;
-    border-radius: 1.5mm;
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.4);
+  .receiptCopyPage.compact .printHeaderId b {
     font-size: 10pt;
-    color: #fff;
+    padding-bottom: 0.5mm;
   }
-  .receiptCardBody {
-    display: flex;
-    gap: 5mm;
-    align-items: flex-start;
-    margin-bottom: 4mm;
+  .receiptCopyPage.compact .printQr {
+    padding: 1.5mm;
+    gap: 0;
   }
-  .receiptCardBody > svg {
-    padding: 2mm;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 2mm;
+  .receiptCopyPage.compact .printQr svg {
+    width: 50px;
+    height: 50px;
   }
-  .receiptCardGrid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3mm 5mm;
+  .receiptCopyPage.compact .printInfoGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2mm;
+    padding: 1.5mm 0;
   }
-  .receiptCardGrid > div {
-    position: relative;
-    padding-left: 2.5mm;
-  }
-  .receiptCardGrid > div::before {
-    content: "";
-    position: absolute;
-    inset: 0.5mm auto 0.5mm 0;
-    width: 0.7mm;
-    border-radius: 1mm;
-    background: #a9bdf5;
-  }
-  .receiptCardGrid small {
-    display: block;
-    color: #1d4fd8;
-    font-size: 6pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-  }
-  .receiptCardGrid b {
-    display: block;
-    margin-top: 0.5mm;
-    font-size: 9pt;
-    color: #111827;
-  }
-  .receiptCardGrid span {
-    display: block;
-    margin-top: 0.5mm;
-    color: #64748b;
+  .receiptCopyPage.compact .printInfoGrid strong,
+  .receiptCopyPage.compact .printIssueRow strong {
     font-size: 7.5pt;
   }
-  .receiptIssue {
-    padding: 3.5mm;
-    margin-bottom: 4mm;
-    background: #f8fafc;
-    border-radius: 2mm;
+  .receiptCopyPage.compact .printInfoGrid span,
+  .receiptCopyPage.compact .printIssueRow span,
+  .receiptCopyPage.compact .printInfoGrid ul {
+    font-size: 6.5pt;
   }
-  .receiptIssue small {
-    display: block;
-    color: #1d4fd8;
-    font-size: 6pt;
-    font-weight: 700;
-    text-transform: uppercase;
+  .receiptCopyPage.compact .printIssueRow {
+    padding: 1.5mm 0;
   }
-  .receiptIssue p {
-    margin: 1mm 0 0;
-    font-size: 9pt;
-    color: #111827;
+  .receiptCopyPage.compact .printSummaryRow {
+    gap: 2mm;
+    padding: 1.5mm 0;
   }
-  .receiptIssue span {
-    display: block;
-    margin-top: 1.5mm;
-    color: #64748b;
+  .receiptCopyPage.compact .printSummaryHead {
+    padding: 1.2mm 3mm;
+    font-size: 6.5pt;
+  }
+  .receiptCopyPage.compact .printSummaryGrid {
+    padding: 1.5mm;
+    gap: 2mm;
+  }
+  .receiptCopyPage.compact .printSummaryGrid small {
+    font-size: 5.5pt;
+  }
+  .receiptCopyPage.compact .printSummaryGrid b {
+    font-size: 8pt;
+  }
+  .receiptCopyPage.compact .printBankCard {
+    padding: 1.5mm 2mm;
+  }
+  .receiptCopyPage.compact .printBankHead {
+    font-size: 5.5pt;
+    margin-bottom: 0.6mm;
+  }
+  .receiptCopyPage.compact .printBankRow {
+    padding: 0.6mm 0;
+  }
+  .receiptCopyPage.compact .printBankRow span {
+    font-size: 5.8pt;
+  }
+  .receiptCopyPage.compact .printTermsRow {
+    padding: 1.2mm 0;
+  }
+  .receiptCopyPage.compact .printTermsBox p {
+    font-size: 5.8pt;
+  }
+  .receiptCopyPage.compact .printSign {
+    gap: 3mm;
     font-size: 7.5pt;
   }
-  .receiptPay {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 2.5mm 3.5mm;
-    margin-bottom: 4mm;
-    background: #f0fdf6;
-    border: 1px solid #bbf0d4;
-    border-radius: 2mm;
-    font-size: 7.5pt;
+  .receiptCopyPage.compact .printSign span {
+    width: 30mm;
   }
-  .receiptPay small {
-    color: #16855a;
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 6pt;
+  .receiptCopyPage.compact .printSignSpace {
+    height: 3.5mm;
   }
-  .receiptPay span {
-    color: #111827;
-    font-weight: 700;
+  .receiptCopyPage.compact .printFooter {
+    margin: 2mm -3mm -3mm;
+    padding: 1.5mm 3mm;
   }
-  .receiptCardFoot {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
+  .receiptCopyPage.compact .printFooterContact {
+    font-size: 5.8pt;
+    gap: 3mm;
+  }
+  .receiptCopyPage.compact .printFooterBrand b {
     font-size: 7pt;
-    color: #101c47;
   }
-  .receiptTerms {
-    margin: 3mm 0 0;
-    font-size: 6.5pt;
-    color: #94a3b8;
-    line-height: 1.4;
-  }
-  .receiptContact {
-    display: flex;
-    gap: 4mm;
-    margin-top: 1.5mm;
-    font-size: 6.5pt;
-    color: #64748b;
+  .receiptCopyPage.compact .printFooterBrand small {
+    font-size: 5.2pt;
   }
   .accessorySheetHead {
     display: flex;
@@ -3731,8 +3655,17 @@ textarea {
     font-size: 6pt;
     text-align: center;
   }
-  .qr .printHeader {
+  .qr .printLogoFull,
+  .qr .printHeaderDivider,
+  .qr .printHeaderId {
     display: none;
+  }
+  .qr .printHeader {
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: 0;
+    border-bottom: 0;
   }
   .qr .printQr {
     margin: 0 auto;
