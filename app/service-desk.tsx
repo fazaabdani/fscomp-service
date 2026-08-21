@@ -1248,11 +1248,18 @@ export default function ServiceDesk() {
       return;
     }
     const datePart = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    let seq = tickets.length + 17;
-    let id = `SRV-${datePart}-${String(seq).padStart(3, "0")}`;
+    // Derived from the clock, not tickets.length — two people creating a
+    // ticket around the same moment on different devices both compute
+    // tickets.length against their own possibly-stale local copy, so a
+    // counter-based id can collide across sessions in a way this
+    // session's own `tickets` array has no way to detect. Milliseconds
+    // make an actual collision practically impossible; the loop below is
+    // just a fallback for the local session's own array.
+    let seq = now.getTime() % 100000;
+    let id = `SRV-${datePart}-${String(seq).padStart(5, "0")}`;
     while (tickets.some((t) => t.id === id)) {
       seq += 1;
-      id = `SRV-${datePart}-${String(seq).padStart(3, "0")}`;
+      id = `SRV-${datePart}-${String(seq).padStart(5, "0")}`;
     }
     const next: Ticket = {
       id,
