@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 
-const allowed = new Set(["tickets", "shop", "services", "staff", "customers"]);
+const allowed = new Set(["tickets", "shop", "services", "customers"]);
 export async function GET(
   _: Request,
   { params }: { params: Promise<{ key: string }> },
@@ -31,8 +31,12 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!allowed.has(key))
     return NextResponse.json({ error: "Key tidak valid" }, { status: 400 });
+  // tickets/customers stay open to any authenticated staff — receiving a
+  // service and auto-creating a customer record is a core Teknisi/Pegawai
+  // workflow (see submitTicket). shop/services (pricing catalog) are
+  // Admin-only per the permissions promised in the Akun panel.
   if (
-    (key === "shop" || key === "staff") &&
+    (key === "shop" || key === "services") &&
     user.role !== "ADMIN"
   )
     return NextResponse.json(

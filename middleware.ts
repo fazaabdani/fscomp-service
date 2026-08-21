@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/session";
+import { prisma } from "@/lib/prisma";
 
 // Node.js runtime (not Edge) so verifySession can use the `crypto` module.
 export const runtime = "nodejs";
 
-export function middleware(req:NextRequest){
+export async function middleware(req:NextRequest){
   const path=req.nextUrl.pathname;
   if(path==="/"&&req.nextUrl.searchParams.has("service")){
     const url=req.nextUrl.clone();url.pathname="/track";url.searchParams.set("id",req.nextUrl.searchParams.get("service")||"");url.searchParams.delete("service");return NextResponse.redirect(url);
@@ -17,7 +18,12 @@ export function middleware(req:NextRequest){
   const isStaticAsset=!path.startsWith("/api")&&/\.(png|jpg|jpeg|svg|webp|gif|ico|css|js|map)$/.test(path);
   const publicPath=isStaticAsset||path.startsWith("/login")||path.startsWith("/track")||path.startsWith("/api/auth")||path.startsWith("/api/public")||path.startsWith("/api/internal")||path==="/api/health"||path.startsWith("/_next");
   if(publicPath)return NextResponse.next();
-  if(!verifySession(req.cookies.get("fs_session")?.value)){const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res}
+  const claimed=verifySession(req.cookies.get("fs_session")?.value);
+  // The signed cookie can't be revoked on its own — re-check the DB so a
+  // deactivated account is kicked to /login within one request instead of
+  // surviving until its 8h cookie expires.
+  const user=claimed?await prisma.user.findUnique({where:{id:claimed.id}}):null;
+  if(!user||!user.active){const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res}
   return NextResponse.next();
 }
 export const config={matcher:["/((?!favicon.ico).*)"]};

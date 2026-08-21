@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { prisma } from "@/lib/prisma";
 
 export type SessionUser = {
   id: string;
@@ -46,5 +47,13 @@ export function verifySession(token?: string | null): SessionUser | null {
 }
 export async function currentSession() {
   const store = await cookies();
-  return verifySession(store.get("fs_session")?.value);
+  const claimed = verifySession(store.get("fs_session")?.value);
+  if (!claimed) return null;
+  // The signed cookie is stateless and can't be revoked on its own, so
+  // deactivating a user or changing their role wouldn't take effect until
+  // the 8h cookie expired. Re-check the DB on every request to close that
+  // gap — cheap enough at this app's scale (single-instance SQLite).
+  const user = await prisma.user.findUnique({ where: { id: claimed.id } });
+  if (!user || !user.active) return null;
+  return { ...claimed, role: user.role, name: user.name };
 }

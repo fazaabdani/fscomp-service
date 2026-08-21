@@ -118,6 +118,13 @@ type Staff = {
   role: "Admin" | "Teknisi/Pegawai";
   rating: number;
 };
+type UserAccount = {
+  id: string;
+  name: string;
+  username: string;
+  role: "ADMIN" | "TECHNICIAN";
+  active: boolean;
+};
 type Customer = {
   id: string;
   name: string;
@@ -196,23 +203,6 @@ const defaultServices: ServiceItem[] = [
     shopPrice: 475000,
     userPrice: 525000,
     warrantyDays: 30,
-  },
-];
-const defaultStaff: Staff[] = [
-  { id: "U-01", name: "Admin", username: "admin", role: "Admin", rating: 5 },
-  {
-    id: "U-02",
-    name: "Rosyadi",
-    username: "rosyadi",
-    role: "Teknisi/Pegawai",
-    rating: 4,
-  },
-  {
-    id: "U-03",
-    name: "Ludfy",
-    username: "ludfy",
-    role: "Teknisi/Pegawai",
-    rating: 5,
   },
 ];
 const seed: Ticket[] = [
@@ -381,6 +371,12 @@ const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
 // wrongly falls back to the estimate for a genuinely free (Rp0) confirmed job.
 const finalPrice = (t: Ticket) =>
   t.costConfirmed ? (t.finalCost ?? 0) : t.finalCost || t.estimate;
+// Gate for printing a "Nota Lunas" — requires the final cost to have been
+// explicitly confirmed (not just defaulting to an unconfirmed estimate) and
+// the remaining balance to actually be zero, so the app can never hand out
+// a paid-in-full receipt for a ticket that hasn't really been settled.
+const isFullyPaid = (t: Ticket) =>
+  t.costConfirmed && Math.max(0, finalPrice(t) - t.downPayment) === 0;
 function mergeById<T extends { id: string }>(
   serverArr: T[],
   localArr: T[],
@@ -404,7 +400,7 @@ const mergeTickets = (server: Ticket[], local: Ticket[]) =>
 const mergeCustomers = (server: Customer[], local: Customer[]) =>
   mergeById(server, local, (c) => c._touchedAt || c.createdAt || "");
 function useAutosave<T>(
-  key: "tickets" | "shop" | "services" | "staff" | "customers",
+  key: "tickets" | "shop" | "services" | "customers",
   value: T,
   ready: boolean,
   versions: React.MutableRefObject<Record<string, number>>,
@@ -412,8 +408,16 @@ function useAutosave<T>(
   apply: (value: T) => void,
   notify: (message: string) => void,
 ) {
+  // The first render after `ready` flips true carries the value we just
+  // loaded FROM the server — writing it straight back would bump the
+  // version and log an audit entry for a no-op on every page load/refresh.
+  const skipNext = useRef(true);
   useEffect(() => {
     if (!ready) return;
+    if (skipNext.current) {
+      skipNext.current = false;
+      return;
+    }
     const id = setTimeout(async () => {
       try {
         const res = await fetch(`/api/state/${key}`, {
@@ -439,6 +443,13 @@ function useAutosave<T>(
         if (res.ok) {
           const data = await res.json();
           versions.current[key] = data.version;
+        } else {
+          const body = await res.json().catch(() => null);
+          notify(
+            body?.error
+              ? `Gagal menyimpan: ${body.error}`
+              : "Gagal menyimpan perubahan ke server",
+          );
         }
       } catch {
         /* offline: local state and localStorage fallback still apply */
@@ -463,7 +474,25 @@ export default function ServiceDesk() {
   const [handoffDone, setHandoffDone] = useState({ receipt: false, whatsapp: false, qr: false, accessories: false });
   const [shop, setShop] = useState<ShopSettings>(defaultSettings);
   const [services, setServices] = useState<ServiceItem[]>(defaultServices);
-  const [staff, setStaff] = useState<Staff[]>(defaultStaff);
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [currentUser, setCurrentUser] = useState<{ name: string; role: string } | null>(null);
+  const staff = useMemo<Staff[]>(
+    () =>
+      users
+        .filter((u) => u.active)
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+          username: u.username,
+          role: u.role === "ADMIN" ? "Admin" : "Teknisi/Pegawai",
+          rating: 5,
+        })),
+    [users],
+  );
+  const refreshUsers = () =>
+    fetch("/api/users", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setUsers(data.users));
   const [customers, setCustomers] = useState<Customer[]>(seedCustomers);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
@@ -475,6 +504,7 @@ export default function ServiceDesk() {
   const [serverReady, setServerReady] = useState(false);
   const stateVersions = useRef<Record<string, number>>({});
   const submittingRef = useRef(false);
+  const paymentInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (modal === "new") {
@@ -515,18 +545,17 @@ export default function ServiceDesk() {
       try {
         setServices(JSON.parse(savedServices));
       } catch {}
-    const savedStaff = localStorage.getItem("fs-service-staff-v1");
-    if (savedStaff)
-      try {
-        setStaff(JSON.parse(savedStaff));
-      } catch {}
     const savedCustomers = localStorage.getItem("fs-service-customers-v1");
     if (savedCustomers)
       try {
         setCustomers(JSON.parse(savedCustomers));
       } catch {}
+    refreshUsers();
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setCurrentUser(data.user));
     Promise.all(
-      ["tickets", "shop", "services", "staff", "customers"].map(async (key) => {
+      ["tickets", "shop", "services", "customers"].map(async (key) => {
         const r = await fetch(`/api/state/${key}`, { cache: "no-store" });
         if (!r.ok) return [key, null, 0] as const;
         const data = await r.json();
@@ -540,7 +569,6 @@ export default function ServiceDesk() {
             if (key === "tickets") setTickets(value);
             if (key === "shop") setShop(value);
             if (key === "services") setServices(value);
-            if (key === "staff") setStaff(value);
             if (key === "customers") setCustomers(value);
           } else {
             const fallback =
@@ -556,22 +584,29 @@ export default function ServiceDesk() {
                     ? savedServices
                       ? JSON.parse(savedServices)
                       : defaultServices
-                    : key === "staff"
-                      ? savedStaff
-                        ? JSON.parse(savedStaff)
-                        : defaultStaff
-                      : savedCustomers
-                        ? JSON.parse(savedCustomers)
-                        : seedCustomers;
-            fetch(`/api/state/${key}`, {
-              method: "PUT",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ value: fallback, expectedVersion: 0 }),
-            })
-              .then((r) => (r.ok ? r.json() : null))
-              .then((r) => {
-                if (r) stateVersions.current[key] = r.version;
-              });
+                    : savedCustomers
+                      ? JSON.parse(savedCustomers)
+                      : seedCustomers;
+            if (key === "tickets") setTickets(fallback);
+            if (key === "shop") setShop(fallback);
+            if (key === "services") setServices(fallback);
+            if (key === "customers") setCustomers(fallback);
+            // Never auto-write placeholder/demo data to a production
+            // server — an empty production DB should stay empty until an
+            // admin enters real data, not get silently seeded with
+            // sample tickets/customers that look real. Local dev keeps
+            // the old convenience of a self-seeding first run.
+            if (process.env.NODE_ENV !== "production") {
+              fetch(`/api/state/${key}`, {
+                method: "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ value: fallback, expectedVersion: 0 }),
+              })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((r) => {
+                  if (r) stateVersions.current[key] = r.version;
+                });
+            }
           }
         }
         setServerReady(true);
@@ -590,15 +625,11 @@ export default function ServiceDesk() {
     localStorage.setItem("fs-service-catalog-v1", JSON.stringify(services));
   }, [services]);
   useEffect(() => {
-    localStorage.setItem("fs-service-staff-v1", JSON.stringify(staff));
-  }, [staff]);
-  useEffect(() => {
     localStorage.setItem("fs-service-customers-v1", JSON.stringify(customers));
   }, [customers]);
   useAutosave("tickets", tickets, serverReady, stateVersions, mergeTickets, setTickets, notify);
   useAutosave("shop", shop, serverReady, stateVersions, null, setShop, notify);
   useAutosave("services", services, serverReady, stateVersions, null, setServices, notify);
-  useAutosave("staff", staff, serverReady, stateVersions, null, setStaff, notify);
   useAutosave("customers", customers, serverReady, stateVersions, mergeCustomers, setCustomers, notify);
   useEffect(() => {
     if (!toast) return;
@@ -684,6 +715,39 @@ export default function ServiceDesk() {
   function notify(message: string) {
     setToast(message);
   }
+  async function recordPayment(
+    ticketId: string,
+    amount: number,
+    method: string,
+    note: string,
+  ) {
+    if (!amount) return;
+    // Guards against the common "impatient double click" duplicate — not a
+    // real server-side idempotency key, but cheap and covers the everyday
+    // case without a schema change.
+    const guardKey = `${ticketId}:${amount}:${method}`;
+    if (paymentInFlightRef.current.has(guardKey)) return;
+    paymentInFlightRef.current.add(guardKey);
+    try {
+      const res = await fetch("/api/payments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ticketId, amount, method, note }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        notify(
+          body?.error
+            ? `Pembayaran gagal tercatat: ${body.error}`
+            : "Pembayaran gagal tercatat di server",
+        );
+      }
+    } catch {
+      notify("Pembayaran gagal tercatat — periksa koneksi lalu cek ulang");
+    } finally {
+      paymentInFlightRef.current.delete(guardKey);
+    }
+  }
   function toggleJob(id: string) {
     setSelectedJobs((current) => {
       const next = new Set(current);
@@ -760,21 +824,14 @@ export default function ServiceDesk() {
   }
   function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
     const before = tickets.find((t) => t.id === id);
-    if (
-      before &&
-      patch.downPayment !== undefined &&
-      patch.downPayment > before.downPayment
-    ) {
-      fetch("/api/payments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ticketId: id,
-          amount: patch.downPayment - before.downPayment,
-          method: patch.paymentMethod || before.paymentMethod || "Tunai",
-          note: message,
-        }),
-      });
+    if (before && patch.downPayment !== undefined && patch.downPayment !== before.downPayment) {
+      const delta = patch.downPayment - before.downPayment;
+      recordPayment(
+        id,
+        delta,
+        patch.paymentMethod || before.paymentMethod || "Tunai",
+        delta > 0 ? message : `Koreksi turun DP — ${message}`,
+      );
     }
     setTickets((old) =>
       old.map((t) =>
@@ -840,6 +897,10 @@ export default function ServiceDesk() {
     return `${base}?text=${encodeURIComponent(kind === "received" ? received : kind === "cost" ? cost : options)}`;
   }
   function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories" | "paid") {
+    if (mode === "paid" && selected && !isFullyPaid(selected)) {
+      notify("Belum bisa cetak nota lunas — biaya final belum dikonfirmasi atau saldo belum Rp0");
+      return;
+    }
     setPrintMode(mode);
     setTimeout(() => {
       window.print();
@@ -945,6 +1006,8 @@ export default function ServiceDesk() {
     setHandoffDone({ receipt: false, whatsapp: false, qr: false, accessories: accessoryItems(next.accessories).length === 0 });
     setModal("handoff");
     notify(`Servis ${id} berhasil dibuat`);
+    if (next.downPayment > 0)
+      recordPayment(id, next.downPayment, "Tunai", `DP awal saat servis ${id} diterima`);
     if (!customers.some((c) => c.phone === phone))
       setCustomers((old) => [
         {
@@ -1081,7 +1144,13 @@ export default function ServiceDesk() {
           </button>
         </div>
         <nav>
-          {nav.map(([Icon, label]) => (
+          {nav
+            .filter(
+              ([, label]) =>
+                currentUser?.role === "ADMIN" ||
+                !["Profil Toko", "Akun", "Jasa Servis"].includes(label),
+            )
+            .map(([Icon, label]) => (
             <button
               key={label}
               className={active === label ? "active" : ""}
@@ -1112,10 +1181,17 @@ export default function ServiceDesk() {
           <small>Aman di perangkat ini dan siap dipakai offline.</small>
         </div>
         <div className="sidebarUser">
-          <span>FA</span>
+          <span>
+            {(currentUser?.name || "?")
+              .split(" ")
+              .map((w) => w[0])
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()}
+          </span>
           <div>
-            <strong>Faza Abdani</strong>
-            <small>Administrator</small>
+            <strong>{currentUser?.name || "Memuat..."}</strong>
+            <small>{currentUser?.role === "ADMIN" ? "Administrator" : "Teknisi/Pegawai"}</small>
           </div>
         </div>
       </aside>
@@ -1197,11 +1273,10 @@ export default function ServiceDesk() {
             />
           ) : active === "Akun" ? (
             <AccountsPanel
-              staff={staff}
-              onChange={(value) => {
-                setStaff(value);
-                notify("Data akun diperbarui");
-              }}
+              users={users}
+              tickets={tickets}
+              onChanged={refreshUsers}
+              notify={notify}
             />
           ) : active === "Jasa Servis" ? (
             <ServicesPanel
@@ -1224,7 +1299,7 @@ export default function ServiceDesk() {
                   <span className="miniTag">
                     <Smartphone size={14} /> Service Command Center
                   </span>
-                  <h2>Selamat datang, Faza.</h2>
+                  <h2>Selamat datang, {currentUser?.name?.split(" ")[0] || "kembali"}.</h2>
                   <p>
                     Pantau setiap perangkat dari meja penerimaan sampai kembali
                     ke tangan pelanggan.
@@ -1845,6 +1920,8 @@ export default function ServiceDesk() {
                 </button>
                 <button
                   className="ghost"
+                  disabled={!isFullyPaid(selected)}
+                  title={isFullyPaid(selected) ? undefined : "Konfirmasi biaya final dan lunaskan saldo dulu"}
                   onClick={() => printTicket("paid")}
                 >
                   <Banknote size={17} /> Print nota lunas
@@ -3046,28 +3123,83 @@ function PaymentsPanel({
 }
 
 function AccountsPanel({
-  staff,
-  onChange,
+  users,
+  tickets,
+  onChanged,
+  notify,
 }: {
-  staff: Staff[];
-  onChange: (staff: Staff[]) => void;
+  users: UserAccount[];
+  tickets: Ticket[];
+  onChanged: () => void;
+  notify: (message: string) => void;
 }) {
   const [show, setShow] = useState(false);
-  function add(e: React.FormEvent<HTMLFormElement>) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [credential, setCredential] = useState<{ username: string; password: string } | null>(null);
+
+  const ratingFor = (name: string) => {
+    const rated = tickets.filter((t) => t.technician === name && t.rating);
+    if (!rated.length) return 0;
+    return rated.reduce((a, t) => a + (t.rating || 0), 0) / rated.length;
+  };
+
+  async function add(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    onChange([
-      ...staff,
-      {
-        id: `U-${Date.now()}`,
+    setBusy("create");
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
         name: String(f.get("name")),
         username: String(f.get("username")),
-        role: String(f.get("role")) as Staff["role"],
-        rating: 5,
-      },
-    ]);
+        role: String(f.get("role")) === "Admin" ? "ADMIN" : "TECHNICIAN",
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    setBusy(null);
+    if (!res.ok) {
+      notify(data?.error || "Gagal membuat akun");
+      return;
+    }
+    setCredential({ username: data.user.username, password: data.tempPassword });
     setShow(false);
+    onChanged();
   }
+
+  async function toggleActive(u: UserAccount) {
+    setBusy(u.id);
+    const res = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ active: !u.active }),
+    });
+    const data = await res.json().catch(() => null);
+    setBusy(null);
+    if (!res.ok) {
+      notify(data?.error || "Gagal mengubah status akun");
+      return;
+    }
+    notify(u.active ? `Akun ${u.name} dinonaktifkan` : `Akun ${u.name} diaktifkan kembali`);
+    onChanged();
+  }
+
+  async function resetPassword(u: UserAccount) {
+    setBusy(u.id + "-reset");
+    const res = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ resetPassword: true }),
+    });
+    const data = await res.json().catch(() => null);
+    setBusy(null);
+    if (!res.ok) {
+      notify(data?.error || "Gagal reset password");
+      return;
+    }
+    setCredential({ username: u.username, password: data.tempPassword });
+  }
+
   return (
     <div className="modulePage">
       <section className="moduleHero">
@@ -3076,21 +3208,42 @@ function AccountsPanel({
             <UserCog size={14} /> HAK AKSES
           </span>
           <h2>Daftar Akun</h2>
-          <p>Kelola admin dan teknisi/pegawai seperti sistem lama.</p>
+          <p>Kelola admin dan teknisi/pegawai. Ini akun login sungguhan.</p>
         </div>
         <button className="heroWhiteButton" onClick={() => setShow(!show)}>
           <Plus /> Buat Data Akun Baru
         </button>
       </section>
+      {credential && (
+        <div className="permissionBox">
+          <h3>Akun siap dipakai</h3>
+          <p>
+            Username <b>{credential.username}</b> — password sementara{" "}
+            <b>{credential.password}</b>. Catat dan sampaikan ke pegawai
+            sekarang; password ini tidak ditampilkan lagi setelah ini.
+          </p>
+          <button type="button" onClick={() => setCredential(null)}>
+            Sudah dicatat
+          </button>
+        </div>
+      )}
       {show && (
         <form className="quickCreate" onSubmit={add}>
           <input name="name" required placeholder="Nama pegawai" />
-          <input name="username" required placeholder="Username" />
+          <input
+            name="username"
+            required
+            pattern="[a-z0-9._-]{3,32}"
+            title="huruf kecil/angka, 3-32 karakter"
+            placeholder="Username"
+          />
           <select name="role">
             <option>Teknisi/Pegawai</option>
             <option>Admin</option>
           </select>
-          <button className="newButton">Buat Akun</button>
+          <button className="newButton" disabled={busy === "create"}>
+            {busy === "create" ? "Membuat..." : "Buat Akun"}
+          </button>
         </form>
       )}
       <section className="ticketPanel modulePanel">
@@ -3099,40 +3252,53 @@ function AccountsPanel({
           <span>Username</span>
           <span>Hak Akses</span>
           <span>Rating</span>
+          <span>Status</span>
           <span>Pilihan</span>
         </div>
-        {staff.map((s) => (
-          <div className="simpleDataRow accountCols" key={s.id}>
-            <span>
-              <b>{s.name}</b>
-            </span>
-            <span>{s.username}</span>
-            <span>
-              <i
-                className={`statusBadge ${s.role === "Admin" ? "primary" : "neutral"}`}
-              >
-                {s.role}
-              </i>
-            </span>
-            <span className="customerStars">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Star
-                  key={n}
-                  size={14}
-                  fill={s.rating >= n ? "currentColor" : "none"}
-                />
-              ))}
-            </span>
-            <span>
-              <button
-                onClick={() => onChange(staff.filter((x) => x.id !== s.id))}
-                disabled={s.role === "Admin"}
-              >
-                Hapus
-              </button>
-            </span>
-          </div>
-        ))}
+        {users.map((u) => {
+          const rating = ratingFor(u.name);
+          return (
+            <div className="simpleDataRow accountCols" key={u.id}>
+              <span>
+                <b>{u.name}</b>
+              </span>
+              <span>{u.username}</span>
+              <span>
+                <i
+                  className={`statusBadge ${u.role === "ADMIN" ? "primary" : "neutral"}`}
+                >
+                  {u.role === "ADMIN" ? "Admin" : "Teknisi/Pegawai"}
+                </i>
+              </span>
+              <span className="customerStars">
+                {rating
+                  ? [1, 2, 3, 4, 5].map((n) => (
+                      <Star key={n} size={14} fill={rating >= n ? "currentColor" : "none"} />
+                    ))
+                  : "-"}
+              </span>
+              <span>
+                <i className={`statusBadge ${u.active ? "success" : "neutral"}`}>
+                  {u.active ? "Aktif" : "Nonaktif"}
+                </i>
+              </span>
+              <span className="accountActions">
+                <button
+                  onClick={() => toggleActive(u)}
+                  disabled={busy === u.id}
+                >
+                  {u.active ? "Nonaktifkan" : "Aktifkan"}
+                </button>
+                <button
+                  onClick={() => resetPassword(u)}
+                  disabled={busy === u.id + "-reset"}
+                >
+                  Reset Password
+                </button>
+              </span>
+            </div>
+          );
+        })}
         <div className="permissionBox">
           <h3>Hak Akses dan Kewenangan</h3>
           <p>

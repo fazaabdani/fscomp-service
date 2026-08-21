@@ -19,7 +19,10 @@ export async function POST(request: Request) {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const b = await request.json();
-  if (!b.ticketId || !Number.isInteger(b.amount) || b.amount <= 0)
+  // Negative amounts are allowed: a DP correction (technician lowers an
+  // over-entered DP) needs a matching reversal so the ledger sum stays
+  // equal to the ticket's actual current DP, not just monotonically grow.
+  if (!b.ticketId || !Number.isInteger(b.amount) || b.amount === 0)
     return NextResponse.json(
       { error: "Pembayaran tidak valid" },
       { status: 400 },
