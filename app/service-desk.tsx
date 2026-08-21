@@ -2185,7 +2185,9 @@ export default function ServiceDesk() {
       )}
       {printMode === "receipt" && selected && (
         <div className="servicePrint receipt">
-          <ServiceReceiptBody ticket={selected} shop={shop} />
+          <div className="receiptCopyPage compact">
+            <ServiceReceiptBody ticket={selected} shop={shop} compact />
+          </div>
         </div>
       )}
       {printMode === "qr" && selected && (
@@ -2206,6 +2208,7 @@ export default function ServiceDesk() {
       )}
       {printMode === "paid" && selected && (
         <div className="servicePrint paid">
+          <div className="receiptCopyPage compact">
           <div className="printHeader">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -2397,6 +2400,7 @@ export default function ServiceDesk() {
               <b>{(shop.name || "FS Comp").toUpperCase()}</b>
               <small>Service &amp; Technology Center</small>
             </div>
+          </div>
           </div>
         </div>
       )}
