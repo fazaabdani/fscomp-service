@@ -4248,6 +4248,27 @@ textarea {
   color: #929daf;
   font-size: 12px;
 }
+.waPlaceholderChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.waPlaceholderChips button {
+  padding: 5px 10px;
+  border: 1px solid #dfe4ec;
+  border-radius: 999px;
+  background: #f4f6fb;
+  color: #5268e9;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.waPlaceholderChips button:hover {
+  background: #edf0ff;
+  border-color: #c7d0f5;
+}
 .settingsGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

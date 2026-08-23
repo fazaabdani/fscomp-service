@@ -110,6 +110,15 @@ model ShopSettings {
   terms       String
   bank        String
   lockEnabled Boolean  @default(false)
+  // Editable WhatsApp message templates (see lib/wa-templates.ts for the
+  // {placeholder} substitution and defaults matching the previous
+  // hardcoded copy). Salutation/closing wrap every customer-facing
+  // template; the three bodies are the message-specific middle section.
+  waSalutation   String @default("Assalamu'alaikum warahmatullahi wabarakatuh, Kak {nama}")
+  waClosing      String @default("Jazakallahu khoiron 🤲😊")
+  waReceived     String @default("Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Semoga Allah membalas kepercayaan Kakak dengan kebaikan. Barang Kakak sudah kami terima dengan nomor servis *{nomor_servis}* pada {tanggal_terima}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n{link_tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Insya Allah kami akan mengabari kembali saat ada perkembangan.")
+  waCost         String @default("Kami sudah melakukan pengecekan {perangkat}. Untuk penanganan *{tindakan}*, estimasi biaya servisnya adalah *{estimasi}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.")
+  waCostOptions  String @default("Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.")
   version     Int      @default(1)
   dbUpdatedAt DateTime @updatedAt
 }

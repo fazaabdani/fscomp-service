@@ -5,6 +5,13 @@ import { QRCodeSVG } from "qrcode.react";
 import { normalizePhone } from "@/lib/phone";
 import { finalPrice, isFullyPaid } from "@/lib/ticket-money";
 import {
+  WA_TEMPLATE_DEFAULTS,
+  WA_TEMPLATE_LABELS,
+  WA_PLACEHOLDERS,
+  renderWaTemplate,
+  type WaTemplateKey,
+} from "@/lib/wa-templates";
+import {
   BarChart3,
   Bell,
   CheckCircle2,
@@ -149,7 +156,7 @@ type ShopSettings = {
   terms: string;
   bank: string;
   lockEnabled: boolean;
-};
+} & Record<WaTemplateKey, string>;
 const defaultSettings: ShopSettings = {
   name: "FS COMP",
   phone: "0816692428",
@@ -160,6 +167,7 @@ const defaultSettings: ShopSettings = {
     "Barang yang tidak diambil lebih dari 30 hari setelah konfirmasi bukan tanggung jawab toko.",
   bank: "BCA 251-029-8724 a/n Faza Abdani Auni Robbi",
   lockEnabled: false,
+  ...WA_TEMPLATE_DEFAULTS,
 };
 
 const processStatuses: Status[] = [
@@ -334,6 +342,7 @@ const nav = [
   [UserCog, "Akun"],
   [Users, "Pelanggan"],
   [ClipboardList, "Jasa Servis"],
+  [MessageCircle, "Pesan WhatsApp"],
   [Plus, "Terima Servis"],
   [Wrench, "Proses Servis"],
   [PackageCheck, "Bisa Diambil"],
@@ -989,17 +998,24 @@ export default function ServiceDesk() {
     setModal("detail");
   }
   const salutation = (name: string) =>
-    `Assalamu'alaikum warahmatullahi wabarakatuh, Kak ${name}`;
-  const closing =
-    "Jazakallahu khoiron 🤲😊";
+    renderWaTemplate(shop.waSalutation, { nama: name });
   function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
-    const received = `${salutation(ticket.customer)},\n\nTerima kasih sudah mempercayakan servis ${ticket.device} kepada *${shop.name}*. Semoga Allah membalas kepercayaan Kakak dengan kebaikan. Barang Kakak sudah kami terima dengan nomor servis *${ticket.id}* pada ${new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n${tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Insya Allah kami akan mengabari kembali saat ada perkembangan.\n\n${closing}`;
-    const cost = `${salutation(ticket.customer)},\n\nKami sudah melakukan pengecekan ${ticket.device}. Untuk penanganan *${ticket.serviceAction || ticket.issue}*, estimasi biaya servisnya adalah *${money(ticket.estimate)}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.\n\n${closing}`;
-    const options = `${salutation(ticket.customer)},\n\nAlhamdulillah, hasil pengecekan ${ticket.device} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *${money(ticket.estimate)}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.\n\n${closing}`;
-    return `${base}?text=${encodeURIComponent(kind === "received" ? received : kind === "cost" ? cost : options)}`;
+    const vars = {
+      toko: shop.name,
+      perangkat: ticket.device,
+      nomor_servis: ticket.id,
+      tanggal_terima: new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }),
+      link_tracking: tracking,
+      tindakan: ticket.serviceAction || ticket.issue,
+      estimasi: money(ticket.estimate),
+    };
+    const body =
+      kind === "received" ? shop.waReceived : kind === "cost" ? shop.waCost : shop.waCostOptions;
+    const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
+    return `${base}?text=${encodeURIComponent(message)}`;
   }
   function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories" | "paid") {
     if (mode === "paid" && selected && !isFullyPaid(selected)) {
@@ -1252,7 +1268,7 @@ export default function ServiceDesk() {
             .filter(
               ([, label]) =>
                 currentUser?.role === "ADMIN" ||
-                !["Profil Toko", "Akun", "Jasa Servis", "Laporan Servis", "Laporan Teknisi"].includes(label),
+                !["Profil Toko", "Akun", "Jasa Servis", "Pesan WhatsApp", "Laporan Servis", "Laporan Teknisi"].includes(label),
             )
             .map(([Icon, label]) => (
             <button
@@ -1458,6 +1474,25 @@ export default function ServiceDesk() {
                 setServices((old) => old.filter((s) => s.id !== item.id));
                 notify("Jasa servis dihapus");
                 return true;
+              }}
+            />
+          ) : active === "Pesan WhatsApp" ? (
+            <WaTemplatesPanel
+              shop={shop}
+              onSave={async (value) => {
+                setShop(value);
+                const res = await fetch("/api/shop", {
+                  method: "PATCH",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(value),
+                });
+                const data = await res.json().catch(() => null);
+                if (res.ok && data?.shop) {
+                  setShop(data.shop);
+                  notify("Template pesan berhasil disimpan");
+                } else {
+                  notify(data?.error || "Gagal menyimpan template pesan");
+                }
               }}
             />
           ) : active === "Status Garansi" ? (
@@ -3789,6 +3824,117 @@ function SettingsPanel({
           </button>
           <button className="newButton">
             <CheckCircle2 size={18} /> Simpan Pengaturan
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function WaTemplatesPanel({
+  shop,
+  onSave,
+}: {
+  shop: ShopSettings;
+  onSave: (shop: ShopSettings) => void;
+}) {
+  const [form, setForm] = useState(shop);
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (!dirty.current) setForm(shop);
+  }, [shop]);
+  const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const field = (key: WaTemplateKey, value: string) => {
+    dirty.current = true;
+    setForm((old) => ({ ...old, [key]: value }));
+  };
+  const insertToken = (key: WaTemplateKey, token: string) => {
+    const el = textareaRefs.current[key];
+    const current = form[key];
+    const start = el?.selectionStart ?? current.length;
+    const end = el?.selectionEnd ?? current.length;
+    field(key, current.slice(0, start) + token + current.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+  const keys = Object.keys(WA_TEMPLATE_LABELS) as WaTemplateKey[];
+  return (
+    <div className="modulePage settingsPage">
+      <section className="moduleHero settingsHero">
+        <div>
+          <span className="miniTag">
+            <MessageCircle size={14} /> TEMPLATE PESAN
+          </span>
+          <h2>Pesan WhatsApp</h2>
+          <p>
+            Ubah kata-kata pesan yang dikirim ke pelanggan. Klik kode di bawah
+            tiap kotak untuk menyisipkan data seperti nama atau nomor servis
+            secara otomatis — jangan diketik manual.
+          </p>
+        </div>
+        <MessageCircle size={50} />
+      </section>
+      <form
+        className="settingsForm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          dirty.current = false;
+          onSave(form);
+        }}
+      >
+        {keys.map((key) => (
+          <section className="settingsCard" key={key}>
+            <div className="settingsTitle">
+              <span>
+                <MessageCircle />
+              </span>
+              <div>
+                <h3>{WA_TEMPLATE_LABELS[key]}</h3>
+                {WA_PLACEHOLDERS[key].length > 0 && (
+                  <p>Kode yang bisa disisipkan, klik untuk menambah:</p>
+                )}
+              </div>
+            </div>
+            {WA_PLACEHOLDERS[key].length > 0 && (
+              <div className="waPlaceholderChips">
+                {WA_PLACEHOLDERS[key].map((p) => (
+                  <button
+                    type="button"
+                    key={p.token}
+                    onClick={() => insertToken(key, p.token)}
+                    title={p.label}
+                  >
+                    {p.token}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="settingsGrid">
+              <label className="full">
+                <textarea
+                  ref={(el) => { textareaRefs.current[key] = el; }}
+                  value={form[key]}
+                  onChange={(e) => field(key, e.target.value)}
+                  rows={key === "waClosing" || key === "waSalutation" ? 2 : 6}
+                />
+              </label>
+            </div>
+          </section>
+        ))}
+        <div className="settingsSave">
+          <button
+            type="button"
+            onClick={() => {
+              dirty.current = true;
+              setForm((old) => ({ ...old, ...WA_TEMPLATE_DEFAULTS }));
+            }}
+          >
+            Kembalikan Default
+          </button>
+          <button className="newButton">
+            <CheckCircle2 size={18} /> Simpan Template Pesan
           </button>
         </div>
       </form>
