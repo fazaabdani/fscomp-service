@@ -39,6 +39,11 @@ export async function POST(request: Request) {
       { error: "Data servis tidak lengkap atau nomor WhatsApp tidak valid" },
       { status: 400 },
     );
+  for (const f of ["estimate", "downPayment", "paymentTermDays"]) {
+    const v = b[f];
+    if (v !== undefined && (typeof v !== "number" || !Number.isFinite(v) || v < 0))
+      return NextResponse.json({ error: `${f} harus angka >= 0` }, { status: 400 });
+  }
 
   const now = new Date();
   const datePart = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;

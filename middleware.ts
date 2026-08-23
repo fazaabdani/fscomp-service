@@ -23,7 +23,15 @@ export async function middleware(req:NextRequest){
   // deactivated account is kicked to /login within one request instead of
   // surviving until its 8h cookie expires.
   const user=claimed?await prisma.user.findUnique({where:{id:claimed.id}}):null;
-  if(!user||!user.active){const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res}
+  if(!user||!user.active){
+    // /api/* must answer with real JSON so fetch() callers can tell the
+    // difference between "not logged in" and actual data — a redirect gets
+    // silently followed to the login page's HTML, which then fails to
+    // parse as JSON and previously left client-side 401 handling unable to
+    // ever see a 401 at all.
+    if(path.startsWith("/api")){const res=NextResponse.json({error:"Unauthorized"},{status:401});res.cookies.delete("fs_session");return res}
+    const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res
+  }
   return NextResponse.next();
 }
 export const config={matcher:["/((?!favicon.ico).*)"]};

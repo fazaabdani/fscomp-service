@@ -379,8 +379,13 @@ const finalPrice = (t: Ticket) =>
 // explicitly confirmed (not just defaulting to an unconfirmed estimate) and
 // the remaining balance to actually be zero, so the app can never hand out
 // a paid-in-full receipt for a ticket that hasn't really been settled.
+// No Math.max clamp: if downPayment overshoots finalPrice (e.g. finalCost
+// confirmed at Rp0 after a DP was already taken), that's an overpayment
+// needing a manual correction, not something to silently wave through as
+// "fully paid" — clamping a negative balance to 0 was exactly the bug that
+// let a Rp0-cost, DP-already-collected ticket print a paid-in-full nota.
 const isFullyPaid = (t: Ticket) =>
-  t.costConfirmed && Math.max(0, finalPrice(t) - t.downPayment) === 0;
+  t.costConfirmed && finalPrice(t) - t.downPayment === 0;
 function accessoryItems(value: string) {
   return value
     .split(/[,+;\n]/)
@@ -521,7 +526,7 @@ function ServiceReceiptBody({
             <div>
               <Banknote size={13} />
               <small>Sisa Pembayaran</small>
-              <b>{money(Math.max(0, ticket.estimate - ticket.downPayment))}</b>
+              <b>{money(Math.max(0, finalPrice(ticket) - ticket.downPayment))}</b>
             </div>
           </div>
           {shop.bank && !compact && (
@@ -1993,14 +1998,13 @@ export default function ServiceDesk() {
                   <input
                     type="number"
                     min="0"
-                    value={selected.estimate}
-                    onChange={(e) =>
-                      patchTicket(
-                        selected.id,
-                        { estimate: Number(e.target.value) },
-                        "Estimasi diperbarui",
-                      )
-                    }
+                    key={`estimate-${selected.id}-${selected.version}`}
+                    defaultValue={selected.estimate}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (v !== selected.estimate)
+                        patchTicket(selected.id, { estimate: v }, "Estimasi diperbarui");
+                    }}
                   />
                 </label>
                 <label>
@@ -2008,14 +2012,13 @@ export default function ServiceDesk() {
                   <input
                     type="number"
                     min="0"
-                    value={selected.downPayment}
-                    onChange={(e) =>
-                      patchTicket(
-                        selected.id,
-                        { downPayment: Number(e.target.value) },
-                        "DP diperbarui",
-                      )
-                    }
+                    key={`downPayment-${selected.id}-${selected.version}`}
+                    defaultValue={selected.downPayment}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (v !== selected.downPayment)
+                        patchTicket(selected.id, { downPayment: v }, "DP diperbarui");
+                    }}
                   />
                 </label>
                 <label>
@@ -2023,14 +2026,13 @@ export default function ServiceDesk() {
                   <input
                     type="number"
                     min="0"
-                    value={selected.finalCost || 0}
-                    onChange={(e) =>
-                      patchTicket(
-                        selected.id,
-                        { finalCost: Number(e.target.value) },
-                        "Biaya final diperbarui",
-                      )
-                    }
+                    key={`finalCost-${selected.id}-${selected.version}`}
+                    defaultValue={selected.finalCost || 0}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (v !== (selected.finalCost || 0))
+                        patchTicket(selected.id, { finalCost: v }, "Biaya final diperbarui");
+                    }}
                   />
                 </label>
               </div>
