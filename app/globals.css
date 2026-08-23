@@ -3484,26 +3484,29 @@ textarea {
     padding-bottom: 0.5mm;
   }
   .receiptCopyPage.compact .printQr {
-    padding: 1.5mm;
+    padding: 1mm;
     gap: 0;
+    border: 0.75px solid #cbd5e1;
   }
   .receiptCopyPage.compact .printQr svg {
-    width: 50px;
-    height: 50px;
+    width: 30mm;
+    height: 30mm;
   }
   .receiptCopyPage.compact .printInfoGrid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 2mm;
+    gap: 2.5mm 4mm;
     padding: 1.5mm 0;
   }
   .receiptCopyPage.compact .printInfoGrid strong,
   .receiptCopyPage.compact .printIssueRow strong {
-    font-size: 7.5pt;
+    font-size: 8.5pt;
+    font-weight: 700;
   }
   .receiptCopyPage.compact .printInfoGrid span,
   .receiptCopyPage.compact .printIssueRow span,
   .receiptCopyPage.compact .printInfoGrid ul {
-    font-size: 6.5pt;
+    font-size: 6pt;
+    color: #94a3b8;
   }
   .receiptCopyPage.compact .printIssueRow {
     padding: 1.5mm 0;
