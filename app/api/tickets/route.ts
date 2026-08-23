@@ -4,6 +4,8 @@ import type { Ticket, Payment } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
+import { isShopLocked } from "@/lib/shop-lock";
+import { clientIp } from "@/lib/audit";
 
 export async function GET() {
   const session = await currentSession();
@@ -26,6 +28,11 @@ export async function POST(request: Request) {
   const session = await currentSession();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN" && (await isShopLocked()))
+    return NextResponse.json(
+      { error: "Toko sedang dikunci Admin — perubahan data ditunda sementara" },
+      { status: 423 },
+    );
   const b = await request.json().catch(() => null);
   if (!b)
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
@@ -109,6 +116,7 @@ export async function POST(request: Request) {
           data: {
             id: randomUUID(),
             userId: session.id,
+            ipAddress: clientIp(request),
             action: "CREATE",
             entity: "Ticket",
             entityId: ticket.id,
@@ -120,6 +128,7 @@ export async function POST(request: Request) {
             data: {
               id: randomUUID(),
               userId: session.id,
+              ipAddress: clientIp(request),
               action: "CREATE",
               entity: "Payment",
               entityId: payment.id,

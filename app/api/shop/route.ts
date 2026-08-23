@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { clientIp } from "@/lib/audit";
 
 const FIELDS = new Set([
   "name", "phone", "whatsapp", "address", "description", "terms", "bank", "lockEnabled",
@@ -49,6 +50,7 @@ export async function PATCH(request: Request) {
     data: {
       id: crypto.randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "UPDATE",
       entity: "ShopSettings",
       entityId: "default",

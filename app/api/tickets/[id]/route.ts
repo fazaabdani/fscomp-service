@@ -4,6 +4,8 @@ import type { Ticket, Payment } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
+import { isShopLocked } from "@/lib/shop-lock";
+import { clientIp } from "@/lib/audit";
 
 const FIELDS = new Set([
   "customer", "phone", "device", "brand", "serial", "issue", "accessories",
@@ -36,6 +38,11 @@ export async function PATCH(
   const session = await currentSession();
   if (!session)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN" && (await isShopLocked()))
+    return NextResponse.json(
+      { error: "Toko sedang dikunci Admin — perubahan data ditunda sementara" },
+      { status: 423 },
+    );
   const body = await request.json().catch(() => null);
   if (!body)
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
@@ -99,6 +106,7 @@ export async function PATCH(
         data: {
           id: randomUUID(),
           userId: session.id,
+          ipAddress: clientIp(request),
           action: "CREATE",
           entity: "Payment",
           entityId: payment.id,
@@ -111,6 +119,7 @@ export async function PATCH(
       data: {
         id: randomUUID(),
         userId: session.id,
+        ipAddress: clientIp(request),
         action: "UPDATE",
         entity: "Ticket",
         entityId: id,

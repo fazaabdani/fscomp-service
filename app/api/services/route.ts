@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { clientIp } from "@/lib/audit";
 
 export async function GET() {
   const session = await currentSession();
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     data: {
       id: crypto.randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "CREATE",
       entity: "ServiceItem",
       entityId: service.id,

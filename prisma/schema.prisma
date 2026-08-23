@@ -71,15 +71,22 @@ model Ticket {
 }
 
 model Customer {
-  id          String   @id
-  name        String
-  category    String
-  phone       String
-  address     String
-  rating      Int      @default(0)
-  createdAt   String
-  version     Int      @default(1)
-  dbUpdatedAt DateTime @updatedAt
+  id                String   @id
+  name              String
+  category          String
+  phone             String
+  // Same phone as `phone` in canonical 62xxxxxxxxxx form. `phone` keeps
+  // whatever format the customer was typed in (existing UI displays it
+  // as-is), but duplicate detection and cross-referencing against
+  // Ticket.phone need a consistent value to compare — 08xx and 62xx
+  // strings for the same real number used to compare unequal. Optional +
+  // unique (not required) so SQLite allows multiple NULLs during backfill.
+  phoneNormalized   String?  @unique
+  address           String
+  rating            Int      @default(0)
+  createdAt         String
+  version           Int      @default(1)
+  dbUpdatedAt       DateTime @updatedAt
   @@index([phone])
 }
 
@@ -108,13 +115,18 @@ model ShopSettings {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  ticketId  String
-  amount    Int
-  method    String
-  note      String?
-  createdBy String
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  ticketId        String
+  amount          Int
+  method          String
+  note            String?
+  createdBy       String
+  // Client-supplied key so a retried/double-submitted request (network
+  // blip, impatient double click) returns the existing row instead of
+  // creating a second payment. Optional + unique — NULL for callers that
+  // don't supply one, which SQLite allows any number of.
+  idempotencyKey  String?  @unique
+  createdAt       DateTime @default(now())
   @@index([ticketId])
 }
 

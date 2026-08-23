@@ -43,7 +43,10 @@ OWNER_INGEST_TOKEN=
 akan menolak membuat/memverifikasi sesi kalau env ini kosong, alih-alih diam-diam memakai secret
 bawaan yang tidak aman.
 
-Login sementara: `admin / admin123`. Ganti password setelah sistem dinyatakan stabil.
+Login default saat instalasi pertama: `admin / admin123`. **Wajib diganti sebelum aplikasi
+dipakai untuk transaksi nyata** — bukan sekadar "setelah stabil". Ganti lewat menu Akun (Reset
+Password) begitu login pertama berhasil, lalu simpan password baru di pengelola kata sandi, bukan
+di dokumen ini.
 
 ## Integrasi dashboard (Owner Command Center)
 
@@ -72,7 +75,43 @@ Image akan menjalankan `prisma db push` otomatis sebelum aplikasi dimulai, sehin
 
 ## Backup
 
-Jalankan `npm run backup` setiap hari melalui cron/Coolify scheduled task. Simpan salinan tambahan di luar server utama.
+Backup harian sudah berjalan otomatis di server toko lewat systemd timer (bukan cron/Coolify — itu
+dokumentasi lama yang keliru): `fscomp-service-backup.timer` menjalankan
+`docker compose exec -T fs-service npm run backup` setiap hari (~02:30 WIB), menyimpan ke volume
+`fs_service_backups` di dalam container. `fscomp-backup-retention.timer` membersihkan backup lama
+sesuai kebijakan retensi (`KEEP_DAILY=7 KEEP_WEEKLY=4 KEEP_MONTHLY=3`) dan menyalin ke luar server
+(lihat `D:\backup otmatis server\rencana-backup-otomatis-google-drive.md` di PC dev untuk detail
+infra backup lintas-app). Cek status: `systemctl status fscomp-service-backup.timer` di server.
+
+**Restore — sudah diuji ujung ke ujung** (2026-08-23): backup di-copy keluar container, dibuka
+dengan Prisma Client langsung (bukan cuma dicek ukuran filenya), `PRAGMA integrity_check` = `ok`,
+dan jumlah baris tickets/customers/payments cocok persis dengan database live saat backup diambil.
+Prosedur restore produksi:
+
+```bash
+# 1. Stop aplikasi supaya tidak ada tulisan ke DB selagi restore
+cd /opt/fscomp-service
+docker compose stop fs-service
+
+# 2. Salin backup terpilih menimpa database aktif (backup ADA di volume yang sama — lihat
+#    volume fs_service_backups vs fs_service_data, keduanya ter-mount di /app/backups dan
+#    /app/prisma/data di dalam container)
+docker compose run --rm --no-deps fs-service \
+  cp /app/backups/<nama-file-backup>.db /app/prisma/data/fs-service.db
+
+# 3. Start lagi dan verifikasi
+docker compose up -d
+sleep 8
+curl -s http://127.0.0.1:${APP_PORT:-3216}/api/health
+```
+
+Backup rutin dibuat dengan `copyFile` mentah pada file SQLite yang sedang aktif (bukan lewat
+`.backup` SQLite yang atomik) — praktik sama seperti `scripts/backup.mjs` sejak awal. Untuk SQLite
+mode `journal_mode=DELETE` (default, bukan WAL) tanpa write bersamaan, ini konsisten; risikonya
+hanya jika backup kebetulan berjalan di tengah sebuah write, yang bisa menghasilkan snapshot
+setengah-tertulis. Belum diprioritaskan untuk diganti ke `.backup` SQLite karena kejadian ini
+jarang dan sudah tertangkap lewat `PRAGMA integrity_check` sebelum sebuah backup dipakai untuk
+restore.
 
 ## Pemeriksaan sebelum go-live
 

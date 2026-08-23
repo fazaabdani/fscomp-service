@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { normalizePhone } from "@/lib/phone";
+import { finalPrice, isFullyPaid } from "@/lib/ticket-money";
 import {
   BarChart3,
   Bell,
@@ -371,21 +372,6 @@ const ageTone = (days: number) =>
 const localDateStr = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
-// finalCost defaults to 0 until costConfirmed is set, so `finalCost || estimate`
-// wrongly falls back to the estimate for a genuinely free (Rp0) confirmed job.
-const finalPrice = (t: Ticket) =>
-  t.costConfirmed ? (t.finalCost ?? 0) : t.finalCost || t.estimate;
-// Gate for printing a "Nota Lunas" — requires the final cost to have been
-// explicitly confirmed (not just defaulting to an unconfirmed estimate) and
-// the remaining balance to actually be zero, so the app can never hand out
-// a paid-in-full receipt for a ticket that hasn't really been settled.
-// No Math.max clamp: if downPayment overshoots finalPrice (e.g. finalCost
-// confirmed at Rp0 after a DP was already taken), that's an overpayment
-// needing a manual correction, not something to silently wave through as
-// "fully paid" — clamping a negative balance to 0 was exactly the bug that
-// let a Rp0-cost, DP-already-collected ticket print a paid-in-full nota.
-const isFullyPaid = (t: Ticket) =>
-  t.costConfirmed && finalPrice(t) - t.downPayment === 0;
 function accessoryItems(value: string) {
   return value
     .split(/[,+;\n]/)
@@ -654,6 +640,10 @@ export default function ServiceDesk() {
   const scanStopRef = useRef<(() => void) | null>(null);
   const serviceFormRef = useRef<HTMLFormElement>(null);
   const [serverReady, setServerReady] = useState(false);
+  // Distinct from serverReady (which only reflects the initial load): this
+  // tracks live reachability so a banner can warn the operator the moment a
+  // save fails from a network error, not just on first page load.
+  const [serverOnline, setServerOnline] = useState(true);
   const submittingRef = useRef(false);
 
   useEffect(() => {
@@ -732,9 +722,11 @@ export default function ServiceDesk() {
         if (servicesRes) setServices(servicesRes.services);
         if (shopRes?.shop) setShop(shopRes.shop);
         setServerReady(true);
+        setServerOnline(true);
       })
       .catch(() => {
         setServerReady(false);
+        setServerOnline(false);
       });
   }, []);
   useEffect(() => {
@@ -921,17 +913,30 @@ export default function ServiceDesk() {
     // in the same transaction as the ticket update (see PATCH /api/tickets/[id])
     // — the client no longer calls /api/payments separately, so the two can
     // never fall out of sync from a lost or failed second request.
-    const res = await fetch(`/api/tickets/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...fullPatch,
-        expectedVersion: before.version,
-        paymentNote: patch.downPayment !== undefined && patch.downPayment !== before.downPayment
-          ? (patch.downPayment > before.downPayment ? message : `Koreksi turun DP — ${message}`)
-          : undefined,
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/tickets/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...fullPatch,
+          expectedVersion: before.version,
+          paymentNote: patch.downPayment !== undefined && patch.downPayment !== before.downPayment
+            ? (patch.downPayment > before.downPayment ? message : `Koreksi turun DP — ${message}`)
+            : undefined,
+        }),
+      });
+    } catch {
+      // Network failure: the optimistic update above never made it to the
+      // server, so it must not keep showing as if it did — that's exactly
+      // what let an operator believe a change was saved when it wasn't.
+      setTickets((old) => old.map((t) => (t.id === id ? before : t)));
+      setSelected((old) => (old?.id === id ? before : old));
+      setServerOnline(false);
+      notify("Tidak terhubung ke server — perubahan TIDAK tersimpan, coba lagi");
+      return;
+    }
+    setServerOnline(true);
     const data = await res.json().catch(() => null);
     if (res.status === 409 && data?.ticket) {
       setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
@@ -943,6 +948,8 @@ export default function ServiceDesk() {
       setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
       setSelected((old) => (old?.id === id ? data.ticket : old));
     } else if (!res.ok) {
+      setTickets((old) => old.map((t) => (t.id === id ? before : t)));
+      setSelected((old) => (old?.id === id ? before : old));
       notify(data?.error ? `Gagal menyimpan: ${data.error}` : "Gagal menyimpan perubahan ke server");
     }
   }
@@ -1056,26 +1063,35 @@ export default function ServiceDesk() {
       notify("DP tidak boleh melebihi estimasi biaya");
       return;
     }
-    const res = await fetch("/api/tickets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        customer: String(form.get("customer")),
-        phone,
-        device: String(form.get("device")),
-        brand: String(form.get("brand")),
-        serial,
-        issue: String(form.get("issue")),
-        accessories: String(form.get("accessories") || "Unit only"),
-        technician: String(form.get("technician")),
-        estimate: Number(form.get("estimate") || 0),
-        downPayment: Number(form.get("downPayment") || 0),
-        category: String(form.get("category")),
-        address: String(form.get("address") || "-"),
-        paymentTermDays: Number(form.get("paymentTermDays") || 0),
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customer: String(form.get("customer")),
+          phone,
+          device: String(form.get("device")),
+          brand: String(form.get("brand")),
+          serial,
+          issue: String(form.get("issue")),
+          accessories: String(form.get("accessories") || "Unit only"),
+          technician: String(form.get("technician")),
+          estimate: Number(form.get("estimate") || 0),
+          downPayment: Number(form.get("downPayment") || 0),
+          category: String(form.get("category")),
+          address: String(form.get("address") || "-"),
+          paymentTermDays: Number(form.get("paymentTermDays") || 0),
+        }),
+      });
+    } catch {
+      submittingRef.current = false;
+      setServerOnline(false);
+      notify("Tidak terhubung ke server — servis TIDAK dibuat, coba lagi");
+      return;
+    }
     submittingRef.current = false;
+    setServerOnline(true);
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.ticket) {
       notify(data?.error || "Gagal membuat servis, coba lagi");
@@ -1211,6 +1227,12 @@ export default function ServiceDesk() {
 
   return (
     <div className="serviceApp">
+      {!serverOnline && (
+        <div className="offlineBanner" role="alert">
+          <ShieldCheck size={16} />
+          Tidak terhubung ke server — perubahan terbaru mungkin belum tersimpan. Periksa koneksi internet.
+        </div>
+      )}
       <aside className={`serviceSidebar ${menuOpen ? "open" : ""}`}>
         <div className="serviceBrand">
           <span className="serviceLogo">
@@ -3413,6 +3435,7 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
               done: 0,
               out: 0,
               revenue: 0,
+              cash: 0,
               cost: 0,
             };
             r.in++;
@@ -3420,12 +3443,20 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
               r.done++;
             if (t.status === "Sudah Diambil") {
               r.out++;
+              // "Pemasukan" is the invoiced value (finalPrice, or estimate
+              // if not yet confirmed) — recognized once a job is handed
+              // over, regardless of whether it's fully paid. "Kas Diterima"
+              // is downPayment, which the atomic ticket/payment transaction
+              // now keeps equal to the real ledger sum — a ticket handed
+              // over with an outstanding balance shows up here as less cash
+              // than invoice, instead of counting as full revenue either way.
               r.revenue += finalPrice(t);
+              r.cash += t.downPayment;
               r.cost += t.partCost || 0;
             }
             m.set(t.receivedAt, r);
             return m;
-          }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cost: number }>())
+          }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cash: number; cost: number }>())
           .values(),
       ).sort((a, b) => b.date.localeCompare(a.date)),
     [tickets],
@@ -3436,15 +3467,16 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
         rows
           .reduce((m, r) => {
             const month = r.date.slice(0, 7);
-            const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cost: 0 };
+            const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cash: 0, cost: 0 };
             x.in += r.in;
             x.done += r.done;
             x.out += r.out;
             x.revenue += r.revenue;
+            x.cash += r.cash;
             x.cost += r.cost;
             m.set(month, x);
             return m;
-          }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cost: number }>())
+          }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cash: number; cost: number }>())
           .values(),
       ).sort((a, b) => b.month.localeCompare(a.month)),
     [rows],
@@ -3482,14 +3514,20 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
             {money(rows.reduce((a, r) => a + r.revenue - r.cost, 0))}
           </strong>
         </article>
+        <article>
+          <small>Kas Diterima (DP tercatat)</small>
+          <strong>{money(rows.reduce((a, r) => a + r.cash, 0))}</strong>
+        </article>
       </section>
       <section className="ticketPanel modulePanel">
         <div className="panelTop">
           <div>
             <h3>Keuntungan per Bulan</h3>
             <p>
-              Rekap pemasukan, modal, dan profit setiap bulan dari servis yang
-              sudah diambil.
+              Pemasukan = nilai invoice servis yang sudah diambil (termasuk
+              yang belum lunas). Kas Diterima = DP yang benar-benar tercatat
+              di ledger pembayaran — bisa lebih kecil dari Pemasukan kalau ada
+              piutang berjalan.
             </p>
           </div>
         </div>
@@ -3499,6 +3537,7 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
           <span>Selesai</span>
           <span>Keluar</span>
           <span>Pemasukan</span>
+          <span>Kas Diterima</span>
           <span>Modal</span>
           <span>Profit</span>
         </div>
@@ -3512,6 +3551,7 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
             <span>{r.done} Barang</span>
             <span>{r.out} Barang</span>
             <span>{money(r.revenue)}</span>
+            <span>{money(r.cash)}</span>
             <span>{money(r.cost)}</span>
             <span>
               <b>{money(r.revenue - r.cost)}</b>

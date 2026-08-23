@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
+import { clientIp } from "@/lib/audit";
 export async function GET(request: Request) {
   const u = await currentSession();
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,30 +42,63 @@ export async function POST(request: Request) {
       { error: "Pembayaran tidak valid" },
       { status: 400 },
     );
-  const ticket = await prisma.ticket.findUnique({ where: { id: b.ticketId } });
-  if (!ticket)
-    return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
-  const p = await prisma.payment.create({
-    data: {
-      id: randomUUID(),
-      ticketId: b.ticketId,
-      amount: b.amount,
-      method: b.method || "Tunai",
-      note: b.note || null,
-      createdBy: u.id,
-    },
-  });
-  await prisma.auditLog.create({
-    data: {
-      id: randomUUID(),
-      userId: u.id,
-      action: "CREATE",
-      entity: "Payment",
-      entityId: p.id,
-      detail: `${b.ticketId}: ${b.amount}`,
-    },
-  });
-  pushPaymentToDashboard(p);
+  const idempotencyKey = typeof b.idempotencyKey === "string" && b.idempotencyKey ? b.idempotencyKey : null;
+  if (idempotencyKey) {
+    const existing = await prisma.payment.findUnique({ where: { idempotencyKey } });
+    if (existing) return NextResponse.json({ payment: existing });
+  }
 
-  return NextResponse.json({ payment: p });
+  let payment;
+  try {
+    // Direct entries update Ticket.downPayment in the same transaction as
+    // the Payment row — this was the one remaining path that could create
+    // a Payment without touching the ticket, letting the ledger drift from
+    // Ticket.downPayment exactly like the bug the ticket routes already
+    // closed.
+    payment = await prisma.$transaction(async (tx) => {
+      const ticket = await tx.ticket.findUnique({ where: { id: b.ticketId } });
+      if (!ticket) throw new Error("TICKET_NOT_FOUND");
+      const nextDownPayment = ticket.downPayment + b.amount;
+      if (nextDownPayment < 0) throw new Error("NEGATIVE_BALANCE");
+      await tx.ticket.update({
+        where: { id: b.ticketId },
+        data: { downPayment: nextDownPayment, version: { increment: 1 } },
+      });
+      const p = await tx.payment.create({
+        data: {
+          id: randomUUID(),
+          ticketId: b.ticketId,
+          amount: b.amount,
+          method: b.method || "Tunai",
+          note: b.note || null,
+          createdBy: u.id,
+          idempotencyKey,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          id: randomUUID(),
+          userId: u.id,
+          ipAddress: clientIp(request),
+          action: "CREATE",
+          entity: "Payment",
+          entityId: p.id,
+          detail: `${b.ticketId}: ${b.amount}`,
+        },
+      });
+      return p;
+    });
+  } catch (e) {
+    if ((e as Error).message === "TICKET_NOT_FOUND")
+      return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
+    if ((e as Error).message === "NEGATIVE_BALANCE")
+      return NextResponse.json(
+        { error: "Koreksi melebihi DP yang tercatat pada tiket" },
+        { status: 400 },
+      );
+    throw e;
+  }
+
+  pushPaymentToDashboard(payment);
+  return NextResponse.json({ payment });
 }

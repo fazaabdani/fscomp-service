@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { makePasswordHash, generateTempPassword } from "@/lib/password";
+import { clientIp } from "@/lib/audit";
 
 const ROLES = new Set(["ADMIN", "TECHNICIAN"]);
 
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
     data: {
       id: randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "CREATE",
       entity: "User",
       entityId: user.id,

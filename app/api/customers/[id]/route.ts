@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { normalizePhone } from "@/lib/phone";
+import { clientIp } from "@/lib/audit";
 
 const FIELDS = new Set(["name", "category", "phone", "address", "rating"]);
 
@@ -29,10 +31,8 @@ export async function PATCH(
     const phone = data.phone.replace(/\D/g, "");
     if (phone.length < 9 || phone.length > 15)
       return NextResponse.json({ error: "Nomor telepon harus 9-15 digit" }, { status: 400 });
-    const dup = await prisma.customer.findFirst({ where: { phone, NOT: { id } } });
-    if (dup)
-      return NextResponse.json({ error: "Nomor telepon sudah terdaftar" }, { status: 409 });
     data.phone = phone;
+    data.phoneNormalized = normalizePhone(phone);
   }
   if (Object.keys(data).length === 0)
     return NextResponse.json({ error: "Tidak ada field yang diubah" }, { status: 400 });
@@ -40,14 +40,22 @@ export async function PATCH(
   const existing = await prisma.customer.findUnique({ where: { id } });
   if (!existing)
     return NextResponse.json({ error: "Pelanggan tidak ditemukan" }, { status: 404 });
-  const customer = await prisma.customer.update({
-    where: { id },
-    data: { ...data, version: { increment: 1 } },
-  });
+  let customer;
+  try {
+    customer = await prisma.customer.update({
+      where: { id },
+      data: { ...data, version: { increment: 1 } },
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002")
+      return NextResponse.json({ error: "Nomor telepon sudah terdaftar" }, { status: 409 });
+    throw e;
+  }
   await prisma.auditLog.create({
     data: {
       id: crypto.randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "UPDATE",
       entity: "Customer",
       entityId: id,
@@ -58,7 +66,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -73,7 +81,16 @@ export async function DELETE(
   const existing = await prisma.customer.findUnique({ where: { id } });
   if (!existing)
     return NextResponse.json({ error: "Pelanggan tidak ditemukan" }, { status: 404 });
-  const inUse = await prisma.ticket.findFirst({ where: { phone: existing.phone } });
+  // Ticket.phone is stored as typed at intake (not normalized), so an exact
+  // match here previously missed a ticket recorded as "0812..." when the
+  // customer's own phone was "62812..." (or vice versa) — silently letting
+  // a customer with real service history get deleted.
+  const targetNorm = existing.phoneNormalized || normalizePhone(existing.phone);
+  const candidates = await prisma.ticket.findMany({
+    where: { phone: { contains: existing.phone.replace(/\D/g, "").slice(-8) } },
+    select: { id: true, phone: true },
+  });
+  const inUse = candidates.find((t) => normalizePhone(t.phone) === targetNorm);
   if (inUse)
     return NextResponse.json(
       { error: "Pelanggan masih punya riwayat servis, tidak bisa dihapus" },
@@ -84,6 +101,7 @@ export async function DELETE(
     data: {
       id: crypto.randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "DELETE",
       entity: "Customer",
       entityId: id,

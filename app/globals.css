@@ -2162,6 +2162,23 @@ textarea {
 }
 
 /* FS Service Center v56 */
+.offlineBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
 .serviceApp {
   --svc-bg: #f4f7fb;
   --svc-card: #fff;
@@ -4423,7 +4440,7 @@ textarea {
   grid-template-columns: 1.2fr 1fr 1.5fr 1fr 0.8fr 1fr 100px;
 }
 .reportCols {
-  grid-template-columns: 1.1fr repeat(3, 0.7fr) repeat(3, 1fr);
+  grid-template-columns: 1.1fr repeat(3, 0.7fr) repeat(4, 1fr);
 }
 .permissionBox {
   margin: 20px;
@@ -4465,7 +4482,7 @@ textarea {
 }
 .reportSummary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
 .reportSummary article {

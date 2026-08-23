@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { clientIp } from "@/lib/audit";
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -23,6 +24,7 @@ export async function DELETE(
     data: {
       id: crypto.randomUUID(),
       userId: session.id,
+      ipAddress: clientIp(request),
       action: "DELETE",
       entity: "ServiceItem",
       entityId: id,

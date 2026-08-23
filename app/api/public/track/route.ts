@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/phone";
 import { isRateLimited, clientKey } from "@/lib/rate-limit";
 
+// This is unauthenticated and public — return only what the /track page
+// actually renders. Financial fields (estimate, downPayment, warrantyDays)
+// were being returned even though nothing displays them, and an ID alone
+// (guessable — date + a small sequence number) isn't proof the requester
+// is the customer, so DP in particular had no business leaving here.
 function toSafeTicket(t: Record<string, unknown>) {
   return {
     id: t.id,
@@ -11,9 +16,6 @@ function toSafeTicket(t: Record<string, unknown>) {
     receivedAt: t.receivedAt,
     updatedAt: t.updatedAt,
     serviceAction: t.serviceAction,
-    estimate: t.costConfirmed ? t.estimate : undefined,
-    downPayment: t.downPayment,
-    warrantyDays: t.warrantyDays,
   };
 }
 

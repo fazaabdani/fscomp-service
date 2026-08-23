@@ -149,8 +149,43 @@ async function migrateShop() {
   console.log("shop: migrated");
 }
 
+const normalizePhone = (phone) => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("62") ? digits : `62${digits.replace(/^0/, "")}`;
+};
+
+// One-time (but safe to re-run) backfill for customers created before
+// phoneNormalized existed. Runs every boot but is a no-op once every row
+// has a value — cheap even at production's ~800 customers.
+async function backfillPhoneNormalized() {
+  const rows = await prisma.customer.findMany({
+    where: { phoneNormalized: null },
+    select: { id: true, phone: true },
+  });
+  if (!rows.length) return console.log("phoneNormalized: nothing to backfill");
+  let ok = 0, skipped = 0;
+  for (const c of rows) {
+    try {
+      await prisma.customer.update({
+        where: { id: c.id },
+        data: { phoneNormalized: normalizePhone(c.phone) },
+      });
+      ok++;
+    } catch (e) {
+      // Unique conflict means another customer row already normalizes to
+      // the same number — a pre-existing duplicate the app already let
+      // through before this constraint existed. Leave it NULL rather than
+      // fail the whole boot; it needs a human to pick which record to keep.
+      skipped++;
+      console.error(`phoneNormalized backfill skipped for customer ${c.id}:`, e.message);
+    }
+  }
+  console.log(`phoneNormalized: ${ok} backfilled, ${skipped} skipped (needs manual review)`);
+}
+
 await migrateTickets();
 await migrateCustomers();
 await migrateServices();
 await migrateShop();
+await backfillPhoneNormalized();
 await prisma.$disconnect();
