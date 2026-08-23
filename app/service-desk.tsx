@@ -2124,10 +2124,29 @@ export default function ServiceDesk() {
                 >
                   <Printer size={17} /> Print tanda terima
                 </button>
+                {!isFullyPaid(selected) && (
+                  <button
+                    className="ghost"
+                    onClick={() =>
+                      patchTicket(
+                        selected.id,
+                        {
+                          finalCost: finalPrice(selected),
+                          downPayment: finalPrice(selected),
+                          costConfirmed: true,
+                          paymentMethod: selected.paymentMethod || "Tunai",
+                        },
+                        `Pembayaran ${selected.id} telah lunas`,
+                      )
+                    }
+                  >
+                    <CircleDollarSign size={17} /> Tandai Lunas
+                  </button>
+                )}
                 <button
                   className="ghost"
                   disabled={!isFullyPaid(selected)}
-                  title={isFullyPaid(selected) ? undefined : "Konfirmasi biaya final dan lunaskan saldo dulu"}
+                  title={isFullyPaid(selected) ? undefined : "Tandai lunas dulu — saldo masih tersisa"}
                   onClick={() => printTicket("paid")}
                 >
                   <Banknote size={17} /> Print nota lunas
