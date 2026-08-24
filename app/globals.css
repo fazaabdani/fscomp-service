@@ -3955,18 +3955,19 @@ textarea {
     color: rgba(255, 255, 255, 0.7);
     font-size: 6pt;
   }
+  /* Tanda Terima Servis (single) & Nota Lunas: content is sized for A5
+     (~200x138mm, same compact card as the 2-copy nota) but printed on A4
+     portrait paper — cutting an A4 portrait sheet in half horizontally
+     gives exactly A5 landscape, so this is "half the sheet", not an
+     arbitrary small card floating in blank space. No print-dialog paper
+     setting to remember (A4 portrait is the near-universal default), and
+     the unused bottom half can be trimmed if a physical A5 nota is
+     wanted, without that being required. */
   .servicePrint.receipt,
   .servicePrint.paid {
-    width: 190mm;
-    min-height: 277mm; /* full notaPortraitReceipt printable height */
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    page: notaPortraitReceipt;
-  }
-  .servicePrint.receipt .printFooter,
-  .servicePrint.paid .printFooter {
-    margin-top: auto;
+    width: 200mm;
+    padding: 0;
+    page: notaPortraitCard;
   }
   .servicePrint.receipt2 {
     width: 200mm;
@@ -3977,195 +3978,13 @@ textarea {
     size: A5 landscape;
     margin: 4mm;
   }
-  @page notaPortraitReceipt {
+  @page notaPortraitCard {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 5mm;
   }
   @page {
     size: A4 portrait;
     margin: 8mm;
-  }
-  /* Tanda Terima Servis (single) & Nota Lunas fill the whole A4 portrait
-     page instead of reusing the compact A5-sized card — no blank space
-     below, and still no print-dialog paper setting to remember since A4
-     portrait is what's already loaded almost everywhere. Scoped to
-     .servicePrint.receipt/.paid so the A5 dual-copy nota
-     (.receiptCopyPage.compact, unrelated) is untouched. */
-  .servicePrint.receipt .printLogoFull,
-  .servicePrint.paid .printLogoFull {
-    height: 14mm;
-  }
-  .servicePrint.receipt .printHeaderId small,
-  .servicePrint.paid .printHeaderId small {
-    font-size: 9.5pt;
-  }
-  .servicePrint.receipt .printHeaderId em,
-  .servicePrint.paid .printHeaderId em {
-    margin-top: 2.5mm;
-    font-size: 7.5pt;
-  }
-  .servicePrint.receipt .printHeaderId b,
-  .servicePrint.paid .printHeaderId b {
-    font-size: 15pt;
-  }
-  .servicePrint.receipt .printHeaderId span,
-  .servicePrint.paid .printHeaderId span {
-    font-size: 7.5pt;
-  }
-  /* Direct-child selector, not descendant — .printQr also holds a 10px
-     Smartphone icon (inside .printQr small) that a plain ".printQr svg"
-     rule would match too and blow up to the same size as the QR code. */
-  .servicePrint.receipt .printQr > svg,
-  .servicePrint.paid .printQr > svg {
-    width: 32mm;
-    height: 32mm;
-  }
-  .servicePrint.receipt .printQr,
-  .servicePrint.paid .printQr {
-    padding: 1.5mm;
-    border: 0.75px solid #cbd5e1;
-  }
-  .servicePrint.receipt .printQr small,
-  .servicePrint.paid .printQr small {
-    font-size: 6.5pt;
-  }
-  .servicePrint.receipt .printInfoGrid,
-  .servicePrint.paid .printInfoGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 5mm 6mm;
-    padding: 5mm 0;
-  }
-  .servicePrint.receipt .printInfoGrid small,
-  .servicePrint.paid .printInfoGrid small,
-  .servicePrint.receipt .printIssueRow small,
-  .servicePrint.paid .printIssueRow small {
-    font-size: 7pt;
-  }
-  .servicePrint.receipt .printInfoGrid strong,
-  .servicePrint.paid .printInfoGrid strong,
-  .servicePrint.receipt .printIssueRow strong,
-  .servicePrint.paid .printIssueRow strong {
-    font-size: 11pt;
-    font-weight: 700;
-  }
-  .servicePrint.receipt .printInfoGrid span,
-  .servicePrint.paid .printInfoGrid span,
-  .servicePrint.receipt .printIssueRow span,
-  .servicePrint.paid .printIssueRow span,
-  .servicePrint.receipt .printInfoGrid ul,
-  .servicePrint.paid .printInfoGrid ul {
-    font-size: 8.5pt;
-    color: #94a3b8;
-  }
-  .servicePrint.receipt .printIssueRow,
-  .servicePrint.paid .printIssueRow {
-    padding: 5mm 0;
-  }
-  .servicePrint.receipt .printIssueRow em,
-  .servicePrint.paid .printIssueRow em {
-    font-size: 7pt;
-  }
-  .servicePrint.receipt .printSummaryRow,
-  .servicePrint.paid .printSummaryRow {
-    flex-direction: column;
-    gap: 4mm;
-    padding: 5mm 0;
-  }
-  .servicePrint.receipt .printSummaryHead,
-  .servicePrint.paid .printSummaryHead {
-    padding: 3mm 5mm;
-    font-size: 9pt;
-  }
-  .servicePrint.receipt .printSummaryGrid,
-  .servicePrint.paid .printSummaryGrid {
-    gap: 4mm;
-    padding: 5mm;
-  }
-  .servicePrint.receipt .printSummaryGrid small,
-  .servicePrint.paid .printSummaryGrid small {
-    font-size: 7.5pt;
-  }
-  .servicePrint.receipt .printSummaryGrid b,
-  .servicePrint.paid .printSummaryGrid b {
-    font-size: 13pt;
-  }
-  .servicePrint.receipt .printPayNote,
-  .servicePrint.paid .printPayNote {
-    margin: 0 5mm 4mm;
-    padding: 3mm 4mm;
-  }
-  .servicePrint.receipt .printPayNote b,
-  .servicePrint.paid .printPayNote b {
-    font-size: 8.5pt;
-  }
-  .servicePrint.receipt .printPayNote span,
-  .servicePrint.paid .printPayNote span {
-    font-size: 8pt;
-  }
-  .servicePrint.receipt .printBankCard,
-  .servicePrint.paid .printBankCard {
-    padding: 4mm 5mm;
-  }
-  .servicePrint.receipt .printBankHead,
-  .servicePrint.paid .printBankHead {
-    font-size: 8pt;
-    margin-bottom: 2mm;
-  }
-  .servicePrint.receipt .printBankRow,
-  .servicePrint.paid .printBankRow {
-    padding: 1.8mm 0;
-  }
-  .servicePrint.receipt .printBankRow span,
-  .servicePrint.paid .printBankRow span {
-    font-size: 8.5pt;
-  }
-  .servicePrint.receipt .printTermsRow,
-  .servicePrint.paid .printTermsRow {
-    flex-direction: column;
-    gap: 4mm;
-    padding: 4mm 0;
-  }
-  .servicePrint.receipt .printTermsBox small,
-  .servicePrint.paid .printTermsBox small {
-    font-size: 8pt;
-  }
-  .servicePrint.receipt .printTermsBox p,
-  .servicePrint.paid .printTermsBox p {
-    font-size: 8pt;
-  }
-  .servicePrint.receipt .printSign,
-  .servicePrint.paid .printSign {
-    justify-content: space-between;
-    font-size: 10.5pt;
-  }
-  .servicePrint.receipt .printSign span,
-  .servicePrint.paid .printSign span {
-    width: 55mm;
-  }
-  .servicePrint.receipt .printSign em,
-  .servicePrint.paid .printSign em {
-    font-size: 7.5pt;
-  }
-  .servicePrint.receipt .printSignSpace,
-  .servicePrint.paid .printSignSpace {
-    height: 10mm;
-  }
-  .servicePrint.receipt .printSign b,
-  .servicePrint.paid .printSign b {
-    font-size: 10pt;
-  }
-  .servicePrint.receipt .printFooterContact,
-  .servicePrint.paid .printFooterContact {
-    font-size: 7.5pt;
-    gap: 5mm;
-  }
-  .servicePrint.receipt .printFooterBrand b,
-  .servicePrint.paid .printFooterBrand b {
-    font-size: 9.5pt;
-  }
-  .servicePrint.receipt .printFooterBrand small,
-  .servicePrint.paid .printFooterBrand small {
-    font-size: 7pt;
   }
 }
 .modulePage {
