@@ -3958,7 +3958,15 @@ textarea {
   .servicePrint.receipt,
   .servicePrint.paid {
     width: 190mm;
+    min-height: 277mm; /* full notaPortraitReceipt printable height */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
     page: notaPortraitReceipt;
+  }
+  .servicePrint.receipt .printFooter,
+  .servicePrint.paid .printFooter {
+    margin-top: auto;
   }
   .servicePrint.receipt2 {
     width: 200mm;
