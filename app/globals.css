@@ -3488,7 +3488,12 @@ textarea {
     gap: 0;
     border: 0.75px solid #cbd5e1;
   }
-  .receiptCopyPage.compact .printQr svg {
+  /* Direct-child selector, not descendant: .printQr also contains a
+     small Smartphone icon (inside .printQr small, next to "Scan untuk
+     tracking servis") that is ALSO an <svg> — a plain ".printQr svg"
+     rule was matching that icon too and blowing it up to the same 30mm
+     as the QR code itself. */
+  .receiptCopyPage.compact .printQr > svg {
     width: 30mm;
     height: 30mm;
   }
