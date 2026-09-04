@@ -24,6 +24,11 @@ export async function POST(request: Request) {
   const name = String(b?.name || "").trim();
   if (!name)
     return NextResponse.json({ error: "Nama jasa servis wajib diisi" }, { status: 400 });
+  for (const f of ["partCost", "shopPrice", "userPrice", "warrantyDays"]) {
+    const v = b?.[f];
+    if (v !== undefined && (typeof v !== "number" || !Number.isFinite(v) || v < 0))
+      return NextResponse.json({ error: `${f} harus angka >= 0` }, { status: 400 });
+  }
   const service = await prisma.serviceItem.create({
     data: {
       id: `JS-${crypto.randomUUID()}`,

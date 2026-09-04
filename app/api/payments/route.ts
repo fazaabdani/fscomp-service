@@ -33,7 +33,8 @@ export async function POST(request: Request) {
       { error: "Hanya Admin yang dapat mencatat pembayaran langsung" },
       { status: 403 },
     );
-  const b = await request.json();
+  const b = await request.json().catch(() => null);
+  if (!b) return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
   // Negative amounts are allowed: a DP correction (technician lowers an
   // over-entered DP) needs a matching reversal so the ledger sum stays
   // equal to the ticket's actual current DP, not just monotonically grow.

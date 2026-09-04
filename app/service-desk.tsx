@@ -353,6 +353,14 @@ const nav = [
   [Users, "Laporan Teknisi"],
 ] as const;
 
+const NOTIF_META: Record<string, { icon: typeof Clock3; label: string; tone: string }> = {
+  SERVICE_OLD: { icon: Clock3, label: "Servis Lama", tone: "warn" },
+  READY_NOT_PICKED_UP: { icon: PackageCheck, label: "Belum Diambil", tone: "info" },
+  WAITING_CONFIRMATION_STUCK: { icon: MessageCircle, label: "Menunggu Konfirmasi", tone: "info" },
+  PAYMENT_DUE: { icon: Banknote, label: "Pembayaran Jatuh Tempo", tone: "danger" },
+  WARRANTY_END: { icon: ShieldCheck, label: "Garansi Akan Habis", tone: "warn" },
+};
+
 const money = (n: number) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -615,6 +623,10 @@ export default function ServiceDesk() {
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState<
+    { type: string; title: string; ticketId: string; customer: string; device: string }[]
+  >([]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [printMode, setPrintMode] = useState<
     "receipt" | "receipt2" | "qr" | "accessories" | "paid" | null
   >(null);
@@ -648,6 +660,7 @@ export default function ServiceDesk() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanStopRef = useRef<(() => void) | null>(null);
   const serviceFormRef = useRef<HTMLFormElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
   const [serverReady, setServerReady] = useState(false);
   // Distinct from serverReady (which only reflects the initial load): this
   // tracks live reachability so a banner can warn the operator the moment a
@@ -738,6 +751,24 @@ export default function ServiceDesk() {
         setServerOnline(false);
       });
   }, []);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/notifications", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => data && setNotifications(data.alerts))
+        .catch(() => {});
+    load();
+    const id = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [notifOpen]);
   useEffect(() => {
     localStorage.setItem("fs-service-tickets-v1", JSON.stringify(tickets));
   }, [tickets]);
@@ -1329,10 +1360,59 @@ export default function ServiceDesk() {
             <p>Kelola operasional servis dalam satu tempat.</p>
           </div>
           <div className="headerActions">
-            <button className="iconCircle">
-              <Bell size={19} />
-              <i />
-            </button>
+            <div className="notifWrap" ref={notifRef}>
+              <button
+                className="iconCircle"
+                onClick={() => setNotifOpen((v) => !v)}
+                aria-label="Notifikasi"
+              >
+                <Bell size={19} />
+                {notifications.length > 0 && <i>{notifications.length}</i>}
+              </button>
+              {notifOpen && (
+                <div className="notifDropdown">
+                  <div className="notifDropdownHead">
+                    <b>Notifikasi</b>
+                    <small>{notifications.length} perlu perhatian</small>
+                  </div>
+                  <div className="notifList">
+                    {notifications.length === 0 && (
+                      <div className="notifEmpty">
+                        <CheckCircle2 size={22} />
+                        <span>Semua aman, tidak ada yang perlu ditindaklanjuti.</span>
+                      </div>
+                    )}
+                    {notifications.map((n, i) => {
+                      const meta = NOTIF_META[n.type] || NOTIF_META.SERVICE_OLD;
+                      const Icon = meta.icon;
+                      return (
+                        <button
+                          key={`${n.ticketId}-${n.type}-${i}`}
+                          className="notifItem"
+                          onClick={() => {
+                            const t = tickets.find((x) => x.id === n.ticketId);
+                            if (t) openDetail(t);
+                            setNotifOpen(false);
+                          }}
+                        >
+                          <span className={`notifIcon ${meta.tone}`}>
+                            <Icon size={15} />
+                          </span>
+                          <span className="notifItemBody">
+                            <b>{meta.label}</b>
+                            <small>
+                              {n.customer} · {n.device}
+                            </small>
+                            <em>{n.title}</em>
+                          </span>
+                          <ChevronRight size={15} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <button className="scanButton" onClick={startScanner}>
               <QrCode size={18} /> Scan QR
             </button>
@@ -1410,9 +1490,7 @@ export default function ServiceDesk() {
                 patchTicket(
                   t.id,
                   {
-                    finalCost: finalPrice(t),
                     downPayment: finalPrice(t),
-                    costConfirmed: true,
                     paymentMethod: t.paymentMethod || "Tunai",
                   },
                   `Pembayaran ${t.id} telah lunas`,
@@ -2124,24 +2202,33 @@ export default function ServiceDesk() {
                 >
                   <Printer size={17} /> Print tanda terima
                 </button>
-                {!isFullyPaid(selected) && (
-                  <button
-                    className="ghost"
-                    onClick={() =>
-                      patchTicket(
-                        selected.id,
-                        {
-                          finalCost: finalPrice(selected),
-                          downPayment: finalPrice(selected),
-                          costConfirmed: true,
-                          paymentMethod: selected.paymentMethod || "Tunai",
-                        },
-                        `Pembayaran ${selected.id} telah lunas`,
-                      )
-                    }
-                  >
-                    <CircleDollarSign size={17} /> Tandai Lunas
-                  </button>
+                {!isFullyPaid(selected) && selected.costConfirmed && (
+                  finalPrice(selected) >= selected.downPayment ? (
+                    <button
+                      className="ghost"
+                      onClick={() =>
+                        patchTicket(
+                          selected.id,
+                          {
+                            downPayment: finalPrice(selected),
+                            paymentMethod: selected.paymentMethod || "Tunai",
+                          },
+                          `Pembayaran ${selected.id} telah lunas`,
+                        )
+                      }
+                    >
+                      <CircleDollarSign size={17} /> Tandai Lunas
+                    </button>
+                  ) : (
+                    <span className="ghost hint" title="DP tercatat melebihi biaya final — koreksi manual dulu di field DP sebelum bisa ditandai lunas">
+                      <CircleDollarSign size={17} /> DP melebihi biaya final
+                    </span>
+                  )
+                )}
+                {!isFullyPaid(selected) && !selected.costConfirmed && (
+                  <span className="ghost hint" title="Konfirmasi biaya final (tombol Konfirmasi Biaya di atas) sebelum bisa ditandai lunas">
+                    <CircleDollarSign size={17} /> Konfirmasi biaya dulu
+                  </span>
                 )}
                 <button
                   className="ghost"
@@ -2989,8 +3076,12 @@ function PaymentsPanel({
 }) {
   const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas">("Semua");
   const rows = tickets.filter((t) => {
-    const total = finalPrice(t);
-    const paid = t.downPayment >= total && (total > 0 || t.costConfirmed);
+    // Same canonical check the paid-nota print gate uses — this panel was
+    // using its own looser `downPayment >= total` (also true on an
+    // overpayment, and didn't require costConfirmed when total>0), so a
+    // ticket could show "Lunas" here while Print Nota Lunas stayed
+    // disabled for the exact same ticket.
+    const paid = isFullyPaid(t);
     return mode === "Semua" || (mode === "Lunas" ? paid : !paid);
   });
   const receivable = tickets.reduce(
@@ -3052,7 +3143,7 @@ function PaymentsPanel({
           {rows.map((t) => {
             const total = finalPrice(t);
             const due = Math.max(0, total - t.downPayment);
-            const paid = due === 0 && (total > 0 || t.costConfirmed);
+            const paid = isFullyPaid(t);
             const termDays =
               t.paymentMethod === "Tempo" && t.paymentTermDays
                 ? t.paymentTermDays
@@ -3085,6 +3176,14 @@ function PaymentsPanel({
                 <span>
                   {paid ? (
                     <CheckCircle2 size={18} />
+                  ) : !t.costConfirmed ? (
+                    <small className="settleHint" title="Konfirmasi biaya final dulu di detail tiket sebelum bisa dilunasi">
+                      Konfirmasi biaya dulu
+                    </small>
+                  ) : total < t.downPayment ? (
+                    <small className="settleHint" title="DP tercatat melebihi biaya final — koreksi manual dulu di detail tiket">
+                      DP melebihi biaya
+                    </small>
                   ) : (
                     <button
                       className="settleButton"

@@ -11,7 +11,9 @@ const WINDOW_MS=60_000;
 const MAX_REQUESTS=10;
 export async function POST(request:Request){
   if(isRateLimited("login",clientKey(request),WINDOW_MS,MAX_REQUESTS))return NextResponse.json({error:"Terlalu banyak percobaan, coba lagi sebentar lagi"},{status:429});
-  const {username,password}=await request.json();
+  const body=await request.json().catch(()=>null);
+  if(!body)return NextResponse.json({error:"Body bukan JSON valid"},{status:400});
+  const {username,password}=body;
   if(typeof username!=="string"||typeof password!=="string")return NextResponse.json({error:"Data login tidak valid"},{status:400});
   let user=await prisma.user.findUnique({where:{username}});
   if(!user&&username===process.env.ADMIN_USERNAME&&password===process.env.ADMIN_PASSWORD){user=await prisma.user.create({data:{id:randomUUID(),name:"Administrator",username,passwordHash:makePasswordHash(password),role:"ADMIN"}})}
