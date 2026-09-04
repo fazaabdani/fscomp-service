@@ -183,9 +183,27 @@ async function backfillPhoneNormalized() {
   console.log(`phoneNormalized: ${ok} backfilled, ${skipped} skipped (needs manual review)`);
 }
 
-await migrateTickets();
-await migrateCustomers();
-await migrateServices();
-await migrateShop();
+// Guards against resurrecting deleted/corrected rows: this script's upserts
+// read straight from the AppState blobs, which are never deleted or kept in
+// sync with the real tables afterward. Without this marker, every boot would
+// re-insert anything ever removed from Ticket/Customer/ServiceItem since the
+// original migration — including test rows deliberately cleaned out later.
+// Delete the "migration_v2_done" AppState row to force one more full re-run
+// (e.g. if a table needs re-seeding from the original blobs on purpose).
+const MARKER_KEY = "migration_v2_done";
+const marker = await prisma.appState.findUnique({ where: { key: MARKER_KEY } });
+if (marker?.value === "true") {
+  console.log("migration already completed previously — skipping (see MARKER_KEY comment to force a re-run)");
+} else {
+  await migrateTickets();
+  await migrateCustomers();
+  await migrateServices();
+  await migrateShop();
+  await prisma.appState.upsert({
+    where: { key: MARKER_KEY },
+    create: { key: MARKER_KEY, value: "true" },
+    update: { value: "true" },
+  });
+}
 await backfillPhoneNormalized();
 await prisma.$disconnect();

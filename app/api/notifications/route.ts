@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { finalPrice } from "@/lib/ticket-money";
 
 const daysSince = (dateStr: string, now: number) =>
   Math.floor((now - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
@@ -40,7 +41,10 @@ export async function GET() {
         alerts.push({ ...base, type: "WAITING_CONFIRMATION_STUCK", title: `Menunggu konfirmasi ${waitingDays} hari` });
     }
 
-    const total = t.finalCost || t.estimate || 0;
+    // Same helper the print/payment gates use — a plain `finalCost ||
+    // estimate` falls back to the estimate for a genuinely free (Rp0),
+    // already-confirmed job, producing a false "payment due" alert.
+    const total = finalPrice(t);
     if (total > t.downPayment && t.paymentTermDays && days > t.paymentTermDays)
       alerts.push({ ...base, type: "PAYMENT_DUE", title: "Pembayaran jatuh tempo" });
 

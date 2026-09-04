@@ -1152,7 +1152,7 @@ export default function ServiceDesk() {
     notify(`Servis ${next.id} berhasil dibuat`);
     // The opening DP payment is created server-side in the same transaction
     // as the ticket (see POST /api/tickets) — nothing to record here.
-    if (!customers.some((c) => c.phone === phone)) {
+    if (!customers.some((c) => normalizePhone(c.phone) === normalizePhone(phone))) {
       const cRes = await fetch("/api/customers", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1328,8 +1328,8 @@ export default function ServiceDesk() {
         </nav>
         <div className="sidebarHelp">
           <ShieldCheck />
-          <strong>Data tersimpan lokal</strong>
-          <small>Aman di perangkat ini dan siap dipakai offline.</small>
+          <strong>Butuh koneksi server</strong>
+          <small>Tampilan bisa dilihat dari cache, tapi perubahan (tiket, pembayaran, dll) hanya tersimpan saat terhubung ke server.</small>
         </div>
         <div className="sidebarUser">
           <span>
@@ -2650,7 +2650,7 @@ function CustomersPanel({
     const phone = String(f.get("phone") || "").replace(/\D/g, "");
     if (phone.length < 9 || phone.length > 15)
       return setError("Nomor telepon harus 9-15 digit");
-    if (data.some((c) => c.phone === phone && c.id !== editing?.id))
+    if (data.some((c) => normalizePhone(c.phone) === normalizePhone(phone) && c.id !== editing?.id))
       return setError("Nomor telepon sudah terdaftar");
     setBusy(true);
     const input = {
@@ -2669,7 +2669,7 @@ function CustomersPanel({
   }
   async function remove(customer: Customer) {
     if (!isAdmin) return;
-    if (tickets.some((t) => t.phone === customer.phone)) return;
+    if (tickets.some((t) => normalizePhone(t.phone) === normalizePhone(customer.phone))) return;
     await onDelete(customer);
   }
   function exportCustomers() {
@@ -2764,7 +2764,12 @@ function CustomersPanel({
           <span>Pilihan</span>
         </div>
         {rows.map((c, index) => {
-          const history = tickets.filter((t) => t.phone === c.phone);
+          // Exact string match missed a ticket recorded as "0812..." when
+          // the customer's own phone was stored "62812..." (or vice versa)
+          // — same class of bug already fixed for the delete guard and
+          // duplicate check, just missed here.
+          const cNorm = normalizePhone(c.phone);
+          const history = tickets.filter((t) => normalizePhone(t.phone) === cNorm);
           const latest = history[0];
           const process = history.filter((t) =>
             processStatuses.includes(t.status),

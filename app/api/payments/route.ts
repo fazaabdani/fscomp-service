@@ -97,6 +97,15 @@ export async function POST(request: Request) {
         { error: "Koreksi melebihi DP yang tercatat pada tiket" },
         { status: 400 },
       );
+    // The idempotencyKey findUnique above and this transaction aren't one
+    // atomic step — two requests with the same key can both pass that
+    // check before either commits. The unique constraint still prevents a
+    // duplicate row, but the loser would otherwise see a raw 500 instead
+    // of the idempotent behavior the key exists for.
+    if (idempotencyKey && (e as { code?: string }).code === "P2002") {
+      const winner = await prisma.payment.findUnique({ where: { idempotencyKey } });
+      if (winner) return NextResponse.json({ payment: winner });
+    }
     throw e;
   }
 
