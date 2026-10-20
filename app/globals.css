@@ -6185,6 +6185,15 @@ textarea {
     color: #c7d2fe;
     font-weight: 700;
   }
+  .trxMoney .trxMoneyDue.trxPaidBar {
+    background: #0e7a52;
+  }
+  .trxMoney .trxMoneyDue.trxPaidBar span {
+    color: #d1fae5;
+  }
+  .trxMoney .trxMoneyDue.trxPaidBar b {
+    letter-spacing: 0.18em;
+  }
   .trxMoney .trxMoneyDue b {
     color: #fff;
     font-size: 10.5pt;

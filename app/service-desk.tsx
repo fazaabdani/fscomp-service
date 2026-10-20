@@ -49,7 +49,6 @@ import {
   Phone,
   MapPin,
   Globe,
-  Wallet,
   Landmark,
   LogOut,
   KeyRound,
@@ -405,38 +404,34 @@ function accessoryItems(value: string) {
     .filter(Boolean)
     .filter((x) => !/^(-|tidak ada|unit only)$/i.test(x));
 }
-// Shared "Tanda Terima Servis" body — used both for the single A4-portrait
-// receipt (top half of the sheet) and, twice, for the A5-landscape dual-copy
-// nota, so the two can't visually drift apart. Styles live under `.trx*` in
-// globals.css and are independent of the Nota Lunas (`print*`) styles.
-function ServiceReceiptBody({
+// Shared building blocks for the printed documents ("Tanda Terima Servis" and
+// "Nota Lunas"). Both use the `.trx*` styles in globals.css so they read as one
+// consistent document family; each card stays within ~130mm so it fits the top
+// half of an A4 portrait sheet (or one A5-landscape page for the 2-copy nota).
+const printDateLabel = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+function DocHeader({
   ticket,
   shop,
-  copyLabel,
+  kicker,
+  meta,
+  chip,
 }: {
   ticket: Ticket;
   shop: ShopSettings;
-  copyLabel?: string;
+  kicker: string;
+  meta: string;
+  chip?: string;
 }) {
   const shopName = shop.name || "FS Comp";
   const [brandFirst, ...brandRest] = shopName.split(/\s+/);
-  const total = finalPrice(ticket);
-  const hasPrice = total > 0;
-  const remaining = Math.max(0, total - ticket.downPayment);
-  const dateLabel = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  const accessories = accessoryItems(ticket.accessories).join(", ") || "Unit only";
-  const bankLines = (shop.bank || "")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const staffName = ticket.technician || ticket.handedBy || "Admin";
   return (
-    <div className="trx">
+    <>
       <div className="trxTop">
         <div className="trxBrand">
           <span className="trxMark">
@@ -452,13 +447,10 @@ function ServiceReceiptBody({
           </div>
         </div>
         <div className="trxDoc">
-          <span className="trxKicker">Tanda Terima Servis</span>
+          <span className="trxKicker">{kicker}</span>
           <b className="trxDocNo">{ticket.id}</b>
-          <small>
-            Diterima {dateLabel(ticket.receivedAt)}
-            {ticket.receivedTime ? ` · ${ticket.receivedTime} WIB` : ""}
-          </small>
-          {copyLabel && <em className="trxChip">{copyLabel}</em>}
+          <small>{meta}</small>
+          {chip && <em className="trxChip">{chip}</em>}
         </div>
         <div className="trxQr">
           <QRCodeSVG
@@ -470,6 +462,90 @@ function ServiceReceiptBody({
         </div>
       </div>
       <div className="trxRule" />
+    </>
+  );
+}
+
+function DocFooter({ shop }: { shop: ShopSettings }) {
+  const shopName = shop.name || "FS Comp";
+  return (
+    <div className="trxFooter">
+      <div className="trxFooterContact">
+        {shop.phone && (
+          <span>
+            <Phone size={9} /> {shop.phone}
+          </span>
+        )}
+        {shop.whatsapp && (
+          <span>
+            <MessageCircle size={9} /> {shop.whatsapp}
+          </span>
+        )}
+        {shop.address && (
+          <span>
+            <MapPin size={9} /> {shop.address}
+          </span>
+        )}
+        <span>
+          <Globe size={9} /> {shopName.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
+        </span>
+      </div>
+      <div className="trxFooterBrand">
+        <b>{shopName.toUpperCase()}</b>
+        <small>Service &amp; Technology Center</small>
+      </div>
+    </div>
+  );
+}
+
+function DocSign({
+  left,
+  right,
+}: {
+  left: { label: string; name: string };
+  right: { label: string; name: string };
+}) {
+  return (
+    <div className="trxSign">
+      {[left, right].map((p) => (
+        <div key={p.label}>
+          <em>{p.label}</em>
+          <i />
+          <b>{p.name}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ServiceReceiptBody({
+  ticket,
+  shop,
+  copyLabel,
+}: {
+  ticket: Ticket;
+  shop: ShopSettings;
+  copyLabel?: string;
+}) {
+  const shopName = shop.name || "FS Comp";
+  const total = finalPrice(ticket);
+  const hasPrice = total > 0;
+  const remaining = Math.max(0, total - ticket.downPayment);
+  const accessories = accessoryItems(ticket.accessories).join(", ") || "Unit only";
+  const bankLines = (shop.bank || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const staffName = ticket.technician || ticket.handedBy || "Admin";
+  return (
+    <div className="trx">
+      <DocHeader
+        ticket={ticket}
+        shop={shop}
+        kicker="Tanda Terima Servis"
+        meta={`Diterima ${printDateLabel(ticket.receivedAt)}${ticket.receivedTime ? ` · ${ticket.receivedTime} WIB` : ""}`}
+        chip={copyLabel}
+      />
 
       <div className="trxBody">
         <div className="trxCol">
@@ -559,46 +635,156 @@ function ServiceReceiptBody({
               "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
           </p>
         </div>
-        <div className="trxSign">
-          <div>
-            <em>Pelanggan</em>
-            <i />
-            <b>{ticket.customer}</b>
-          </div>
-          <div>
-            <em>Petugas {shopName}</em>
-            <i />
-            <b>{staffName}</b>
-          </div>
+        <DocSign
+          left={{ label: "Pelanggan", name: ticket.customer }}
+          right={{ label: `Petugas ${shopName}`, name: staffName }}
+        />
+      </div>
+
+      <DocFooter shop={shop} />
+    </div>
+  );
+}
+
+function PaidNotaBody({
+  ticket,
+  shop,
+  issuer,
+}: {
+  ticket: Ticket;
+  shop: ShopSettings;
+  issuer: string;
+}) {
+  const total = finalPrice(ticket);
+  const pickedAt = ticket.pickedUpAt || localDateStr();
+  const warrantyUntil = ticket.warrantyDays
+    ? printDateLabel(
+        localDateStr(
+          new Date(
+            new Date(`${pickedAt}T00:00:00`).getTime() + ticket.warrantyDays * 86400000,
+          ),
+        ),
+      )
+    : "";
+  return (
+    <div className="trx">
+      <DocHeader
+        ticket={ticket}
+        shop={shop}
+        kicker="Nota Lunas Pembayaran"
+        meta={`Dicetak ${printDateLabel(localDateStr())}`}
+      />
+
+      <div className="trxBody">
+        <div className="trxCol">
+          <section>
+            <h4 className="trxSecHead">Data Pelanggan &amp; Perangkat</h4>
+            <dl className="trxDl">
+              <div>
+                <dt>Pelanggan</dt>
+                <dd>
+                  <b>{ticket.customer}</b>
+                  <span>{ticket.phone}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Perangkat</dt>
+                <dd>
+                  <b>{ticket.device}</b>
+                  {ticket.brand && <span>{ticket.brand}</span>}
+                </dd>
+              </div>
+              <div>
+                <dt>Serial Number</dt>
+                <dd className="trxMono">{ticket.serial || "-"}</dd>
+              </div>
+              <div>
+                <dt>Tanggal Ambil</dt>
+                <dd>
+                  {printDateLabel(pickedAt)}
+                  {ticket.pickedUpTime ? ` · ${ticket.pickedUpTime} WIB` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt>Diambil oleh</dt>
+                <dd>{ticket.pickupBy || ticket.customer}</dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <h4 className="trxSecHead">{ticket.serviceAction ? "Tindakan Servis" : "Keluhan / Kondisi Awal"}</h4>
+            <div className="trxIssue">
+              <p>{ticket.serviceAction || ticket.issue}</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="trxCol">
+          <section>
+            <h4 className="trxSecHead">Ringkasan Pembayaran</h4>
+            <div className="trxMoney">
+              <div>
+                <span>Biaya servis (final)</span>
+                <b>{money(total)}</b>
+              </div>
+              <div>
+                <span>Metode pembayaran</span>
+                <b>{ticket.paymentMethod || "Tunai"}</b>
+              </div>
+              <div>
+                <span>Total diterima</span>
+                <b>{money(ticket.downPayment)}</b>
+              </div>
+              <div className="trxMoneyDue trxPaidBar">
+                <span>Status pembayaran</span>
+                <b>LUNAS</b>
+              </div>
+            </div>
+            <p className="trxFine">
+              Pembayaran sebesar {money(total)} telah diterima secara penuh.
+            </p>
+          </section>
+          <section>
+            <h4 className="trxSecHead">Garansi Servis</h4>
+            <ul className="trxBank">
+              {ticket.warrantyDays ? (
+                <>
+                  <li>
+                    <ShieldCheck size={10} />
+                    <span>{ticket.warrantyDays} hari sejak tanggal pengambilan</span>
+                  </li>
+                  <li>
+                    <ShieldCheck size={10} />
+                    <span>Berlaku sampai {warrantyUntil}</span>
+                  </li>
+                </>
+              ) : (
+                <li>
+                  <ShieldCheck size={10} />
+                  <span>Tidak ada garansi untuk servis ini</span>
+                </li>
+              )}
+            </ul>
+          </section>
         </div>
       </div>
 
-      <div className="trxFooter">
-        <div className="trxFooterContact">
-          {shop.phone && (
-            <span>
-              <Phone size={9} /> {shop.phone}
-            </span>
-          )}
-          {shop.whatsapp && (
-            <span>
-              <MessageCircle size={9} /> {shop.whatsapp}
-            </span>
-          )}
-          {shop.address && (
-            <span>
-              <MapPin size={9} /> {shop.address}
-            </span>
-          )}
-          <span>
-            <Globe size={9} /> {shopName.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
-          </span>
+      <div className="trxTerms">
+        <div className="trxTermsText">
+          <h4 className="trxSecHead">Ketentuan Garansi</h4>
+          <p>
+            {ticket.warrantyDays
+              ? "Garansi hanya untuk keluhan yang sama, tidak mencakup kerusakan baru akibat kelalaian pemakaian. Simpan nota ini sebagai bukti pembayaran dan klaim garansi."
+              : "Servis ini tanpa garansi. Simpan nota ini sebagai bukti pembayaran."}
+          </p>
         </div>
-        <div className="trxFooterBrand">
-          <b>{shopName.toUpperCase()}</b>
-          <small>Service &amp; Technology Center</small>
-        </div>
+        <DocSign
+          left={{ label: "Diserahkan oleh", name: issuer }}
+          right={{ label: "Diterima oleh", name: ticket.pickupBy || ticket.customer }}
+        />
       </div>
+
+      <DocFooter shop={shop} />
     </div>
   );
 }
@@ -2458,198 +2644,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       {printMode === "paid" && selected && (
         <div className="servicePrint paid">
           <div className="receiptCopyPage compact">
-          <div className="printHeader">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-            <div className="printHeaderDivider" />
-            <div className="printHeaderId">
-              <small>Nota Lunas Pembayaran</small>
-              <em>Service ID</em>
-              <b>{selected.id}</b>
-              <span>
-                Tanggal Cetak:{" "}
-                {new Date().toLocaleDateString("id-ID", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-            <div className="printQr">
-              <QRCodeSVG
-                value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
-                size={70}
-                level="H"
-              />
-              <small>
-                <Smartphone size={10} /> Scan untuk tracking servis
-              </small>
-            </div>
-          </div>
-          <div className="printInfoGrid">
-            <div>
-              <span className="printInfoIcon">
-                <User size={14} color="#fff" />
-              </span>
-              <div>
-                <small>Pelanggan</small>
-                <strong>{selected.customer}</strong>
-                <span>{selected.phone}</span>
-              </div>
-            </div>
-            <div>
-              <span className="printInfoIcon">
-                <Smartphone size={14} color="#fff" />
-              </span>
-              <div>
-                <small>Perangkat</small>
-                <strong>{selected.device}</strong>
-                <span>SN: {selected.serial || "-"}</span>
-              </div>
-            </div>
-            <div>
-              <span className="printInfoIcon">
-                <CalendarDays size={14} color="#fff" />
-              </span>
-              <div>
-                <small>Tanggal Ambil</small>
-                <strong>{selected.pickedUpAt || localDateStr()}</strong>
-                <span>Petugas: {selected.handedBy || currentUser?.name || "Admin"}</span>
-              </div>
-            </div>
-            <div>
-              <span className="printInfoIcon">
-                <CircleDollarSign size={14} color="#fff" />
-              </span>
-              <div>
-                <small>Metode Pembayaran</small>
-                <strong>{selected.paymentMethod || "Tunai"}</strong>
-                <span>Status: Lunas</span>
-              </div>
-            </div>
-          </div>
-          <div className="printSummaryRow">
-            <div className="printSummary">
-              <div className="printSummaryHead">Ringkasan Pembayaran</div>
-              <div className="printSummaryGrid">
-                <div>
-                  <FileText size={13} />
-                  <small>Biaya Final</small>
-                  <b>{money(finalPrice(selected))}</b>
-                </div>
-                <div>
-                  <Wallet size={13} />
-                  <small>DP (Sudah Dibayar)</small>
-                  <b>{money(selected.downPayment)}</b>
-                </div>
-                <div>
-                  <Banknote size={13} />
-                  <small>Pelunasan (Sekarang)</small>
-                  <b>
-                    {money(
-                      Math.max(
-                        0,
-                        finalPrice(selected) - selected.downPayment,
-                      ),
-                    )}
-                  </b>
-                </div>
-              </div>
-              <div className="printPayNote">
-                <CircleDollarSign size={13} />
-                <div>
-                  <b>Status Pembayaran</b>
-                  <span>
-                    LUNAS — {money(finalPrice(selected))} telah diterima
-                    secara penuh.
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="printBankCard">
-              <div className="printBankHead">Garansi Servis</div>
-              {selected.warrantyDays ? (
-                <>
-                  <div className="printBankRow">
-                    <ShieldCheck size={12} />
-                    <span>{selected.warrantyDays} hari sejak pengambilan</span>
-                  </div>
-                  <div className="printBankRow">
-                    <ShieldCheck size={12} />
-                    <span>
-                      Berlaku sampai{" "}
-                      {new Date(
-                        new Date(
-                          `${selected.pickedUpAt || localDateStr()}T00:00:00`,
-                        ).getTime() +
-                          selected.warrantyDays * 86400000,
-                      ).toLocaleDateString("id-ID", {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="printBankRow">
-                  <ShieldCheck size={12} />
-                  <span>Tidak ada garansi untuk servis ini</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="printTermsRow">
-            <div className="printTermsBox">
-              <ShieldCheck size={14} />
-              <div>
-                <small>Ketentuan Garansi</small>
-                <p>
-                  {selected.warrantyDays
-                    ? "Garansi hanya untuk keluhan yang sama, tidak mencakup kerusakan baru akibat kelalaian pemakaian."
-                    : "Servis ini tanpa garansi. Simpan nota ini sebagai bukti pembayaran."}
-                </p>
-              </div>
-            </div>
-            <div className="printSign">
-              <span>
-                <em>Diserahkan oleh</em>
-                <i className="printSignSpace" />
-                <b>{selected.handedBy || currentUser?.name || "Admin"}</b>
-              </span>
-              <span>
-                <em>Diterima oleh</em>
-                <i className="printSignSpace" />
-                <b>{selected.pickupBy || selected.customer}</b>
-              </span>
-            </div>
-          </div>
-          <div className="printFooter">
-            <div className="printFooterContact">
-              {shop.phone && (
-                <span>
-                  <Phone size={11} /> {shop.phone}
-                </span>
-              )}
-              {shop.whatsapp && (
-                <span>
-                  <MessageCircle size={11} /> {shop.whatsapp}
-                </span>
-              )}
-              {shop.address && (
-                <span>
-                  <MapPin size={11} /> {shop.address}
-                </span>
-              )}
-              <span>
-                <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
-              </span>
-            </div>
-            <div className="printFooterBrand">
-              <b>{(shop.name || "FS Comp").toUpperCase()}</b>
-              <small>Service &amp; Technology Center</small>
-            </div>
-          </div>
+            <PaidNotaBody
+              ticket={selected}
+              shop={shop}
+              issuer={selected.handedBy || currentUser?.name || "Admin"}
+            />
           </div>
         </div>
       )}
