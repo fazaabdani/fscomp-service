@@ -62,12 +62,15 @@ model Ticket {
   partCost          Int?
   pickupBy          String?
   handedBy          String?
+  // Set when this ticket is a warranty claim: the id of the original service.
+  warrantyOf        String?
   version           Int      @default(1)
   createdAt         DateTime @default(now())
   dbUpdatedAt       DateTime @updatedAt
   @@index([status])
   @@index([phone])
   @@index([serial])
+  @@index([warrantyOf])
 }
 
 model Customer {

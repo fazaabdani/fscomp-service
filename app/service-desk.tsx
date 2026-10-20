@@ -110,6 +110,7 @@ type Ticket = {
   pickedUpTime?: string;
   notes?: string;
   partCost?: number;
+  warrantyOf?: string | null;
   pickupBy?: string;
   handedBy?: string;
   version?: number;
@@ -399,6 +400,9 @@ const localDateStr = (d: Date = new Date()) =>
 // A scanned/pasted tracking URL or label text should find the ticket just
 // like the bare number does (USB QR scanners type the whole URL).
 const extractServiceCode = (v: string) => v.match(/SRV-\d{6}-\d+/i)?.[0]?.toUpperCase() ?? null;
+const warrantyDaysLeft = (t: { warrantyDays?: number; pickedUpAt?: string; updatedAt: string }) =>
+  (t.warrantyDays || 0) -
+  Math.floor((Date.now() - new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`).getTime()) / 86400000);
 const paymentMethods = ["Tunai", "Transfer BCA", "Transfer BRI", "Transfer Mandiri", "QRIS", "Tempo"];
 const warrantyOptions: [number, string][] = [
   [0, "Tidak ada"],
@@ -597,6 +601,7 @@ function ServiceReceiptBody({
             <h4 className="trxSecHead">Keluhan / Kondisi Awal</h4>
             <div className="trxIssue">
               <p>{ticket.issue}</p>
+              {ticket.warrantyOf && <small>Klaim garansi dari servis {ticket.warrantyOf}</small>}
               {ticket.notes && <small>Catatan: {ticket.notes}</small>}
             </div>
           </section>
@@ -811,6 +816,8 @@ export default function ServiceDesk() {
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  // The original ticket when the intake form is opened as a warranty claim.
+  const [warrantyClaim, setWarrantyClaim] = useState<Ticket | null>(null);
   const [notifications, setNotifications] = useState<
     { type: string; title: string; ticketId: string; customer: string; device: string }[]
   >([]);
@@ -863,9 +870,12 @@ export default function ServiceDesk() {
 
   useEffect(() => {
     if (modal === "new") {
-      setCustomerQuery("");
+      setCustomerQuery(warrantyClaim?.customer ?? "");
       setCustomerPickerOpen(false);
+    } else {
+      setWarrantyClaim(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
 
   useEffect(() => {
@@ -1328,15 +1338,38 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
     return `${base}?text=${encodeURIComponent(message)}`;
   }
+  function startWarrantyClaim(original: Ticket) {
+    setWarrantyClaim(original);
+    setModal("new");
+  }
   function printTicket(mode: "receipt" | "receipt2" | "qr" | "accessories" | "paid") {
     if (mode === "paid" && selected && !isFullyPaid(selected)) {
       notify("Belum bisa cetak nota lunas — biaya final belum dikonfirmasi atau saldo belum Rp0");
       return;
     }
+    // The browser proposes the page title as the "Save as PDF" file name.
+    const t = selected;
+    const kind =
+      mode === "paid" ? "Nota Lunas" : mode === "qr" ? "Label QR" : mode === "accessories" ? "Label QR Perlengkapan" : "Tanda Terima";
+    const date = mode === "paid" ? t?.pickedUpAt || localDateStr() : t?.receivedAt || localDateStr();
+    const unit = t
+      ? t.brand && !t.device.toLowerCase().includes(t.brand.toLowerCase())
+        ? `${t.device} ${t.brand}`
+        : t.device
+      : "";
+    const pdfName = t
+      ? `${t.customer} - ${date} - ${unit} - ${kind}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim()
+      : "";
+    const originalTitle = document.title;
     setPrintMode(mode);
     setTimeout(() => {
-      window.print();
-      setPrintMode(null);
+      if (pdfName) document.title = pdfName;
+      try {
+        window.print();
+      } finally {
+        document.title = originalTitle;
+        setPrintMode(null);
+      }
     }, 120);
   }
   function chooseCustomer(customer: Customer) {
@@ -1419,6 +1452,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           category: String(form.get("category")),
           address: String(form.get("address") || "-"),
           paymentTermDays: Number(form.get("paymentTermDays") || 0),
+          ...(warrantyClaim ? { warrantyOf: warrantyClaim.id } : {}),
         }),
       });
     } catch {
@@ -1865,7 +1899,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               }}
             />
           ) : active === "Status Garansi" ? (
-            <WarrantyPanel tickets={tickets} onOpen={openDetail} />
+            <WarrantyPanel tickets={tickets} onOpen={openDetail} onClaim={startWarrantyClaim} />
           ) : active === "Laporan Servis" ? (
             <ServiceReport tickets={tickets} />
           ) : active === "Laporan Teknisi" ? (
@@ -2029,6 +2063,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                             <Clock3 size={12} />
                             {t.receivedAt}
                           </small>
+                          {t.warrantyOf && (
+                            <small className="claimTag">
+                              <Shield size={11} /> Klaim garansi
+                            </small>
+                          )}
                         </span>
                         <span>
                           <b>{t.customer}</b>
@@ -2106,6 +2145,20 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <X />
                 </button>
               </div>
+              {warrantyClaim && (
+                <div className="claimBanner">
+                  <Shield size={16} />
+                  <div>
+                    <b>Klaim garansi dari {warrantyClaim.id}</b>
+                    <span>
+                      {warrantyClaim.device} · diambil {warrantyClaim.pickedUpAt || warrantyClaim.updatedAt} · garansi{" "}
+                      {warrantyDaysLeft(warrantyClaim) >= 0
+                        ? `masih ${warrantyDaysLeft(warrantyClaim)} hari`
+                        : "SUDAH HABIS"}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="formGridService">
                 <label className="customerLookup">
                   Nama pemilik barang
@@ -2150,25 +2203,27 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     name="phone"
                     required
                     inputMode="tel"
+                    defaultValue={warrantyClaim?.phone ?? ""}
                     placeholder="08xxxxxxxxxx"
                   />
                 </label>
                 <label>
                   Kategori pelanggan
-                  <select name="category">
+                  <select name="category" defaultValue={warrantyClaim?.category || "User"}>
                     <option>User</option>
                     <option>Toko</option>
                   </select>
                 </label>
                 <label>
                   Alamat pelanggan
-                  <input name="address" placeholder="Desa / kecamatan / kota" />
+                  <input name="address" defaultValue={warrantyClaim?.address && warrantyClaim.address !== "-" ? warrantyClaim.address : ""} placeholder="Desa / kecamatan / kota" />
                 </label>
                 <label>
                   Jenis / model barang
                   <input
                     name="device"
                     required
+                    defaultValue={warrantyClaim?.device ?? ""}
                     placeholder="Contoh: Laptop ThinkPad T14"
                   />
                 </label>
@@ -2177,17 +2232,19 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <input
                     name="brand"
                     required
+                    defaultValue={warrantyClaim?.brand ?? ""}
                     placeholder="Lenovo, ASUS, Epson..."
                   />
                 </label>
                 <label>
                   Serial number
-                  <input name="serial" placeholder="Opsional" />
+                  <input name="serial" defaultValue={warrantyClaim && warrantyClaim.serial !== "-" ? warrantyClaim.serial : ""} placeholder="Opsional" />
                 </label>
                 <label>
                   Kelengkapan untuk label QR
                   <input
                     name="accessories"
+                    defaultValue={warrantyClaim && warrantyClaim.accessories !== "Unit only" ? warrantyClaim.accessories : ""}
                     placeholder="Contoh: Charger, tas, mouse"
                   />
                   <small className="fieldHint">
@@ -2285,6 +2342,37 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <p>
                     {selected.customer} · {selected.phone}
                   </p>
+                  {(selected.warrantyOf || tickets.some((x) => x.warrantyOf === selected.id)) && (
+                    <div className="claimLinks">
+                      <Shield size={14} />
+                      {selected.warrantyOf && (
+                        <span>
+                          Klaim garansi dari{" "}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const o = tickets.find((x) => x.id === selected.warrantyOf);
+                              if (o) openDetail(o);
+                            }}
+                          >
+                            {selected.warrantyOf}
+                          </button>
+                        </span>
+                      )}
+                      {tickets.filter((x) => x.warrantyOf === selected.id).length > 0 && (
+                        <span>
+                          Klaim:{" "}
+                          {tickets
+                            .filter((x) => x.warrantyOf === selected.id)
+                            .map((x) => (
+                              <button type="button" key={x.id} onClick={() => openDetail(x)}>
+                                {x.id}
+                              </button>
+                            ))}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="serviceAge">
                     <Clock3 size={15} />
                     <strong>
@@ -2605,6 +2693,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 >
                   <Copy size={17} /> Salin tracking
                 </button>
+                {selected.status === "Sudah Diambil" && (selected.warrantyDays || 0) > 0 && (
+                  <button className="ghost" onClick={() => startWarrantyClaim(selected)}>
+                    <Shield size={17} /> Klaim garansi
+                  </button>
+                )}
                 <button className="ghost" onClick={() => setModal("edit")}>
                   <FileText size={17} /> Ubah Data Lainnya
                 </button>
@@ -3804,9 +3897,11 @@ function ServicesPanel({
 function WarrantyPanel({
   tickets,
   onOpen,
+  onClaim,
 }: {
   tickets: Ticket[];
   onOpen: (ticket: Ticket) => void;
+  onClaim: (ticket: Ticket) => void;
 }) {
   const daysLeft = (t: Ticket) =>
     (t.warrantyDays || 0) -
@@ -3874,7 +3969,7 @@ function WarrantyPanel({
               </span>
               <span>
                 {remaining >= 0 ? (
-                  <button onClick={() => onOpen(t)}>Terima Garansi</button>
+                  <button onClick={() => onClaim(t)}>Terima Garansi</button>
                 ) : (
                   "-"
                 )}

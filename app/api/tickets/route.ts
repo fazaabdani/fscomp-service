@@ -52,6 +52,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `${f} harus angka >= 0` }, { status: 400 });
   }
 
+  // Warranty claim: link to the original ticket (must exist).
+  const warrantyOf = str(b.warrantyOf).trim();
+  if (warrantyOf) {
+    const original = await prisma.ticket.findUnique({ where: { id: warrantyOf }, select: { id: true } });
+    if (!original)
+      return NextResponse.json({ error: "Servis asal untuk klaim garansi tidak ditemukan" }, { status: 400 });
+  }
+
   const now = new Date();
   const datePart = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
   const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -94,6 +102,7 @@ export async function POST(request: Request) {
             category: str(b.category, "User"),
             address: str(b.address, "-"),
             paymentTermDays: num(b.paymentTermDays),
+            warrantyOf: warrantyOf || null,
             receivedAt: localDate,
             // Real intake time. Left null, the edit form showed a made-up
             // "09:00" default and saving any edit wrote that fiction in.

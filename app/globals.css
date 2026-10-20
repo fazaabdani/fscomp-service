@@ -6524,3 +6524,52 @@ textarea {
   background: #fafbfd;
   font-family: Consolas, "Courier New", monospace;
 }
+
+.claimBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 24px 0;
+  padding: 11px 14px;
+  border: 1px solid #bfd0ff;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #3347b8;
+}
+.claimBanner b,
+.claimBanner span {
+  display: block;
+}
+.claimBanner b {
+  font-size: 13px;
+}
+.claimBanner span {
+  margin-top: 2px;
+  color: #5b6aa8;
+  font-size: 12px;
+}
+.ticketRow .claimTag {
+  color: #3347b8;
+  font-weight: 700;
+}
+.claimLinks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+  color: #3347b8;
+  font-size: 12px;
+  font-weight: 650;
+}
+.claimLinks button {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #3347b8;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
