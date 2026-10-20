@@ -5896,3 +5896,415 @@ textarea {
 .passwordModal {
   width: min(420px, 100%);
 }
+
+/* ===== Tanda Terima Servis (.trx) — print design =====
+   Sized for a 200mm-wide card that uses roughly the top half of an A4
+   portrait sheet (or one A5-landscape page in the 2-copy nota). */
+@media print {
+  .trx {
+    --trx-navy: #0f1b4d;
+    --trx-blue: #1d4fd8;
+    --trx-ink: #0f172a;
+    --trx-muted: #64748b;
+    --trx-line: #e3e8f2;
+    --trx-soft: #f4f7fd;
+    width: 100%;
+    overflow: hidden;
+    border: 0.3mm solid #c9d3e6;
+    border-radius: 3mm;
+    background: #fff;
+    color: var(--trx-ink);
+    font-family: var(--font-inter), "Segoe UI", Arial, sans-serif;
+    font-size: 8pt;
+    line-height: 1.3;
+    break-inside: avoid;
+  }
+  .trx * {
+    box-sizing: border-box;
+  }
+  .trx h4,
+  .trx p,
+  .trx dl,
+  .trx dd,
+  .trx ul {
+    margin: 0;
+    padding: 0;
+  }
+  .trx small,
+  .trx em,
+  .trx i {
+    font-style: normal;
+  }
+
+  /* --- header --- */
+  .trxTop {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 6mm;
+    padding: 3.8mm 6mm 3mm;
+    background: linear-gradient(180deg, #fff 0%, var(--trx-soft) 100%);
+  }
+  .trxBrand {
+    display: flex;
+    align-items: center;
+    gap: 3mm;
+    min-width: 0;
+  }
+  .trxMark {
+    position: relative;
+    display: block;
+    flex: none;
+    width: 14mm;
+    height: 14mm;
+    overflow: hidden;
+    border-radius: 50%;
+  }
+  .trxMark img {
+    position: absolute;
+    top: -4.7mm;
+    left: -8.1mm;
+    width: 30mm;
+    max-width: none;
+    height: auto;
+  }
+  .trxBrand b {
+    display: block;
+    color: var(--trx-navy);
+    font-size: 15pt;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+    text-transform: uppercase;
+  }
+  .trxBrand b i {
+    color: var(--trx-blue);
+    font-weight: 800;
+  }
+  .trxBrand small {
+    display: block;
+    margin-top: 1.2mm;
+    color: var(--trx-muted);
+    font-size: 5.6pt;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .trxDoc {
+    display: grid;
+    justify-items: end;
+    gap: 0.9mm;
+    text-align: right;
+  }
+  .trxKicker {
+    color: var(--trx-blue);
+    font-size: 6.2pt;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .trxDocNo {
+    color: var(--trx-navy);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1.05;
+  }
+  .trxDoc small {
+    color: var(--trx-muted);
+    font-size: 6.4pt;
+    font-weight: 500;
+  }
+  .trxChip {
+    margin-top: 0.8mm;
+    padding: 0.7mm 2.6mm;
+    border: 0.25mm solid var(--trx-blue);
+    border-radius: 10mm;
+    color: var(--trx-blue);
+    font-size: 5.6pt;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .trxQr {
+    display: grid;
+    justify-items: center;
+    gap: 0.6mm;
+    padding: 1.6mm 1.6mm 1.2mm;
+    border: 0.3mm solid #c9d3e6;
+    border-radius: 2mm;
+    background: #fff;
+  }
+  .trxQr > svg {
+    width: 18mm;
+    height: 18mm;
+  }
+  .trxQr small {
+    color: var(--trx-muted);
+    font-size: 5.2pt;
+    font-weight: 600;
+  }
+  .trxQr .trxQrUrl {
+    color: var(--trx-blue);
+    font-size: 5pt;
+    font-weight: 700;
+  }
+  .trxRule {
+    height: 1.3mm;
+    background: linear-gradient(90deg, var(--trx-navy) 0 72%, var(--trx-blue) 72% 100%);
+  }
+
+  /* --- body --- */
+  .trxBody {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 5mm;
+    padding: 3.2mm 6mm 2mm;
+  }
+  .trxCol {
+    display: grid;
+    align-content: start;
+    gap: 2.4mm;
+    min-width: 0;
+  }
+  .trxSecHead {
+    display: flex;
+    align-items: center;
+    gap: 1.8mm;
+    margin-bottom: 1.4mm !important;
+    color: var(--trx-navy);
+    font-size: 6.2pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .trxSecHead::before {
+    content: "";
+    width: 1mm;
+    height: 2.6mm;
+    border-radius: 0.5mm;
+    background: var(--trx-blue);
+  }
+  .trxDl > div {
+    display: grid;
+    grid-template-columns: 22mm 1fr;
+    gap: 2mm;
+    align-items: baseline;
+    padding: 1.15mm 0;
+    border-bottom: 0.2mm solid var(--trx-line);
+  }
+  .trxDl > div:last-child {
+    border-bottom: 0;
+  }
+  .trxDl dt {
+    color: var(--trx-muted);
+    font-size: 6.4pt;
+    font-weight: 600;
+  }
+  .trxDl dd {
+    color: var(--trx-ink);
+    font-size: 8.2pt;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .trxDl dd b {
+    font-weight: 700;
+  }
+  .trxDl dd span {
+    margin-left: 2mm;
+    color: var(--trx-muted);
+    font-size: 7.2pt;
+    font-weight: 500;
+  }
+  .trxDl dd.trxClamp {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  /* the card brings its own frame, so drop the generic page padding: a long
+     ticket must still fit one A5-landscape page in the 2-copy nota */
+  .receiptCopyPage.compact:has(> .trx) {
+    padding: 0;
+  }
+  .trxMono {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 7.8pt !important;
+  }
+  .trxIssue {
+    padding: 2mm 3mm;
+    border-left: 1mm solid var(--trx-blue);
+    border-radius: 0 1.5mm 1.5mm 0;
+    background: var(--trx-soft);
+  }
+  .trxIssue p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    font-size: 8.4pt;
+    font-weight: 600;
+  }
+  .trxIssue small {
+    display: block;
+    margin-top: 1mm;
+    color: var(--trx-muted);
+    font-size: 6.4pt;
+  }
+
+  /* --- money --- */
+  .trxMoney {
+    overflow: hidden;
+    border: 0.3mm solid #c9d3e6;
+    border-radius: 2mm;
+  }
+  .trxMoney > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 3mm;
+    padding: 1.7mm 3mm;
+    border-bottom: 0.2mm solid var(--trx-line);
+  }
+  .trxMoney span {
+    color: var(--trx-muted);
+    font-size: 6.6pt;
+    font-weight: 600;
+  }
+  .trxMoney b {
+    font-size: 8.6pt;
+    font-weight: 700;
+    text-align: right;
+  }
+  .trxMoney .trxMoneyDue {
+    border-bottom: 0;
+    background: var(--trx-navy);
+  }
+  .trxMoney .trxMoneyDue span {
+    color: #c7d2fe;
+    font-weight: 700;
+  }
+  .trxMoney .trxMoneyDue b {
+    color: #fff;
+    font-size: 10.5pt;
+    font-weight: 800;
+  }
+  .trxFine {
+    margin-top: 1.2mm !important;
+    color: var(--trx-muted);
+    font-size: 5.8pt;
+    line-height: 1.35;
+  }
+  .trxBank {
+    list-style: none;
+    overflow: hidden;
+    border: 0.3mm solid #c9d3e6;
+    border-radius: 2mm;
+  }
+  .trxBank li {
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+    padding: 0.9mm 2.4mm;
+    border-bottom: 0.2mm solid var(--trx-line);
+    color: var(--trx-blue);
+  }
+  .trxBank li:last-child {
+    border-bottom: 0;
+  }
+  .trxBank svg {
+    flex: none;
+  }
+  .trxBank li span {
+    color: var(--trx-ink);
+    font-size: 6.1pt;
+    font-weight: 600;
+  }
+
+  /* --- terms + signatures --- */
+  .trxTerms {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 6mm;
+    margin: 0 6mm;
+    padding: 2mm 0 2.5mm;
+    border-top: 0.2mm dashed #b8c4dc;
+  }
+  .trxTermsText p {
+    color: var(--trx-muted);
+    font-size: 6.2pt;
+    line-height: 1.4;
+  }
+  .trxSign {
+    display: flex;
+    gap: 5mm;
+  }
+  .trxSign > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 38mm;
+    text-align: center;
+  }
+  .trxSign em {
+    color: var(--trx-muted);
+    font-size: 5.8pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .trxSign i {
+    display: block;
+    height: 7.5mm;
+  }
+  .trxSign b {
+    width: 100%;
+    padding-top: 1.1mm;
+    border-top: 0.3mm solid var(--trx-navy);
+    font-size: 7.4pt;
+    font-weight: 700;
+  }
+
+  /* --- footer --- */
+  .trxFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5mm;
+    padding: 2.2mm 6mm;
+    background: var(--trx-navy);
+    color: #fff;
+  }
+  .trxFooterContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1mm 4mm;
+    min-width: 0;
+    font-size: 5.8pt;
+  }
+  .trxFooterContact span {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.2mm;
+    color: rgba(255, 255, 255, 0.88);
+  }
+  .trxFooterBrand {
+    flex: none;
+    text-align: right;
+  }
+  .trxFooterBrand b {
+    display: block;
+    font-size: 7pt;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+  }
+  .trxFooterBrand small {
+    display: block;
+    margin-top: 0.3mm;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 5pt;
+    letter-spacing: 0.06em;
+  }
+}

@@ -405,222 +405,201 @@ function accessoryItems(value: string) {
     .filter(Boolean)
     .filter((x) => !/^(-|tidak ada|unit only)$/i.test(x));
 }
-// Shared "Tanda Terima Servis" body — used both for the single A4-landscape
-// receipt and (twice, once per page) for the A5-landscape dual-copy nota,
-// so the two can't visually drift apart the way they did before.
+// Shared "Tanda Terima Servis" body — used both for the single A4-portrait
+// receipt (top half of the sheet) and, twice, for the A5-landscape dual-copy
+// nota, so the two can't visually drift apart. Styles live under `.trx*` in
+// globals.css and are independent of the Nota Lunas (`print*`) styles.
 function ServiceReceiptBody({
   ticket,
   shop,
   copyLabel,
-  compact,
 }: {
   ticket: Ticket;
   shop: ShopSettings;
   copyLabel?: string;
-  compact?: boolean;
 }) {
+  const shopName = shop.name || "FS Comp";
+  const [brandFirst, ...brandRest] = shopName.split(/\s+/);
+  const total = finalPrice(ticket);
+  const hasPrice = total > 0;
+  const remaining = Math.max(0, total - ticket.downPayment);
+  const dateLabel = (d: string) =>
+    new Date(`${d}T00:00:00`).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  const accessories = accessoryItems(ticket.accessories).join(", ") || "Unit only";
+  const bankLines = (shop.bank || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const staffName = ticket.technician || ticket.handedBy || "Admin";
   return (
-    <>
-      <div className="printHeader">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className="printLogoFull" src="/logo-full.png" alt={shop.name || "FS Comp"} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-        <div className="printHeaderDivider" />
-        <div className="printHeaderId">
-          <small>Tanda Terima Servis{copyLabel ? ` · ${copyLabel}` : ""}</small>
-          <em>Service ID</em>
-          <b>{ticket.id}</b>
-          {!compact && (
-            <span>
-              Tanggal Cetak:{" "}
-              {new Date().toLocaleDateString("id-ID", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
-          )}
+    <div className="trx">
+      <div className="trxTop">
+        <div className="trxBrand">
+          <span className="trxMark">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-full.png" alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          </span>
+          <div>
+            <b>
+              <i>{brandFirst}</i>
+              {brandRest.length ? ` ${brandRest.join(" ")}` : ""}
+            </b>
+            <small>Solusi teknologi, untuk masa depan</small>
+          </div>
         </div>
-        <div className="printQr">
+        <div className="trxDoc">
+          <span className="trxKicker">Tanda Terima Servis</span>
+          <b className="trxDocNo">{ticket.id}</b>
+          <small>
+            Diterima {dateLabel(ticket.receivedAt)}
+            {ticket.receivedTime ? ` · ${ticket.receivedTime} WIB` : ""}
+          </small>
+          {copyLabel && <em className="trxChip">{copyLabel}</em>}
+        </div>
+        <div className="trxQr">
           <QRCodeSVG
             value={`${location.origin}/track?id=${encodeURIComponent(ticket.id)}`}
             size={86}
             level="H"
           />
-          {!compact && (
-            <small>
-              <Smartphone size={10} /> Scan untuk tracking servis
-            </small>
-          )}
+          <small>Scan untuk lacak status</small>
         </div>
       </div>
-      <div className="printInfoGrid">
-        <div>
-          <span className="printInfoIcon">
-            <User size={14} color="#fff" />
-          </span>
-          <div>
-            <small>Pelanggan</small>
-            <strong>{ticket.customer}</strong>
-            <span>{ticket.phone}</span>
-          </div>
-        </div>
-        <div>
-          <span className="printInfoIcon">
-            <Smartphone size={14} color="#fff" />
-          </span>
-          <div>
-            <small>Perangkat</small>
-            <strong>{ticket.device}</strong>
-            <span>SN: {ticket.serial || "-"}</span>
-          </div>
-        </div>
-        <div>
-          <span className="printInfoIcon">
-            <CalendarDays size={14} color="#fff" />
-          </span>
-          <div>
-            <small>Tanggal Terima</small>
-            <strong>{ticket.receivedAt}</strong>
-            <span>Teknisi: {ticket.technician}</span>
-          </div>
-        </div>
-        <div>
-          <span className="printInfoIcon">
-            <CheckCircle2 size={14} color="#fff" />
-          </span>
-          <div>
-            <small>Kelengkapan Diterima</small>
-            {accessoryItems(ticket.accessories).length ? (
-              compact ? (
-                <span>{accessoryItems(ticket.accessories).join(", ")}</span>
-              ) : (
-                <ul>
-                  {accessoryItems(ticket.accessories).map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              )
-            ) : (
-              <span>Unit only</span>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="printIssueRow">
-        <span className="printInfoIcon">
-          <Wrench size={14} color="#fff" />
-        </span>
-        <div>
-          <small>Keluhan / Kondisi Awal</small>
-          <strong>{ticket.issue}</strong>
-          {ticket.notes && (
-            <>
-              <em>Catatan Tambahan</em>
-              <span>{ticket.notes}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="printSummaryRow">
-        <div className="printSummary">
-          <div className="printSummaryHead">Ringkasan Servis</div>
-          <div className="printSummaryGrid">
-            <div>
-              <FileText size={13} />
-              <small>Estimasi Biaya</small>
-              <b>{ticket.estimate ? money(ticket.estimate) : "Belum diestimasi"}</b>
-            </div>
-            <div>
-              <Wallet size={13} />
-              <small>DP (Uang Muka)</small>
-              <b>{money(ticket.downPayment)}</b>
-            </div>
-            <div>
-              <Banknote size={13} />
-              <small>Sisa Pembayaran</small>
-              <b>{money(Math.max(0, finalPrice(ticket) - ticket.downPayment))}</b>
-            </div>
-          </div>
-          {shop.bank && !compact && (
-            <div className="printPayNote">
-              <Landmark size={13} />
+      <div className="trxRule" />
+
+      <div className="trxBody">
+        <div className="trxCol">
+          <section>
+            <h4 className="trxSecHead">Data Pelanggan &amp; Perangkat</h4>
+            <dl className="trxDl">
               <div>
-                <b>Info Pembayaran</b>
-                <span>
-                  Konfirmasi pembayaran harap menyertakan nomor Service ID
-                  pada keterangan.
-                </span>
+                <dt>Pelanggan</dt>
+                <dd>
+                  <b>{ticket.customer}</b>
+                  <span>{ticket.phone}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Perangkat</dt>
+                <dd>
+                  <b>{ticket.device}</b>
+                  {ticket.brand && <span>{ticket.brand}</span>}
+                </dd>
+              </div>
+              <div>
+                <dt>Serial Number</dt>
+                <dd className="trxMono">{ticket.serial || "-"}</dd>
+              </div>
+              <div>
+                <dt>Kelengkapan</dt>
+                <dd className="trxClamp">{accessories}</dd>
+              </div>
+              <div>
+                <dt>Teknisi</dt>
+                <dd>{ticket.technician || "-"}</dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <h4 className="trxSecHead">Keluhan / Kondisi Awal</h4>
+            <div className="trxIssue">
+              <p>{ticket.issue}</p>
+              {ticket.notes && <small>Catatan: {ticket.notes}</small>}
+            </div>
+          </section>
+        </div>
+
+        <div className="trxCol">
+          <section>
+            <h4 className="trxSecHead">Rincian Biaya</h4>
+            <div className="trxMoney">
+              <div>
+                <span>Estimasi biaya</span>
+                <b>{ticket.estimate ? money(ticket.estimate) : "Belum diestimasi"}</b>
+              </div>
+              <div>
+                <span>DP / uang muka</span>
+                <b>{money(ticket.downPayment)}</b>
+              </div>
+              <div className="trxMoneyDue">
+                <span>Sisa pembayaran</span>
+                <b>{hasPrice ? money(remaining) : "Menunggu estimasi"}</b>
               </div>
             </div>
+            <p className="trxFine">
+              Biaya akhir dikonfirmasi setelah pengecekan dan persetujuan pelanggan.
+              {bankLines.length > 0 && " Cantumkan nomor servis pada berita transfer."}
+            </p>
+          </section>
+          {bankLines.length > 0 && (
+            <section>
+              <h4 className="trxSecHead">Rekening Transaksi</h4>
+              <ul className="trxBank">
+                {bankLines.map((line) => (
+                  <li key={line}>
+                    <Landmark size={10} />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </div>
-        {shop.bank && (
-          <div className="printBankCard">
-            <div className="printBankHead">Rekening Transaksi</div>
-            {shop.bank
-              .split("\n")
-              .map((l) => l.trim())
-              .filter(Boolean)
-              .map((line) => (
-                <div className="printBankRow" key={line}>
-                  <Landmark size={12} />
-                  <span>{line}</span>
-                </div>
-              ))}
-          </div>
-        )}
       </div>
-      <div className="printTermsRow">
-        <div className="printTermsBox">
-          <ShieldCheck size={14} />
+
+      <div className="trxTerms">
+        <div className="trxTermsText">
+          <h4 className="trxSecHead">Ketentuan Servis</h4>
+          <p>
+            {shop.terms ||
+              "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
+          </p>
+        </div>
+        <div className="trxSign">
           <div>
-            <small>Ketentuan Servis</small>
-            <p>
-              {shop.terms ||
-                "Simpan tanda terima ini. Pengambilan perangkat wajib menunjukkan nomor servis atau QR Code."}
-            </p>
+            <em>Pelanggan</em>
+            <i />
+            <b>{ticket.customer}</b>
+          </div>
+          <div>
+            <em>Petugas {shopName}</em>
+            <i />
+            <b>{staffName}</b>
           </div>
         </div>
-        <div className="printSign">
-          <span>
-            <em>Pelanggan</em>
-            <i className="printSignSpace" />
-            <b>{ticket.customer}</b>
-          </span>
-          <span>
-            <em>Petugas {shop.name || "FS Comp"}</em>
-            <i className="printSignSpace" />
-            <b>{ticket.technician || ticket.handedBy || "Admin"}</b>
-          </span>
-        </div>
       </div>
-      <div className="printFooter">
-        <div className="printFooterContact">
+
+      <div className="trxFooter">
+        <div className="trxFooterContact">
           {shop.phone && (
             <span>
-              <Phone size={11} /> {shop.phone}
+              <Phone size={9} /> {shop.phone}
             </span>
           )}
           {shop.whatsapp && (
             <span>
-              <MessageCircle size={11} /> {shop.whatsapp}
+              <MessageCircle size={9} /> {shop.whatsapp}
             </span>
           )}
           {shop.address && (
             <span>
-              <MapPin size={11} /> {shop.address}
+              <MapPin size={9} /> {shop.address}
             </span>
           )}
           <span>
-            <Globe size={11} /> {shop.name?.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
+            <Globe size={9} /> {shopName.toLowerCase().replace(/\s+/g, "") || "fscomp"}.id
           </span>
         </div>
-        <div className="printFooterBrand">
-          <b>{(shop.name || "FS Comp").toUpperCase()}</b>
+        <div className="trxFooterBrand">
+          <b>{shopName.toUpperCase()}</b>
           <small>Service &amp; Technology Center</small>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 export default function ServiceDesk() {
@@ -2456,7 +2435,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       {printMode === "receipt" && selected && (
         <div className="servicePrint receipt">
           <div className="receiptCopyPage compact">
-            <ServiceReceiptBody ticket={selected} shop={shop} compact />
+            <ServiceReceiptBody ticket={selected} shop={shop} />
           </div>
         </div>
       )}
@@ -2678,7 +2657,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         <div className="servicePrint receipt2">
           {["Untuk Pelanggan", "Arsip Toko"].map((copy) => (
             <div className="receiptCopyPage compact" key={copy}>
-              <ServiceReceiptBody ticket={selected} shop={shop} copyLabel={copy} compact />
+              <ServiceReceiptBody ticket={selected} shop={shop} copyLabel={copy} />
             </div>
           ))}
         </div>
