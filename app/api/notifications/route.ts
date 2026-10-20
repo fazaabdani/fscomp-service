@@ -46,7 +46,11 @@ export async function GET() {
     // already-confirmed job, producing a false "payment due" alert.
     const total = finalPrice(t);
     if (total > t.downPayment && t.paymentTermDays && days > t.paymentTermDays)
-      alerts.push({ ...base, type: "PAYMENT_DUE", title: "Pembayaran jatuh tempo" });
+      alerts.push({
+        ...base,
+        type: "PAYMENT_DUE",
+        title: `Sisa Rp ${(total - t.downPayment).toLocaleString("id-ID")}, lewat tempo ${days - t.paymentTermDays} hari`,
+      });
 
     if (t.status === "Sudah Diambil" && t.warrantyDays && t.pickedUpAt) {
       const remain = t.warrantyDays - daysSince(t.pickedUpAt, now);
@@ -54,5 +58,17 @@ export async function GET() {
         alerts.push({ ...base, type: "WARRANTY_END", title: `Garansi tersisa ${remain} hari` });
     }
   }
+  // Most actionable first: money owed, then customers to chase, then
+  // finished-but-uncollected, then warranties, then general age. Within a
+  // type the numbers in the title (days/amount) are already the signal, so a
+  // stable order by type is enough.
+  const rank: Record<string, number> = {
+    PAYMENT_DUE: 0,
+    WAITING_CONFIRMATION_STUCK: 1,
+    READY_NOT_PICKED_UP: 2,
+    WARRANTY_END: 3,
+    SERVICE_OLD: 4,
+  };
+  alerts.sort((a, b) => (rank[a.type] ?? 9) - (rank[b.type] ?? 9));
   return NextResponse.json({ alerts });
 }

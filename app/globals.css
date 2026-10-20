@@ -2426,6 +2426,18 @@ textarea {
   background: #fff;
   box-shadow: 0 18px 40px rgba(20, 30, 60, 0.16);
 }
+@media (max-width: 760px) {
+  /* The bell sits mid-header on phones, so a 340px panel anchored to it
+     clips off-screen; pin it to the viewport instead. */
+  .notifDropdown {
+    position: fixed;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 80px);
+  }
+}
 .notifDropdownHead {
   display: flex;
   align-items: baseline;

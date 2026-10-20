@@ -581,7 +581,7 @@ function ServiceReceiptBody({
           <span>
             <em>Petugas {shop.name || "FS Comp"}</em>
             <i className="printSignSpace" />
-            <b>{ticket.handedBy || "Admin"}</b>
+            <b>{ticket.technician || ticket.handedBy || "Admin"}</b>
           </span>
         </div>
       </div>
@@ -661,6 +661,11 @@ export default function ServiceDesk() {
   const scanStopRef = useRef<(() => void) | null>(null);
   const serviceFormRef = useRef<HTMLFormElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  // Guards for the background refresh below: pendingWrites > 0 means a save
+  // is in flight; writeEpoch changes on every write start so a refresh that
+  // began before one can tell its (now stale) response shouldn't be applied.
+  const pendingWrites = useRef(0);
+  const writeEpoch = useRef(0);
   const [serverReady, setServerReady] = useState(false);
   // Distinct from serverReady (which only reflects the initial load): this
   // tracks live reachability so a banner can warn the operator the moment a
@@ -761,6 +766,44 @@ export default function ServiceDesk() {
     const id = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
+  // Tickets/customers used to load once at page open, so a ticket created at
+  // the front desk never showed up on the technician's screen until they
+  // reloaded. Refresh every 30s and whenever the tab regains focus — but not
+  // while a modal is open (would wipe a half-typed form) or a save is in
+  // flight (would overwrite its optimistic state with older server data).
+  useEffect(() => {
+    if (modal !== null) return;
+    let cancelled = false;
+    const refresh = async () => {
+      if (document.hidden || pendingWrites.current > 0) return;
+      const epoch = writeEpoch.current;
+      try {
+        const [tr, cr] = await Promise.all([
+          fetch("/api/tickets", { cache: "no-store" }),
+          fetch("/api/customers", { cache: "no-store" }),
+        ]);
+        if (tr.status === 401 || cr.status === 401) { forceLogout(); return; }
+        if (!tr.ok || !cr.ok) return;
+        const [t, c] = await Promise.all([tr.json(), cr.json()]);
+        if (cancelled || pendingWrites.current > 0 || writeEpoch.current !== epoch) return;
+        setTickets(t.tickets);
+        setCustomers(c.customers);
+        setServerOnline(true);
+      } catch {
+        setServerOnline(false);
+      }
+    };
+    const id = setInterval(refresh, 30_000);
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [modal]);
   useEffect(() => {
     if (!notifOpen) return;
     const onClick = (e: MouseEvent) => {
@@ -856,7 +899,9 @@ export default function ServiceDesk() {
   const stats = {
     process: tickets.filter((t) => processStatuses.includes(t.status)).length,
     ready: tickets.filter((t) => t.status === "Bisa Diambil").length,
-    customers: new Set(tickets.map((t) => t.phone)).size,
+    // Count real customer records, not distinct raw phone strings on
+    // tickets — "0812…" and "62812…" for one person counted as two.
+    customers: customers.length,
     revenue: tickets
       .filter((t) => t.status === "Sudah Diambil")
       .reduce((a, t) => a + finalPrice(t), 0),
@@ -936,12 +981,24 @@ export default function ServiceDesk() {
         ? {
             pickedUpAt: localDateStr(),
             pickedUpTime: new Date().toTimeString().slice(0, 5),
+            // Record who actually handed the unit over, so the printed
+            // nota doesn't fall back to a hardcoded "Admin".
+            ...(before.handedBy || !currentUser?.name ? {} : { handedBy: currentUser.name }),
           }
         : {}),
     };
     patchTicket(id, patch, `Status diperbarui: ${status}`);
   }
   async function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
+    writeEpoch.current++;
+    pendingWrites.current++;
+    try {
+      await patchTicketInner(id, patch, message);
+    } finally {
+      pendingWrites.current--;
+    }
+  }
+  async function patchTicketInner(id: string, patch: Partial<Ticket>, message: string) {
     const before = tickets.find((t) => t.id === id);
     if (!before) return;
     const updatedAt = localDateStr();
@@ -1023,7 +1080,7 @@ export default function ServiceDesk() {
       paymentMethod: String(form.get("paymentMethod") || "Tunai"),
       warrantyDays: Number(form.get("warrantyDays") || 0),
       pickupBy: String(form.get("pickupBy") || ""),
-      handedBy: String(form.get("handedBy") || "Admin"),
+      handedBy: String(form.get("handedBy") || currentUser?.name || "Admin"),
     };
     patchTicket(selected.id, patch, `Data servis ${selected.id} berhasil diubah`);
     setModal("detail");
@@ -1078,6 +1135,15 @@ export default function ServiceDesk() {
     notify("Link tracking berhasil disalin");
   }
   async function submitTicket(e: React.FormEvent<HTMLFormElement>) {
+    writeEpoch.current++;
+    pendingWrites.current++;
+    try {
+      await submitTicketInner(e);
+    } finally {
+      pendingWrites.current--;
+    }
+  }
+  async function submitTicketInner(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -1910,7 +1976,7 @@ export default function ServiceDesk() {
                 </label>
                 <label>
                   Penerima
-                  <select name="technician">
+                  <select name="technician" defaultValue={currentUser?.name}>
                     {staff.map((x) => (
                       <option key={x.id}>{x.name}</option>
                     ))}
@@ -2304,7 +2370,7 @@ export default function ServiceDesk() {
                 <label>Cara pembayaran<select name="paymentMethod" defaultValue={selected.paymentMethod || "Tunai"}><option>Tunai</option><option>Transfer BCA</option><option>Transfer BRI</option><option>Transfer Mandiri</option><option>QRIS</option><option>Tempo</option></select></label>
                 <label>Garansi servis<select name="warrantyDays" defaultValue={selected.warrantyDays || 0}><option value="0">Tidak ada</option><option value="3">3 Hari</option><option value="7">1 Minggu</option><option value="14">2 Minggu</option><option value="30">1 Bulan</option><option value="60">2 Bulan</option><option value="90">3 Bulan</option>{![0,3,7,14,30,60,90].includes(selected.warrantyDays || 0) && <option value={selected.warrantyDays}>{selected.warrantyDays} Hari</option>}</select></label>
                 <label>Pengambil<input name="pickupBy" defaultValue={selected.pickupBy || selected.customer}/></label>
-                <label>Penyerah<input name="handedBy" defaultValue={selected.handedBy || "Admin"}/></label>
+                <label>Penyerah<input name="handedBy" defaultValue={selected.handedBy || currentUser?.name || "Admin"}/></label>
               </div>
               <div className="modalFoot"><button type="button" className="ghost" onClick={() => setModal("detail")}>Batal</button><button className="newButton"><CheckCircle2 size={17}/> Simpan Perubahan</button></div>
             </form>
@@ -2425,7 +2491,7 @@ export default function ServiceDesk() {
               <div>
                 <small>Tanggal Ambil</small>
                 <strong>{selected.pickedUpAt || localDateStr()}</strong>
-                <span>Petugas: {selected.handedBy || "Admin"}</span>
+                <span>Petugas: {selected.handedBy || currentUser?.name || "Admin"}</span>
               </div>
             </div>
             <div>
@@ -2526,7 +2592,7 @@ export default function ServiceDesk() {
               <span>
                 <em>Diserahkan oleh</em>
                 <i className="printSignSpace" />
-                <b>{selected.handedBy || "Admin"}</b>
+                <b>{selected.handedBy || currentUser?.name || "Admin"}</b>
               </span>
               <span>
                 <em>Diterima oleh</em>

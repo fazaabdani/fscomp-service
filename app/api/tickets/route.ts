@@ -95,6 +95,9 @@ export async function POST(request: Request) {
             address: str(b.address, "-"),
             paymentTermDays: num(b.paymentTermDays),
             receivedAt: localDate,
+            // Real intake time. Left null, the edit form showed a made-up
+            // "09:00" default and saving any edit wrote that fiction in.
+            receivedTime: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
             updatedAt: localDate,
             statusChangedAt: localDate,
           },
