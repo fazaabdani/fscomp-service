@@ -7,7 +7,8 @@ export type WaTemplateKey =
   | "waClosing"
   | "waReceived"
   | "waCost"
-  | "waCostOptions";
+  | "waCostOptions"
+  | "waReady";
 
 export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
   waSalutation: "Assalamu'alaikum warahmatullahi wabarakatuh, Kak {nama}",
@@ -18,6 +19,8 @@ export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
     "Kami sudah melakukan pengecekan {perangkat}. Untuk penanganan *{tindakan}*, estimasi biaya servisnya adalah *{estimasi}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.",
   waCostOptions:
     "Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.",
+  waReady:
+    "Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{pembayaran}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.",
 };
 
 export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
@@ -26,6 +29,7 @@ export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
   waReceived: "Konfirmasi Servis Diterima",
   waCost: "Konfirmasi Biaya — Satu Nominal",
   waCostOptions: "Konfirmasi Biaya — Beberapa Pilihan",
+  waReady: "Servis Selesai — Siap Diambil",
 };
 
 export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: string }[]> = {
@@ -46,6 +50,14 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
   waCostOptions: [
     { token: "{perangkat}", label: "Perangkat" },
     { token: "{estimasi}", label: "Estimasi biaya" },
+  ],
+  waReady: [
+    { token: "{toko}", label: "Nama toko" },
+    { token: "{perangkat}", label: "Perangkat" },
+    { token: "{nomor_servis}", label: "Nomor servis" },
+    { token: "{pembayaran}", label: "Info sisa/lunas" },
+    { token: "{sisa}", label: "Sisa pembayaran" },
+    { token: "{link_tracking}", label: "Link tracking" },
   ],
 };
 

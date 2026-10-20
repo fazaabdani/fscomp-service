@@ -6506,3 +6506,21 @@ textarea {
     flex: 1 0 100%;
   }
 }
+
+.serviceSidebar nav {
+  align-content: start;
+}
+.scanManual {
+  display: flex;
+  gap: 10px;
+  padding: 4px 24px 6px;
+}
+.scanManual input {
+  flex: 1;
+  min-height: 43px;
+  padding: 0 14px;
+  border: 1px solid var(--svc-line);
+  border-radius: 11px;
+  background: #fafbfd;
+  font-family: Consolas, "Courier New", monospace;
+}

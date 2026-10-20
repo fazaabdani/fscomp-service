@@ -396,6 +396,19 @@ const ageTone = (days: number) =>
 // the UTC date and drifts a day off in Asia/Jakarta between 00:00-06:59 WIB.
 const localDateStr = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// A scanned/pasted tracking URL or label text should find the ticket just
+// like the bare number does (USB QR scanners type the whole URL).
+const extractServiceCode = (v: string) => v.match(/SRV-\d{6}-\d+/i)?.[0]?.toUpperCase() ?? null;
+const paymentMethods = ["Tunai", "Transfer BCA", "Transfer BRI", "Transfer Mandiri", "QRIS", "Tempo"];
+const warrantyOptions: [number, string][] = [
+  [0, "Tidak ada"],
+  [3, "3 Hari"],
+  [7, "1 Minggu"],
+  [14, "2 Minggu"],
+  [30, "1 Bulan"],
+  [60, "2 Bulan"],
+  [90, "3 Bulan"],
+];
 const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
 function accessoryItems(value: string) {
   return value
@@ -1055,7 +1068,7 @@ export default function ServiceDesk() {
       tickets.filter((t) => {
         const matches = `${t.id} ${t.customer} ${t.device} ${t.issue}`
           .toLowerCase()
-          .includes(query.toLowerCase());
+          .includes((extractServiceCode(query) ?? query).toLowerCase());
         const statusMatch = filter === "Semua" || t.status === filter;
         const sectionMatch =
           active === "Bisa Diambil"
@@ -1156,6 +1169,16 @@ export default function ServiceDesk() {
 
 DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secara manual jika perlu.` : "";
       if (!window.confirm(`Batalkan servis ${before.id} (${before.customer})? Servis tidak lagi dihitung sebagai pekerjaan aktif maupun piutang.${dp}`)) return;
+    }
+    if (status === "Sudah Diambil" && before) {
+      const remaining = Math.max(0, finalPrice(before) - before.downPayment);
+      if (
+        remaining > 0 &&
+        !window.confirm(
+          `Masih ada sisa pembayaran ${money(remaining)}. Tetap serahkan perangkat ke pelanggan?\n\nSisa ini akan tercatat sebagai piutang.`,
+        )
+      )
+        return;
     }
     const patch: Partial<Ticket> = {
       status,
@@ -1276,7 +1299,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
   }
   const salutation = (name: string) =>
     renderWaTemplate(shop.waSalutation, { nama: name });
-  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options") {
+  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
@@ -1288,9 +1311,20 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       link_tracking: tracking,
       tindakan: ticket.serviceAction || ticket.issue,
       estimasi: money(ticket.estimate),
+      sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
+      pembayaran:
+        finalPrice(ticket) - ticket.downPayment > 0
+          ? `Sisa pembayaran: *${money(finalPrice(ticket) - ticket.downPayment)}*`
+          : "Pembayaran sudah *lunas*.",
     };
     const body =
-      kind === "received" ? shop.waReceived : kind === "cost" ? shop.waCost : shop.waCostOptions;
+      kind === "received"
+        ? shop.waReceived
+        : kind === "cost"
+          ? shop.waCost
+          : kind === "ready"
+            ? shop.waReady
+            : shop.waCostOptions;
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
     return `${base}?text=${encodeURIComponent(message)}`;
   }
@@ -2368,7 +2402,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   onClick={() =>
                     patchTicket(
                       selected.id,
-                      { costConfirmed: !selected.costConfirmed },
+                      {
+                        costConfirmed: !selected.costConfirmed,
+                        // Approving the estimate means that's the price unless a
+                        // different final cost was typed; leaving it at 0 made the
+                        // ticket look free and blocked payment.
+                        ...(!selected.costConfirmed && !selected.finalCost && selected.estimate
+                          ? { finalCost: selected.estimate }
+                          : {}),
+                      },
                       selected.costConfirmed
                         ? "Konfirmasi biaya dibatalkan"
                         : "Biaya telah dikonfirmasi",
@@ -2431,6 +2473,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <input
                     type="number"
                     min="0"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
                     key={`estimate-${selected.id}-${selected.version}`}
                     defaultValue={selected.estimate}
                     onBlur={(e) => {
@@ -2445,6 +2490,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <input
                     type="number"
                     min="0"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
                     key={`downPayment-${selected.id}-${selected.version}`}
                     defaultValue={selected.downPayment}
                     onBlur={(e) => {
@@ -2459,6 +2507,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <input
                     type="number"
                     min="0"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
                     key={`finalCost-${selected.id}-${selected.version}`}
                     defaultValue={selected.finalCost || 0}
                     onBlur={(e) => {
@@ -2467,6 +2518,32 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         patchTicket(selected.id, { finalCost: v }, "Biaya final diperbarui");
                     }}
                   />
+                </label>
+                <label>
+                  Cara pembayaran
+                  <select
+                    value={selected.paymentMethod || "Tunai"}
+                    onChange={(e) =>
+                      patchTicket(selected.id, { paymentMethod: e.target.value }, "Cara pembayaran diperbarui")
+                    }
+                  >
+                    {[...paymentMethods, ...(selected.paymentMethod && !paymentMethods.includes(selected.paymentMethod) ? [selected.paymentMethod] : [])].map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Garansi servis
+                  <select
+                    value={selected.warrantyDays || 0}
+                    onChange={(e) =>
+                      patchTicket(selected.id, { warrantyDays: Number(e.target.value) }, "Garansi diperbarui")
+                    }
+                  >
+                    {[...warrantyOptions, ...(warrantyOptions.some(([d]) => d === (selected.warrantyDays || 0)) ? [] : ([[selected.warrantyDays || 0, `${selected.warrantyDays} Hari`]] as [number, string][]))].map(([d, label]) => (
+                      <option key={d} value={d}>{label}</option>
+                    ))}
+                  </select>
                 </label>
               </div>
               <div className="actionGrid">
@@ -2591,6 +2668,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="chatChoices">
                 <a target="_blank" href={whatsappUrl(selected, "empty")}><MessageCircle/><span><b>Chat WhatsApp Kosong</b><small>Hanya membuka percakapan pelanggan tanpa isi pesan.</small></span></a>
                 <a target="_blank" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
+                <a target="_blank" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
                 <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.</small><span className="costChatVariants"><a target="_blank" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
               </div>
             </div>
@@ -2611,9 +2689,30 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <span />
                 <p>Posisikan QR di dalam bingkai</p>
               </div>
+              <form
+                className="scanManual"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const raw = String(new FormData(e.currentTarget).get("code") || "").trim();
+                  const code = extractServiceCode(raw) || raw.toUpperCase();
+                  const found = tickets.find((t) => t.id.toUpperCase() === code);
+                  if (!found) return notify("Nomor servis tidak ditemukan");
+                  scanStopRef.current?.();
+                  scanStopRef.current = null;
+                  openDetail(found);
+                }}
+              >
+                <input
+                  name="code"
+                  autoFocus
+                  autoComplete="off"
+                  placeholder="Ketik atau scan nomor servis (SRV-...)"
+                />
+                <button className="newButton">Buka</button>
+              </form>
               <small className="scanHint">
-                Pemindaian menggunakan kamera perangkat dan tidak mengunggah
-                gambar.
+                Kamera tidak wajib: alat scan QR USB atau ketik nomor servis
+                langsung di kolom di atas. Gambar tidak diunggah ke mana pun.
               </small>
             </div>
           )}
@@ -3709,7 +3808,19 @@ function WarrantyPanel({
   tickets: Ticket[];
   onOpen: (ticket: Ticket) => void;
 }) {
-  const rows = tickets.filter((t) => t.status === "Sudah Diambil");
+  const daysLeft = (t: Ticket) =>
+    (t.warrantyDays || 0) -
+    Math.floor((Date.now() - new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`).getTime()) / 86400000);
+  // Only tickets that actually carry a warranty; active ones first (soonest
+  // to expire at the top), expired ones after.
+  const rows = tickets
+    .filter((t) => t.status === "Sudah Diambil" && (t.warrantyDays || 0) > 0)
+    .sort((a, b) => {
+      const ra = daysLeft(a);
+      const rb = daysLeft(b);
+      if (ra >= 0 !== rb >= 0) return ra >= 0 ? -1 : 1;
+      return ra >= 0 ? ra - rb : rb - ra;
+    });
   return (
     <div className="modulePage">
       <section className="moduleHero warrantyHero">
@@ -3721,8 +3832,8 @@ function WarrantyPanel({
           <p>Pantau garansi aktif, hampir habis, dan hangus.</p>
         </div>
         <strong>
-          {rows.filter((t) => t.warrantyDays).length}
-          <small>Servis bergaransi</small>
+          {rows.filter((t) => daysLeft(t) >= 0).length}
+          <small>Garansi aktif</small>
         </strong>
       </section>
       <section className="ticketPanel modulePanel">
@@ -3771,6 +3882,13 @@ function WarrantyPanel({
             </div>
           );
         })}
+        {rows.length === 0 && (
+          <div className="noData">
+            <Shield />
+            <strong>Belum ada servis bergaransi</strong>
+            <p>Atur garansi di detail servis sebelum perangkat diambil.</p>
+          </div>
+        )}
       </section>
     </div>
   );
