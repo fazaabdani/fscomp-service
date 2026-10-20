@@ -64,6 +64,7 @@ type Status =
   | "Ditangani Mitra"
   | "Bisa Diambil"
   | "Sudah Diambil"
+  | "Dibatalkan"
   | "Baru"
   | "Diagnosa"
   | "Dikerjakan"
@@ -184,6 +185,11 @@ const statuses: Status[] = [
   "Bisa Diambil",
   "Sudah Diambil",
 ];
+// Terminal side-exit for jobs that will never be finished or collected. It is
+// deliberately NOT in `statuses` (the linear progress timeline) nor in
+// `processStatuses`, so it drops out of the active/ready/receivable views.
+const CANCELLED: Status = "Dibatalkan";
+const selectableStatuses: Status[] = [...statuses, CANCELLED];
 const defaultServices: ServiceItem[] = [
   {
     id: "JS-01",
@@ -368,7 +374,9 @@ const money = (n: number) =>
     maximumFractionDigits: 0,
   }).format(n);
 const tone = (s: Status) =>
-  s === "Bisa Diambil" || s === "Sudah Diambil"
+  s === "Dibatalkan"
+    ? "danger"
+    : s === "Bisa Diambil" || s === "Sudah Diambil"
     ? "success"
     : s === "Menunggu Sparepart" || s === "Menunggu Konfirmasi"
       ? "warning"
@@ -888,7 +896,9 @@ export default function ServiceDesk() {
             : active === "Sudah Diambil"
               ? t.status === "Sudah Diambil"
               : active === "Proses Servis"
-                ? processStatuses.includes(t.status)
+                ? // Picking a specific status in the filter (e.g. Dibatalkan)
+                  // must be able to reveal tickets outside the active set.
+                  processStatuses.includes(t.status) || filter === t.status
                 : true;
         const technicianMatch = technicianFilter === "Semua Teknisi" || t.technician === technicianFilter;
         return matches && statusMatch && sectionMatch && technicianMatch;
@@ -970,6 +980,16 @@ export default function ServiceDesk() {
   }
   function updateStatus(id: string, status: Status) {
     const before = tickets.find((t) => t.id === id);
+    if (status === CANCELLED && before) {
+      if (before.status === "Sudah Diambil") {
+        notify("Servis yang sudah diambil tidak bisa dibatalkan");
+        return;
+      }
+      const dp = before.downPayment > 0 ? `
+
+DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secara manual jika perlu.` : "";
+      if (!window.confirm(`Batalkan servis ${before.id} (${before.customer})? Servis tidak lagi dihitung sebagai pekerjaan aktif maupun piutang.${dp}`)) return;
+    }
     const patch: Partial<Ticket> = {
       status,
       statusChangedAt: localDateStr(),
@@ -1160,7 +1180,8 @@ export default function ServiceDesk() {
       tickets.some(
         (t) =>
           t.serial.toLowerCase() === serial.toLowerCase() &&
-          t.status !== "Sudah Diambil",
+          t.status !== "Sudah Diambil" &&
+          t.status !== CANCELLED,
       )
     ) {
       submittingRef.current = false;
@@ -1729,7 +1750,7 @@ export default function ServiceDesk() {
                       }
                     >
                       <option>Semua</option>
-                      {statuses.map((s) => (
+                      {selectableStatuses.map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
@@ -2097,6 +2118,11 @@ export default function ServiceDesk() {
                   </div>
                 </div>
               </div>
+              {selected.status === CANCELLED ? (
+                <div className="cancelledNote">
+                  Servis ini dibatalkan{selected.statusChangedAt ? ` pada ${selected.statusChangedAt}` : ""}. Ubah status di bawah bila ingin dibuka kembali.
+                </div>
+              ) : (
               <div className="trackingTimeline">
                 {statuses.map((s, i) => (
                   <div
@@ -2116,6 +2142,7 @@ export default function ServiceDesk() {
                   </div>
                 ))}
               </div>
+              )}
               <div className="detailGrid">
                 <div>
                   <small>Keluhan</small>
@@ -2189,8 +2216,8 @@ export default function ServiceDesk() {
                       updateStatus(selected.id, e.target.value as Status)
                     }
                   >
-                    {statuses.map((s) => (
-                      <option key={s}>{s}</option>
+                    {selectableStatuses.map((s) => (
+                      <option key={s} disabled={s === CANCELLED && selected.status === "Sudah Diambil"}>{s}</option>
                     ))}
                   </select>
                 </label>
@@ -3146,7 +3173,10 @@ function PaymentsPanel({
   onOpen: (ticket: Ticket) => void;
 }) {
   const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas">("Semua");
-  const rows = tickets.filter((t) => {
+  // A cancelled job is neither billable nor owed; its DP (if any) still
+  // counts as cash received below.
+  const billable = tickets.filter((t) => t.status !== CANCELLED);
+  const rows = billable.filter((t) => {
     // Same canonical check the paid-nota print gate uses — this panel was
     // using its own looser `downPayment >= total` (also true on an
     // overpayment, and didn't require costConfirmed when total>0), so a
@@ -3155,7 +3185,7 @@ function PaymentsPanel({
     const paid = isFullyPaid(t);
     return mode === "Semua" || (mode === "Lunas" ? paid : !paid);
   });
-  const receivable = tickets.reduce(
+  const receivable = billable.reduce(
     (a, t) => a + Math.max(0, finalPrice(t) - t.downPayment),
     0,
   );
@@ -3165,7 +3195,7 @@ function PaymentsPanel({
         <article>
           <small>Total Tagihan</small>
           <strong>
-            {money(tickets.reduce((a, t) => a + finalPrice(t), 0))}
+            {money(billable.reduce((a, t) => a + finalPrice(t), 0))}
           </strong>
           <span>Semua transaksi servis</span>
         </article>

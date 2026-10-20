@@ -27,7 +27,7 @@ const NON_NEGATIVE_NUMBER_FIELDS = new Set([
 const VALID_STATUSES = new Set([
   "Belum Cek", "Sedang Tes", "Sedang Cek", "Menunggu Konfirmasi",
   "Sedang Dikerjakan", "Menunggu Sparepart", "Ditangani Mitra",
-  "Bisa Diambil", "Sudah Diambil", "Baru",
+  "Bisa Diambil", "Sudah Diambil", "Dibatalkan", "Baru",
 ]);
 
 export async function PATCH(
@@ -68,6 +68,7 @@ export async function PATCH(
   let ticket: Ticket | null = null;
   let payment: Payment | null = null;
   let conflict = false;
+  let cancelBlocked = false;
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.ticket.findUnique({ where: { id } });
@@ -75,6 +76,11 @@ export async function PATCH(
     if (expectVersion && existing.version !== body.expectedVersion) {
       conflict = true;
       ticket = existing;
+      return;
+    }
+
+    if (data.status === "Dibatalkan" && existing.status === "Sudah Diambil") {
+      cancelBlocked = true;
       return;
     }
 
@@ -129,6 +135,11 @@ export async function PATCH(
     ticket = updated;
   });
 
+  if (cancelBlocked)
+    return NextResponse.json(
+      { error: "Servis yang sudah diambil tidak bisa dibatalkan" },
+      { status: 409 },
+    );
   if (!ticket)
     return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
   if (conflict)

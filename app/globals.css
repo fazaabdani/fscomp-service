@@ -2879,6 +2879,20 @@ textarea {
   background: #e9ecff;
   color: #3f52c9;
 }
+.statusBadge.danger {
+  background: #fde8e8;
+  color: #b42318;
+}
+.cancelledNote {
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid #f3c4c4;
+  border-radius: 12px;
+  background: #fff5f5;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 600;
+}
 .statusBadge.neutral {
   background: #eef1f5;
   color: #5c6779;

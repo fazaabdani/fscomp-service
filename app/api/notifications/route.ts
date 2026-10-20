@@ -21,7 +21,7 @@ export async function GET() {
   for (const t of tickets) {
     const days = daysSince(t.receivedAt, now);
     const base = { ticketId: t.id, customer: t.customer, device: t.device };
-    if (!["Bisa Diambil", "Sudah Diambil"].includes(t.status) && days > 7)
+    if (!["Bisa Diambil", "Sudah Diambil", "Dibatalkan"].includes(t.status) && days > 7)
       alerts.push({ ...base, type: "SERVICE_OLD", title: `Servis ${days} hari, belum siap` });
 
     // The most common real headache for a repair shop: a finished job the
@@ -45,7 +45,7 @@ export async function GET() {
     // estimate` falls back to the estimate for a genuinely free (Rp0),
     // already-confirmed job, producing a false "payment due" alert.
     const total = finalPrice(t);
-    if (total > t.downPayment && t.paymentTermDays && days > t.paymentTermDays)
+    if (t.status !== "Dibatalkan" && total > t.downPayment && t.paymentTermDays && days > t.paymentTermDays)
       alerts.push({
         ...base,
         type: "PAYMENT_DUE",
