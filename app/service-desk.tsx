@@ -1683,7 +1683,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <Wrench size={44} />
                 </div>
               </section>
-              <div className="serviceStats">
+              <div className={`serviceStats${currentUser?.role === "ADMIN" ? "" : " threeCards"}`}>
                 <article>
                   <span className="statIcon blue">
                     <Wrench />
@@ -1714,18 +1714,21 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     <em>Tersimpan lokal</em>
                   </div>
                 </article>
-                <article>
-                  <span className="statIcon orange">
-                    <CircleDollarSign />
-                  </span>
-                  <div>
-                    <small>Pendapatan selesai</small>
-                    <strong className="moneyStat">
-                      {money(stats.revenue)}
-                    </strong>
-                    <em>Akumulasi layanan</em>
-                  </div>
-                </article>
+                {/* Shop revenue is owner-level info; staff don't see it. */}
+                {currentUser?.role === "ADMIN" && (
+                  <article>
+                    <span className="statIcon orange">
+                      <CircleDollarSign />
+                    </span>
+                    <div>
+                      <small>Pendapatan selesai</small>
+                      <strong className="moneyStat">
+                        {money(stats.revenue)}
+                      </strong>
+                      <em>Akumulasi layanan</em>
+                    </div>
+                  </article>
+                )}
               </div>
 
               <section className="ticketPanel">

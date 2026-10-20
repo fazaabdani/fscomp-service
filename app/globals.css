@@ -2624,6 +2624,11 @@ textarea {
   gap: 16px;
   margin: 20px 0;
 }
+@media (min-width: 1101px) {
+  .serviceStats.threeCards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .serviceStats article {
   display: flex;
   align-items: center;
