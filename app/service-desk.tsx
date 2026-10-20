@@ -1386,7 +1386,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             .filter(
               ([, label]) =>
                 currentUser?.role === "ADMIN" ||
-                !["Profil Toko", "Akun", "Jasa Servis", "Pesan WhatsApp", "Laporan Servis", "Laporan Teknisi"].includes(label),
+                !["Profil Toko", "Akun", "Jasa Servis", "Pesan WhatsApp", "Status Pembayaran", "Laporan Servis", "Laporan Teknisi"].includes(label),
             )
             .map(([Icon, label]) => (
             <button
