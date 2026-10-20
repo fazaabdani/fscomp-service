@@ -1088,7 +1088,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       condition: conditionVal ? (conditionVal as Ticket["condition"]) : undefined,
       serviceAction: String(form.get("serviceAction") || ""),
       technician: String(form.get("technician")),
-      partCost: Number(form.get("partCost") || 0),
+      // Staff don't get the Modal field, so an absent input must leave the
+      // stored cost alone rather than zeroing it.
+      ...(form.has("partCost") ? { partCost: Number(form.get("partCost") || 0) } : {}),
       estimate: Number(form.get("estimate") || 0),
       downPayment: Number(form.get("downPayment") || 0),
       finalCost: Number(form.get("finalCost") || 0),
@@ -2108,16 +2110,20 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         )}
                       </strong>
                     </span>
-                    <span>
-                      Modal
-                      <strong>{money(selected.partCost || 0)}</strong>
-                    </span>
-                    <span>
-                      Profit
-                      <strong>
-                        {money(finalPrice(selected) - (selected.partCost || 0))}
-                      </strong>
-                    </span>
+                    {currentUser?.role === "ADMIN" && (
+                      <>
+                        <span>
+                          Modal
+                          <strong>{money(selected.partCost || 0)}</strong>
+                        </span>
+                        <span>
+                          Profit
+                          <strong>
+                            {money(finalPrice(selected) - (selected.partCost || 0))}
+                          </strong>
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2389,7 +2395,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Teknisi<select name="technician" defaultValue={selected.technician}>{staff.map((person) => <option key={person.id}>{person.name}</option>)}</select></label>
                 <label className="full">Keterangan / tindakan<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
-                <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>
+                {currentUser?.role === "ADMIN" && <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>}
                 <label>Estimasi biaya<input name="estimate" type="number" min="0" defaultValue={selected.estimate}/></label>
                 <label>Biaya servis final<input name="finalCost" type="number" min="0" defaultValue={selected.finalCost || 0}/></label>
                 <label>Tanggal ditangani<input name="handledAt" type="date" defaultValue={selected.handledAt || ""}/></label>
