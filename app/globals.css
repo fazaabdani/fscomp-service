@@ -2975,6 +2975,7 @@ textarea {
 .formGridService label,
 .statusControl {
   display: grid;
+  align-content: start;
   gap: 7px;
   color: #667287;
   font-size: 12px;
@@ -4182,7 +4183,7 @@ textarea {
   font-weight: 500;
 }
 .modulePanel {
-  min-height: 520px;
+  min-height: 0;
 }
 .customerTable,
 .paymentTable {
@@ -6315,5 +6316,149 @@ textarea {
     color: rgba(255, 255, 255, 0.65);
     font-size: 5pt;
     letter-spacing: 0.06em;
+  }
+}
+
+/* ===== Comfort pass: denser dashboard chrome, roomier work-order modal ===== */
+.welcomeCard {
+  min-height: 0;
+  padding: 16px 26px;
+  border-radius: 18px;
+}
+.welcomeCard .miniTag,
+.welcomeCard .orb {
+  display: none;
+}
+.welcomeCard h2 {
+  margin: 0 0 3px;
+  font-size: 20px;
+}
+.welcomeCard p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.serviceModal .modalHead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #fff;
+}
+.serviceModal .modalFoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  border-top: 1px solid var(--svc-line);
+  background: #fff;
+}
+.detailCols {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.detailCol {
+  min-width: 0;
+}
+.detailCol > :first-child {
+  margin-top: 0;
+}
+@media (min-width: 900px) {
+  .detailModal {
+    width: min(1040px, 100%);
+  }
+  .detailCols {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+  .detailCols .detailCol + .detailCol {
+    border-left: 1px solid var(--svc-line);
+    padding-left: 0;
+  }
+  .detailModal .detailGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .detailModal .trackingTimeline {
+    margin-top: 0;
+  }
+  .detailModal .detailHero {
+    grid-template-columns: 130px 1fr;
+    padding-top: 18px;
+    padding-bottom: 14px;
+  }
+  .detailModal .detailHero h3 {
+    margin-top: 8px;
+  }
+  .detailModal .detailMoney {
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .detailModal .ratingBox {
+    margin-top: 0;
+  }
+  .detailModal .confirmationGrid {
+    margin-top: 12px;
+    margin-bottom: 12px;
+  }
+  .detailModal .actionGrid {
+    margin-top: 14px;
+  }
+  .detailModal .serviceControls {
+    margin-top: 16px;
+  }
+}
+@media (max-width: 420px) {
+  .serviceStats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .serviceStats article {
+    min-height: 86px;
+    padding: 12px;
+  }
+  .serviceStats .statIcon {
+    display: none;
+  }
+  .serviceStats strong {
+    font-size: 20px;
+  }
+  .welcomeCard {
+    padding: 14px 18px;
+  }
+}
+
+@media (max-width: 899px) {
+  /* Phone: put the controls (status, amounts, print/WA actions) before the
+     long read-only detail so the first screen is actionable. */
+  .detailCols {
+    display: flex;
+    flex-direction: column;
+  }
+  .detailCols .detailCol + .detailCol {
+    order: -1;
+  }
+  .detailModal .detailGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 16px;
+  }
+  .detailModal .detailGrid > div {
+    padding: 10px 12px;
+  }
+  .detailModal .serviceControls {
+    margin-top: 14px;
+  }
+  .serviceModal .modalHead {
+    padding: 14px 18px;
+  }
+}
+
+.detailModal .actionGrid {
+  margin-top: 14px;
+}
+@media (max-width: 760px) {
+  .serviceModal .modalFoot {
+    padding: 12px 16px 14px;
+  }
+  .serviceModal .modalFoot .newButton {
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
   }
 }

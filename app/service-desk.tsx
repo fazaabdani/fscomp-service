@@ -1585,11 +1585,6 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             </button>
           ))}
         </nav>
-        <div className="sidebarHelp">
-          <ShieldCheck />
-          <strong>Data tersimpan di server</strong>
-          <small>Pastikan internet tersambung saat menyimpan. Jika muncul peringatan koneksi, tunggu sampai hilang sebelum menutup halaman.</small>
-        </div>
         <div className="sidebarUser">
           <span>
             {(currentUser?.name || "?")
@@ -1886,7 +1881,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <div>
                     <small>Total pelanggan</small>
                     <strong>{stats.customers}</strong>
-                    <em>Tersimpan lokal</em>
+                    <em>Terdaftar di sistem</em>
                   </div>
                 </article>
                 {/* Shop revenue is owner-level info; staff don't see it. */}
@@ -2243,7 +2238,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <div className="qrCard">
                   <QRCodeSVG
                     value={`${location.origin}/track?id=${encodeURIComponent(selected.id)}`}
-                    size={142}
+                    size={104}
                     level="H"
                   />
                   <small>Scan untuk tracking status</small>
@@ -2325,6 +2320,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 ))}
               </div>
               )}
+              <div className="detailCols">
+              <div className="detailCol">
               <div className="detailGrid">
                 <div>
                   <small>Keluhan</small>
@@ -2389,6 +2386,32 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   </span>
                 </button>
               </div>
+              <div className="ratingBox">
+                <span>Rating pelayanan pelanggan</span>
+                <div>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() =>
+                        patchTicket(
+                          selected.id,
+                          { rating: n },
+                          `Rating ${n} bintang disimpan`,
+                        )
+                      }
+                      aria-label={`${n} bintang`}
+                    >
+                      <Star
+                        fill={
+                          (selected.rating || 0) >= n ? "currentColor" : "none"
+                        }
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              </div>
+              <div className="detailCol">
               <div className="serviceControls">
                 <label>
                   Ubah status
@@ -2445,30 +2468,6 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     }}
                   />
                 </label>
-              </div>
-              <div className="ratingBox">
-                <span>Rating pelayanan pelanggan</span>
-                <div>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() =>
-                        patchTicket(
-                          selected.id,
-                          { rating: n },
-                          `Rating ${n} bintang disimpan`,
-                        )
-                      }
-                      aria-label={`${n} bintang`}
-                    >
-                      <Star
-                        fill={
-                          (selected.rating || 0) >= n ? "currentColor" : "none"
-                        }
-                      />
-                    </button>
-                  ))}
-                </div>
               </div>
               <div className="actionGrid">
                 <button
@@ -2535,6 +2534,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <button className="waButton" onClick={() => setModal("chat")}>
                   <MessageCircle size={17} /> Chat pelanggan
                 </button>
+              </div>
+              </div>
               </div>
             </div>
           )}
@@ -3258,7 +3259,11 @@ function PaymentsPanel({
   onSettle: (ticket: Ticket) => void;
   onOpen: (ticket: Ticket) => void;
 }) {
-  const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas">("Semua");
+  const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas" | "Dalam Proses">("Semua");
+  // Money is only *owed* once the work is done. An open job's estimate is
+  // a forecast, not a receivable — mixing them inflated "Sisa Piutang" with
+  // devices that hadn't even been diagnosed yet.
+  const isDone = (t: Ticket) => t.status === "Bisa Diambil" || t.status === "Sudah Diambil";
   // A cancelled job is neither billable nor owed; its DP (if any) still
   // counts as cash received below.
   const billable = tickets.filter((t) => t.status !== CANCELLED);
@@ -3269,12 +3274,11 @@ function PaymentsPanel({
     // ticket could show "Lunas" here while Print Nota Lunas stayed
     // disabled for the exact same ticket.
     const paid = isFullyPaid(t);
-    return mode === "Semua" || (mode === "Lunas" ? paid : !paid);
+    if (mode === "Lunas") return paid;
+    if (mode === "Belum Lunas") return !paid && isDone(t);
+    if (mode === "Dalam Proses") return !paid && !isDone(t);
+    return true;
   });
-  // Money is only *owed* once the work is done. An open job's estimate is
-  // a forecast, not a receivable — mixing them inflated "Sisa Piutang" with
-  // devices that hadn't even been diagnosed yet.
-  const isDone = (t: Ticket) => t.status === "Bisa Diambil" || t.status === "Sudah Diambil";
   const owed = (t: Ticket) => Math.max(0, finalPrice(t) - t.downPayment);
   const receivable = billable.filter(isDone).reduce((a, t) => a + owed(t), 0);
   const inProgress = billable.filter((t) => !isDone(t)).reduce((a, t) => a + owed(t), 0);
@@ -3313,7 +3317,7 @@ function PaymentsPanel({
             <p>Konfirmasi DP, pelunasan, tagihan, dan tempo pelanggan</p>
           </div>
           <div className="paymentTabs">
-            {(["Semua", "Belum Lunas", "Lunas"] as const).map((x) => (
+            {(["Semua", "Belum Lunas", "Lunas", "Dalam Proses"] as const).map((x) => (
               <button
                 className={mode === x ? "active" : ""}
                 onClick={() => setMode(x)}
@@ -3343,7 +3347,8 @@ function PaymentsPanel({
               t.paymentMethod === "Tempo" && t.paymentTermDays
                 ? t.paymentTermDays
                 : 7;
-            const isOverdue = !paid && ageDays(t.receivedAt) > termDays;
+            const done = isDone(t);
+            const isOverdue = !paid && done && ageDays(t.receivedAt) > termDays;
             return (
               <div
                 className={`paymentServiceRow ${isOverdue ? "overdue" : ""}`}
@@ -3364,8 +3369,8 @@ function PaymentsPanel({
                   <b>{money(due)}</b>
                 </span>
                 <span>
-                  <i className={`statusBadge ${paid ? "success" : "warning"}`}>
-                    {paid ? "Lunas" : isOverdue ? "Jatuh Tempo" : "Belum Lunas"}
+                  <i className={`statusBadge ${paid ? "success" : done ? "warning" : "neutral"}`}>
+                    {paid ? "Lunas" : !done ? "Dalam Proses" : isOverdue ? "Jatuh Tempo" : "Belum Lunas"}
                   </i>
                 </span>
                 <span>
