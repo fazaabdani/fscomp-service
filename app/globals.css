@@ -2847,7 +2847,7 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ticketRow > span:nth-child(4) {
+.ticketRow > span:nth-child(5) {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -4262,7 +4262,7 @@ textarea {
 }
 .paymentStats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 15px;
 }
 .paymentStats article {
@@ -5857,4 +5857,42 @@ textarea {
     padding: 0.06cm 0.14cm;
     font-size: 7pt;
   }
+}
+
+/* Phone layout for the service list: a 1100px-wide table forced sideways
+   scrolling just to see a ticket's status or price. */
+@media (max-width: 760px) {
+  .ticketHead {
+    display: none;
+  }
+  .ticketTable {
+    overflow-x: visible;
+  }
+  .ticketRow {
+    min-width: 0;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "chk id status"
+      "chk cust cost"
+      "chk issue issue"
+      "chk tech tech";
+    gap: 5px 12px;
+    align-items: start;
+    padding: 14px 15px;
+  }
+  .ticketRow > span:nth-child(1) { grid-area: chk; align-self: start; }
+  .ticketRow > span:nth-child(2) { grid-area: id; min-width: 0; }
+  .ticketRow > span:nth-child(3) { grid-area: cust; min-width: 0; }
+  .ticketRow > span:nth-child(4) { grid-area: issue; min-width: 0; }
+  .ticketRow > span:nth-child(5) { grid-area: tech; }
+  .ticketRow > span:nth-child(6) { grid-area: status; justify-self: end; text-align: right; }
+  .ticketRow > span:nth-child(6) small { justify-content: flex-end; }
+  .ticketRow > span:nth-child(7) { grid-area: cost; justify-self: end; text-align: right; }
+  .ticketRow > span:nth-child(8) { display: none; }
+}
+.formGridService.single {
+  grid-template-columns: 1fr;
+}
+.passwordModal {
+  width: min(420px, 100%);
 }

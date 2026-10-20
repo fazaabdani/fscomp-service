@@ -52,6 +52,7 @@ import {
   Wallet,
   Landmark,
   LogOut,
+  KeyRound,
 } from "lucide-react";
 
 type Status =
@@ -631,6 +632,7 @@ export default function ServiceDesk() {
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
   const [notifications, setNotifications] = useState<
     { type: string; title: string; ticketId: string; customer: string; device: string }[]
   >([]);
@@ -1407,8 +1409,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               {label === "Status Pembayaran" && (
                 <b>
                   {
-                    tickets.filter((t) => finalPrice(t) > t.downPayment)
-                      .length
+                    tickets.filter(
+                      (t) =>
+                        (t.status === "Bisa Diambil" || t.status === "Sudah Diambil") &&
+                        finalPrice(t) > t.downPayment,
+                    ).length
                   }
                 </b>
               )}
@@ -1417,8 +1422,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         </nav>
         <div className="sidebarHelp">
           <ShieldCheck />
-          <strong>Butuh koneksi server</strong>
-          <small>Tampilan bisa dilihat dari cache, tapi perubahan (tiket, pembayaran, dll) hanya tersimpan saat terhubung ke server.</small>
+          <strong>Data tersimpan di server</strong>
+          <small>Pastikan internet tersambung saat menyimpan. Jika muncul peringatan koneksi, tunggu sampai hilang sebelum menutup halaman.</small>
         </div>
         <div className="sidebarUser">
           <span>
@@ -1433,6 +1438,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             <strong>{currentUser?.name || "Memuat..."}</strong>
             <small>{currentUser?.role === "ADMIN" ? "Administrator" : "Teknisi/Pegawai"}</small>
           </div>
+          <button className="iconCircle" onClick={() => setPwOpen(true)} aria-label="Ganti password" title="Ganti password">
+            <KeyRound size={16} />
+          </button>
           <button className="iconCircle" onClick={logout} aria-label="Keluar" title="Keluar">
             <LogOut size={16} />
           </button>
@@ -2702,12 +2710,103 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           </div>
         </div>
       )}
+      {pwOpen && (
+        <PasswordModal
+          onClose={() => setPwOpen(false)}
+          onDone={() => {
+            setPwOpen(false);
+            notify("Password berhasil diganti");
+          }}
+        />
+      )}
       {toast && (
         <div className="serviceToast">
           <CheckCircle2 />
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function PasswordModal({
+  onClose,
+  onDone,
+}: {
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const current = String(form.get("current") || "");
+    const next = String(form.get("next") || "");
+    if (next.length < 8) return setError("Password baru minimal 8 karakter");
+    if (next !== String(form.get("confirm") || ""))
+      return setError("Konfirmasi password tidak sama");
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ current, next }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error || "Gagal mengganti password");
+        return;
+      }
+      onDone();
+    } catch {
+      setError("Tidak bisa terhubung ke server");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div
+      className="modalBackdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <form className="serviceModal passwordModal" onSubmit={submit}>
+        <div className="modalHead">
+          <div>
+            <span>AKUN SAYA</span>
+            <h2>Ganti Password</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Tutup">
+            <X />
+          </button>
+        </div>
+        <div className="formGridService single">
+          <label>
+            Password saat ini
+            <input name="current" type="password" required autoComplete="current-password" />
+          </label>
+          <label>
+            Password baru (min. 8 karakter)
+            <input name="next" type="password" required minLength={8} autoComplete="new-password" />
+          </label>
+          <label>
+            Ulangi password baru
+            <input name="confirm" type="password" required minLength={8} autoComplete="new-password" />
+          </label>
+          {error && <div className="authError">{error}</div>}
+        </div>
+        <div className="modalFoot">
+          <button type="button" className="ghost" onClick={onClose}>
+            Batal
+          </button>
+          <button className="newButton" disabled={busy}>
+            <CheckCircle2 size={17} /> Simpan Password
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -3194,19 +3293,22 @@ function PaymentsPanel({
     const paid = isFullyPaid(t);
     return mode === "Semua" || (mode === "Lunas" ? paid : !paid);
   });
-  const receivable = billable.reduce(
-    (a, t) => a + Math.max(0, finalPrice(t) - t.downPayment),
-    0,
-  );
+  // Money is only *owed* once the work is done. An open job's estimate is
+  // a forecast, not a receivable — mixing them inflated "Sisa Piutang" with
+  // devices that hadn't even been diagnosed yet.
+  const isDone = (t: Ticket) => t.status === "Bisa Diambil" || t.status === "Sudah Diambil";
+  const owed = (t: Ticket) => Math.max(0, finalPrice(t) - t.downPayment);
+  const receivable = billable.filter(isDone).reduce((a, t) => a + owed(t), 0);
+  const inProgress = billable.filter((t) => !isDone(t)).reduce((a, t) => a + owed(t), 0);
   return (
     <div className="modulePage">
       <section className="paymentStats">
         <article>
           <small>Total Tagihan</small>
           <strong>
-            {money(billable.reduce((a, t) => a + finalPrice(t), 0))}
+            {money(billable.filter(isDone).reduce((a, t) => a + finalPrice(t), 0))}
           </strong>
-          <span>Semua transaksi servis</span>
+          <span>Servis yang sudah selesai</span>
         </article>
         <article>
           <small>DP Diterima</small>
@@ -3218,7 +3320,12 @@ function PaymentsPanel({
         <article className="dangerCard">
           <small>Sisa Piutang</small>
           <strong>{money(receivable)}</strong>
-          <span>Perlu ditagih</span>
+          <span>Servis selesai, belum lunas — perlu ditagih</span>
+        </article>
+        <article>
+          <small>Estimasi Berjalan</small>
+          <strong>{money(inProgress)}</strong>
+          <span>Servis yang masih dikerjakan</span>
         </article>
       </section>
       <section className="ticketPanel modulePanel">
