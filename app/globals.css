@@ -6462,3 +6462,47 @@ textarea {
     white-space: nowrap;
   }
 }
+
+/* Full-HD shop monitors: the UI is built for ~1366px and reads small at
+   1920px, so scale it up a little. Screen only (print is sized in mm). Viewport
+   units are not scaled by `zoom`, hence the divisions below. */
+@media screen and (min-width: 1800px) {
+  html {
+    --ui-zoom: 1.12;
+    zoom: var(--ui-zoom);
+  }
+  .serviceApp {
+    min-height: calc(100vh / var(--ui-zoom));
+  }
+  .serviceModal {
+    max-height: calc(92vh / var(--ui-zoom));
+  }
+  .editServiceGrid {
+    max-height: calc(64vh / var(--ui-zoom));
+  }
+}
+
+.acceptFoot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: auto;
+  color: #566277;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.acceptFoot input {
+  width: 17px;
+  height: 17px;
+  accent-color: #5268e9;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .serviceModal .modalFoot {
+    flex-wrap: wrap;
+  }
+  .acceptFoot {
+    flex: 1 0 100%;
+  }
+}

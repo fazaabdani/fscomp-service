@@ -2204,12 +2204,12 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     <option value="30">1 Bulan</option>
                   </select>
                 </label>
-                <label className="acceptLine full">
-                  <input type="checkbox" required /> Dengan ini penerima setuju
-                  menerima barang servis dan data sudah benar.
-                </label>
               </div>
               <div className="modalFoot">
+                <label className="acceptFoot">
+                  <input type="checkbox" required /> Penerima setuju menerima
+                  barang servis dan data sudah benar.
+                </label>
                 <button
                   type="button"
                   className="ghost"
