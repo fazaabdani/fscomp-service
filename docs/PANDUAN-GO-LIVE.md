@@ -1,7 +1,8 @@
 # Panduan Go-Live servis.fscomp.id
 
-Status 20 Okt 2026: semua data di produksi adalah data uji. Dokumen ini adalah urutan langkah
-sebelum dipakai staf untuk operasional sungguhan.
+Status 21 Okt 2026: data uji sudah DIGANTI dengan database aplikasi lama (1.358 servis, 935 pelanggan;
+lihat `docs/IMPOR-DATA-APLIKASI-LAMA.md`). Langkah menghapus data uji di bawah tidak perlu lagi dijalankan
+— jangan jalankan `reset-test-data.mjs` di produksi, itu akan menghapus data asli.
 
 ## Urutan langkah (jangan dibalik)
 
@@ -14,7 +15,7 @@ sebelum dipakai staf untuk operasional sungguhan.
    orangnya; minta dia menggantinya sendiri lewat ikon kunci.
 4. **Lengkapi Profil Toko** (nama, telepon, WhatsApp, alamat, ketentuan servis, rekening) dan
    **Jasa Servis** — dipakai di nota dan pesan WhatsApp.
-5. **Hapus data uji** (langkah di bawah).
+5. ~~Hapus data uji~~ — sudah selesai lewat impor data aplikasi lama (21 Okt 2026).
 6. Coba 1 servis sungguhan dari awal sampai nota lunas, cetak nota di printer yang akan dipakai.
 
 ## Menghapus data uji
