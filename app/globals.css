@@ -6679,3 +6679,66 @@ textarea {
   font-weight: 700;
   color: #2a3547;
 }
+
+.actionNote {
+  margin: 0 24px 12px;
+}
+.actionNote label {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #bfd0ff;
+  border-radius: 11px;
+  background: #f5f8ff;
+}
+.actionNote b {
+  color: #2f43b0;
+  font-size: 12.5px;
+}
+.actionNote span {
+  color: #7b88a6;
+  font-size: 11px;
+}
+.actionNote textarea {
+  min-height: 66px;
+  padding: 8px 10px;
+  border: 1px solid #cfd9f7;
+  border-radius: 9px;
+  background: #fff;
+  color: #243048;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.ticketRow .actionLine {
+  color: #2f43b0;
+  font-weight: 600;
+}
+@media print {
+  .trx .trxIssue.trxIssueSoft {
+    border-left-color: #b6c2dc;
+    background: #f8f9fc;
+  }
+  .trx .trxIssue.trxIssueSoft p {
+    -webkit-line-clamp: 2;
+    font-size: 7.8pt;
+    font-weight: 500;
+  }
+}
+
+.issueNote {
+  margin: 0 24px 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--svc-line);
+  border-radius: 11px;
+}
+.issueNote small {
+  display: block;
+  color: #929daf;
+  font-size: 12px;
+}
+.issueNote strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+}

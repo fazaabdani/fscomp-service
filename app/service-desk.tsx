@@ -730,9 +730,15 @@ function PaidNotaBody({
             </dl>
           </section>
           <section>
-            <h4 className="trxSecHead">{ticket.serviceAction ? "Tindakan Servis" : "Keluhan / Kondisi Awal"}</h4>
+            <h4 className="trxSecHead">Keluhan Awal</h4>
+            <div className="trxIssue trxIssueSoft">
+              <p>{ticket.issue}</p>
+            </div>
+          </section>
+          <section>
+            <h4 className="trxSecHead">Tindakan Servis</h4>
             <div className="trxIssue">
-              <p>{ticket.serviceAction || ticket.issue}</p>
+              <p>{ticket.serviceAction?.trim() || "—"}</p>
             </div>
           </section>
         </div>
@@ -1357,7 +1363,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       nomor_servis: ticket.id,
       tanggal_terima: new Date(`${ticket.receivedAt}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }),
       link_tracking: tracking,
-      tindakan: ticket.serviceAction || ticket.issue,
+      // Complaint and technician action are different things: never present the
+      // customer's complaint as "what we will do".
+      keluhan: ticket.issue,
+      tindakan: ticket.serviceAction?.trim() || "perbaikan sesuai hasil pengecekan",
       estimasi: money(ticket.estimate),
       sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
       pembayaran:
@@ -2082,7 +2091,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     </span>
                     <span>No. Servis</span>
                     <span>Pelanggan & Perangkat</span>
-                    <span>Keluhan</span>
+                    <span>Keluhan / Tindakan</span>
                     <span>Teknisi</span>
                     <span>Status & Lama</span>
                     <span>Biaya</span>
@@ -2136,7 +2145,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         </span>
                         <span>
                           <b>{t.issue}</b>
-                          <small>{t.accessories}</small>
+                          {t.serviceAction?.trim() ? (
+                            <small className="actionLine">Tindakan: {t.serviceAction}</small>
+                          ) : (
+                            <small>{t.accessories}</small>
+                          )}
                         </span>
                         <span>
                           <span className="avatarMini">
@@ -2302,12 +2315,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   </small>
                 </label>
                 <label className="full">
-                  Kerusakan / keluhan
+                  Keluhan pelanggan (saat unit masuk)
                   <textarea
                     name="issue"
                     required
-                    placeholder="Tuliskan gejala atau kerusakan secara rinci"
+                    placeholder="Tuliskan gejala atau keluhan sesuai yang disampaikan pelanggan"
                   />
+                  <small className="fieldHint">
+                    Tindakan oleh teknisi dicatat terpisah nanti di detail servis.
+                  </small>
                 </label>
                 <label>
                   Penerima
@@ -2504,11 +2520,27 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               )}
               <div className="detailCols">
               <div className="detailCol">
+              <div className="issueNote">
+                <small>Keluhan pelanggan (saat unit masuk)</small>
+                <strong>{selected.issue}</strong>
+              </div>
+              <div className="actionNote">
+                <label>
+                  <b>Tindakan teknisi</b>
+                  <span>Apa yang dikerjakan / diganti. Tampil juga di halaman cek status pelanggan.</span>
+                  <textarea
+                    key={`action-${selected.id}-${selected.version}`}
+                    defaultValue={selected.serviceAction || ""}
+                    placeholder="Contoh: Ganti panel LCD 14 inch, kalibrasi baterai, install ulang Windows"
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v !== (selected.serviceAction || "").trim())
+                        patchTicket(selected.id, { serviceAction: v }, "Tindakan teknisi disimpan");
+                    }}
+                  />
+                </label>
+              </div>
               <div className="detailGrid">
-                <div>
-                  <small>Keluhan</small>
-                  <strong>{selected.issue}</strong>
-                </div>
                 <div>
                   <small>Kelengkapan</small>
                   <strong>{selected.accessories}</strong>
@@ -2798,10 +2830,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Merek<input name="brand" required defaultValue={selected.brand}/></label>
                 <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
                 <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
-                <label className="full">Kerusakan<textarea name="issue" required defaultValue={selected.issue}/></label>
+                <label className="full">Keluhan pelanggan (saat unit masuk)<textarea name="issue" required defaultValue={selected.issue}/></label>
                 <label>Kondisi servis<select name="condition" defaultValue={selected.condition || ""}><option value="">Belum ditentukan</option><option>Sudah Jadi</option><option>Tidak Bisa</option><option>Dibatalkan</option></select></label>
                 <label>Teknisi<select name="technician" defaultValue={selected.technician}>{staff.map((person) => <option key={person.id}>{person.name}</option>)}</select></label>
-                <label className="full">Keterangan / tindakan<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
+                <label className="full">Tindakan teknisi<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
                 {currentUser?.role === "ADMIN" && <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>}
                 <label>Estimasi biaya<input name="estimate" type="number" min="0" defaultValue={selected.estimate}/></label>
@@ -2826,7 +2858,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <a target="_blank" href={whatsappUrl(selected, "empty")}><MessageCircle/><span><b>Chat WhatsApp Kosong</b><small>Hanya membuka percakapan pelanggan tanpa isi pesan.</small></span></a>
                 <a target="_blank" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
                 <a target="_blank" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
-                <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.</small><span className="costChatVariants"><a target="_blank" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
+                <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.{!selected.serviceAction?.trim() && " Tindakan teknisi belum diisi — isi dulu di detail servis agar pesan lebih jelas."}</small><span className="costChatVariants"><a target="_blank" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
               </div>
             </div>
           )}
