@@ -44,12 +44,17 @@ export async function GET() {
     // Same helper the print/payment gates use — a plain `finalCost ||
     // estimate` falls back to the estimate for a genuinely free (Rp0),
     // already-confirmed job, producing a false "payment due" alert.
+    // Money is only owed once the work is done (an open job's estimate is a
+    // forecast). Term = what was chosen at intake, else 7 days — a job handed
+    // over with a balance and no term used to never raise an alert at all.
     const total = finalPrice(t);
-    if (t.status !== "Dibatalkan" && total > t.downPayment && t.paymentTermDays && days > t.paymentTermDays)
+    const isDone = t.status === "Bisa Diambil" || t.status === "Sudah Diambil";
+    const term = t.paymentTermDays || 7;
+    if (isDone && total > t.downPayment && days > term)
       alerts.push({
         ...base,
         type: "PAYMENT_DUE",
-        title: `Sisa Rp ${(total - t.downPayment).toLocaleString("id-ID")}, lewat tempo ${days - t.paymentTermDays} hari`,
+        title: `Sisa Rp ${(total - t.downPayment).toLocaleString("id-ID")}, lewat tempo ${days - term} hari`,
       });
 
     if (t.status === "Sudah Diambil" && t.warrantyDays && t.pickedUpAt) {

@@ -3535,10 +3535,10 @@ function PaymentsPanel({
             const total = finalPrice(t);
             const due = Math.max(0, total - t.downPayment);
             const paid = isFullyPaid(t);
-            const termDays =
-              t.paymentMethod === "Tempo" && t.paymentTermDays
-                ? t.paymentTermDays
-                : 7;
+            // Same rule as the notification bell: the term chosen at intake,
+            // else 7 days — it used to be honoured only when the payment
+            // method happened to be "Tempo".
+            const termDays = t.paymentTermDays || 7;
             const done = isDone(t);
             const isOverdue = !paid && done && ageDays(t.receivedAt) > termDays;
             return (
@@ -3995,19 +3995,26 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
       Array.from(
         tickets
           .reduce((m, t) => {
-            const r = m.get(t.receivedAt) || {
-              date: t.receivedAt,
-              in: 0,
-              done: 0,
-              out: 0,
-              revenue: 0,
-              cash: 0,
-              cost: 0,
+            // Each figure lands on the day it actually happened: intake on the
+            // received date, money and "keluar" on the pickup date (a job
+            // received on the 30th and collected on the 2nd is next month's
+            // income), "selesai" on the day it became ready/collected.
+            const bucket = (date: string) => {
+              let r = m.get(date);
+              if (!r) {
+                r = { date, in: 0, done: 0, out: 0, revenue: 0, cash: 0, cost: 0 };
+                m.set(date, r);
+              }
+              return r;
             };
-            r.in++;
-            if (t.status === "Bisa Diambil" || t.status === "Sudah Diambil")
-              r.done++;
-            if (t.status === "Sudah Diambil") {
+            bucket(t.receivedAt).in++;
+            const picked = t.status === "Sudah Diambil";
+            if (picked || t.status === "Bisa Diambil") {
+              const doneDate = (picked ? t.pickedUpAt : t.statusChangedAt) || t.receivedAt;
+              bucket(doneDate).done++;
+            }
+            if (picked) {
+              const r = bucket(t.pickedUpAt || t.receivedAt);
               r.out++;
               // "Pemasukan" is the invoiced value (finalPrice, or estimate
               // if not yet confirmed) — recognized once a job is handed
@@ -4020,7 +4027,6 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
               r.cash += t.downPayment;
               r.cost += t.partCost || 0;
             }
-            m.set(t.receivedAt, r);
             return m;
           }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cash: number; cost: number }>())
           .values(),
