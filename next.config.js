@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Inlined into both client and server bundles at build time; /api/health
+  // reports it so an already-open tab can tell it is running an old build.
+  env: { NEXT_PUBLIC_BUILD_ID: String(Date.now()) },
   async headers() {
     return [
       {

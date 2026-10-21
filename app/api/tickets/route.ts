@@ -65,6 +65,8 @@ export async function POST(request: Request) {
   const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const downPayment = num(b.downPayment);
+  // How the opening DP was paid (cash by default).
+  const dpMethod = str(b.paymentMethod).trim().slice(0, 40) || "Tunai";
 
   // Server-assigned id: the previous client-side "tickets.length + 17"
   // scheme let two sessions compute the same id and silently overwrite
@@ -103,6 +105,7 @@ export async function POST(request: Request) {
             address: str(b.address, "-"),
             paymentTermDays: num(b.paymentTermDays),
             warrantyOf: warrantyOf || null,
+            paymentMethod: downPayment > 0 ? dpMethod : null,
             receivedAt: localDate,
             // Real intake time. Left null, the edit form showed a made-up
             // "09:00" default and saving any edit wrote that fiction in.
@@ -118,7 +121,7 @@ export async function POST(request: Request) {
                   id: randomUUID(),
                   ticketId: ticket.id,
                   amount: downPayment,
-                  method: "Tunai",
+                  method: dpMethod,
                   note: `DP awal saat servis ${ticket.id} diterima`,
                   createdBy: session.id,
                 },

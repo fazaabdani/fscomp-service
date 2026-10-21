@@ -816,6 +816,7 @@ export default function ServiceDesk() {
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  const [newVersion, setNewVersion] = useState(false);
   // The original ticket when the intake form is opened as a warranty claim.
   const [warrantyClaim, setWarrantyClaim] = useState<Ticket | null>(null);
   const [notifications, setNotifications] = useState<
@@ -953,6 +954,28 @@ export default function ServiceDesk() {
         setServerReady(false);
         setServerOnline(false);
       });
+  }, []);
+  // An open tab keeps running the JS it loaded; after a deploy staff would
+  // keep seeing the old screens (and missing new fields) until a manual
+  // reload. Compare our build id with the server's and offer a reload.
+  useEffect(() => {
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+    if (!mine) return;
+    const check = async () => {
+      try {
+        const r = await fetch("/api/health", { cache: "no-store" });
+        const j = await r.json();
+        if (j?.build && j.build !== mine) setNewVersion(true);
+      } catch {
+        /* offline: the connection banner already covers it */
+      }
+    };
+    const id = setInterval(check, 60_000);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", check);
+    };
   }, []);
   useEffect(() => {
     const load = () =>
@@ -1452,6 +1475,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           category: String(form.get("category")),
           address: String(form.get("address") || "-"),
           paymentTermDays: Number(form.get("paymentTermDays") || 0),
+          paymentMethod: String(form.get("paymentMethod") || "Tunai"),
           ...(warrantyClaim ? { warrantyOf: warrantyClaim.id } : {}),
         }),
       });
@@ -1598,6 +1622,14 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
 
   return (
     <div className="serviceApp">
+      {newVersion && (
+        <div className="versionBanner">
+          <span>Ada versi baru aplikasi. Selesaikan input yang sedang dikerjakan, lalu muat ulang agar fitur terbaru aktif.</span>
+          <button type="button" onClick={() => window.location.reload()}>
+            Muat ulang sekarang
+          </button>
+        </div>
+      )}
       {!serverOnline && (
         <div className="offlineBanner" role="alert">
           <ShieldCheck size={16} />
@@ -1811,12 +1843,12 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           ) : active === "Status Pembayaran" ? (
             <PaymentsPanel
               tickets={tickets}
-              onSettle={(t) =>
+              onSettle={(t, method) =>
                 patchTicket(
                   t.id,
                   {
                     downPayment: finalPrice(t),
-                    paymentMethod: t.paymentMethod || "Tunai",
+                    paymentMethod: method,
                   },
                   `Pembayaran ${t.id} telah lunas`,
                 )
@@ -2286,6 +2318,16 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   />
                 </label>
                 <label>
+                  Cara bayar DP
+                  <select name="paymentMethod" defaultValue="Tunai">
+                    {paymentMethods
+                      .filter((m) => m !== "Tempo")
+                      .map((m) => (
+                        <option key={m}>{m}</option>
+                      ))}
+                  </select>
+                </label>
+                <label>
                   Tempo pembayaran
                   <select name="paymentTermDays">
                     <option value="0">Tidak ada</option>
@@ -2540,6 +2582,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   ))}
                 </div>
               </div>
+              {currentUser?.role === "ADMIN" && (
+                <PaymentHistory ticketId={selected.id} version={selected.version ?? 0} />
+              )}
               </div>
               <div className="detailCol">
               <div className="serviceControls">
@@ -2609,6 +2654,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 </label>
                 <label>
                   Cara pembayaran
+                  <span className="fieldHintInline">dipakai untuk pembayaran berikutnya</span>
                   <select
                     value={selected.paymentMethod || "Tunai"}
                     onChange={(e) =>
@@ -2896,6 +2942,50 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+// Admin-only view of the payment ledger for one ticket (the API refuses
+// technicians): when, how much, and by which method each payment came in.
+function PaymentHistory({ ticketId, version }: { ticketId: string; version: number }) {
+  const [rows, setRows] = useState<
+    { id: string; amount: number; method: string; note: string | null; createdAt: string }[] | null
+  >(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/payments?ticketId=${encodeURIComponent(ticketId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled) setRows(d?.payments ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketId, version]);
+  if (!rows || rows.length === 0) return null;
+  const total = rows.reduce((a, p) => a + p.amount, 0);
+  return (
+    <div className="payHistory">
+      <h4>Riwayat pembayaran</h4>
+      <ul>
+        {[...rows].reverse().map((p) => (
+          <li key={p.id}>
+            <span>
+              {new Date(p.createdAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <b className={p.amount < 0 ? "neg" : ""}>{money(p.amount)}</b>
+            <em>{p.method}</em>
+          </li>
+        ))}
+      </ul>
+      <div>
+        <span>Total diterima</span>
+        <b>{money(total)}</b>
+      </div>
     </div>
   );
 }
@@ -3448,9 +3538,10 @@ function PaymentsPanel({
   onOpen,
 }: {
   tickets: Ticket[];
-  onSettle: (ticket: Ticket) => void;
+  onSettle: (ticket: Ticket, method: string) => void;
   onOpen: (ticket: Ticket) => void;
 }) {
+  const [methods, setMethods] = useState<Record<string, string>>({});
   const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas" | "Dalam Proses">("Semua");
   // Money is only *owed* once the work is done. An open job's estimate is
   // a forecast, not a receivable — mixing them inflated "Sisa Piutang" with
@@ -3577,12 +3668,30 @@ function PaymentsPanel({
                       DP melebihi biaya
                     </small>
                   ) : (
-                    <button
-                      className="settleButton"
-                      onClick={() => onSettle(t)}
-                    >
-                      Pelunasan
-                    </button>
+                    <span className="settleBox">
+                      <select
+                        aria-label="Cara pembayaran"
+                        value={methods[t.id] ?? (t.paymentMethod && t.paymentMethod !== "Tempo" ? t.paymentMethod : "Tunai")}
+                        onChange={(e) => setMethods((old) => ({ ...old, [t.id]: e.target.value }))}
+                      >
+                        {paymentMethods
+                          .filter((m) => m !== "Tempo")
+                          .map((m) => (
+                            <option key={m}>{m}</option>
+                          ))}
+                      </select>
+                      <button
+                        className="settleButton"
+                        onClick={() =>
+                          onSettle(
+                            t,
+                            methods[t.id] ?? (t.paymentMethod && t.paymentMethod !== "Tempo" ? t.paymentMethod : "Tunai"),
+                          )
+                        }
+                      >
+                        Pelunasan
+                      </button>
+                    </span>
                   )}
                 </span>
               </div>
