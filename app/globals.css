@@ -6574,30 +6574,41 @@ textarea {
   cursor: pointer;
 }
 
-.versionBanner {
+.versionPill {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 200;
+  right: 18px;
+  bottom: 18px;
+  z-index: 90;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 9px 16px;
+  gap: 10px;
+  padding: 7px 8px 7px 14px;
+  border: 1px solid #cfd9f7;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(20, 30, 70, 0.16);
+  color: #44526b;
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.versionPill button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
   background: #1d4fd8;
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
-.versionBanner button {
-  padding: 5px 14px;
-  border: 0;
-  border-radius: 8px;
-  background: #fff;
-  color: #1d4fd8;
+  font: inherit;
   font-weight: 800;
   cursor: pointer;
+}
+.versionPill button.versionClose {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: #eef1f6;
+  color: #7a869b;
+  font-size: 16px;
+  line-height: 1;
 }
 .fieldHintInline {
   display: block;

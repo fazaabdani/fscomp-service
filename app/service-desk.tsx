@@ -817,6 +817,7 @@ export default function ServiceDesk() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const [newVersion, setNewVersion] = useState(false);
+  const [versionDismissed, setVersionDismissed] = useState(false);
   // The original ticket when the intake form is opened as a warranty claim.
   const [warrantyClaim, setWarrantyClaim] = useState<Ticket | null>(null);
   const [notifications, setNotifications] = useState<
@@ -862,6 +863,10 @@ export default function ServiceDesk() {
   // began before one can tell its (now stale) response shouldn't be applied.
   const pendingWrites = useRef(0);
   const writeEpoch = useRef(0);
+  // True when reloading would not interrupt anything (no open modal/form, no
+  // save in flight). Kept in a ref so the version-check listeners can read it.
+  const idleRef = useRef(true);
+  idleRef.current = modal === null && !pwOpen && pendingWrites.current === 0;
   const [serverReady, setServerReady] = useState(false);
   // Distinct from serverReady (which only reflects the initial load): this
   // tracks live reachability so a banner can warn the operator the moment a
@@ -961,20 +966,30 @@ export default function ServiceDesk() {
   useEffect(() => {
     const mine = process.env.NEXT_PUBLIC_BUILD_ID;
     if (!mine) return;
-    const check = async () => {
+    const check = async (comingBack = false) => {
       try {
         const r = await fetch("/api/health", { cache: "no-store" });
         const j = await r.json();
-        if (j?.build && j.build !== mine) setNewVersion(true);
+        if (j?.build && j.build !== mine) {
+          // Coming back to the tab while nothing is being edited: just load
+          // the new version quietly instead of nagging.
+          if (comingBack && idleRef.current) window.location.reload();
+          else setNewVersion(true);
+        }
       } catch {
         /* offline: the connection banner already covers it */
       }
     };
-    const id = setInterval(check, 60_000);
-    window.addEventListener("focus", check);
+    const id = setInterval(() => check(false), 5 * 60_000);
+    const onVisible = () => {
+      if (!document.hidden) check(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
     return () => {
       clearInterval(id);
-      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, []);
   useEffect(() => {
@@ -1622,11 +1637,14 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
 
   return (
     <div className="serviceApp">
-      {newVersion && (
-        <div className="versionBanner">
-          <span>Ada versi baru aplikasi. Selesaikan input yang sedang dikerjakan, lalu muat ulang agar fitur terbaru aktif.</span>
+      {newVersion && !versionDismissed && (
+        <div className="versionPill" role="status">
+          <span>Versi baru tersedia</span>
           <button type="button" onClick={() => window.location.reload()}>
-            Muat ulang sekarang
+            Muat ulang
+          </button>
+          <button type="button" className="versionClose" aria-label="Nanti saja" onClick={() => setVersionDismissed(true)}>
+            ×
           </button>
         </div>
       )}
