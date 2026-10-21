@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { normalizePhone } from "@/lib/phone";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
-import { monthlyDaily, technicianMonthly, monthsPresent, handledDate, recognized } from "@/lib/reports";
+import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
 import {
   buildXls,
   fmtBarang,
@@ -1274,13 +1274,6 @@ export default function ServiceDesk() {
   const stats = {
     process: tickets.filter((t) => processStatuses.includes(t.status)).length,
     ready: tickets.filter((t) => t.status === "Bisa Diambil").length,
-    // Count real customer records, not distinct raw phone strings on
-    // tickets — "0812…" and "62812…" for one person counted as two.
-    customers: customers.length,
-    // Money actually received for collected units (same rule as the reports).
-    revenue: tickets
-      .filter((t) => t.status === "Sudah Diambil")
-      .reduce((a, t) => a + recognized(t).revenue, 0),
   };
 
   function notify(message: string) {
@@ -2109,69 +2102,6 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             <TechnicianReport tickets={tickets} shopName={shop.name} />
           ) : (
             <>
-              <section className="welcomeCard">
-                <div>
-                  <span className="miniTag">
-                    <Smartphone size={14} /> Service Command Center
-                  </span>
-                  <h2>Selamat datang, {currentUser?.name?.split(" ")[0] || "kembali"}.</h2>
-                  <p>
-                    Pantau setiap perangkat dari meja penerimaan sampai kembali
-                    ke tangan pelanggan.
-                  </p>
-                </div>
-                <div className="orb">
-                  <Wrench size={44} />
-                </div>
-              </section>
-              <div className={`serviceStats${currentUser?.role === "ADMIN" ? "" : " threeCards"}`}>
-                <article>
-                  <span className="statIcon blue">
-                    <Wrench />
-                  </span>
-                  <div>
-                    <small>Sedang diproses</small>
-                    <strong>{stats.process}</strong>
-                    <em>Unit aktif</em>
-                  </div>
-                </article>
-                <article>
-                  <span className="statIcon green">
-                    <PackageCheck />
-                  </span>
-                  <div>
-                    <small>Siap diambil</small>
-                    <strong>{stats.ready}</strong>
-                    <em>Menunggu pelanggan</em>
-                  </div>
-                </article>
-                <article>
-                  <span className="statIcon purple">
-                    <Users />
-                  </span>
-                  <div>
-                    <small>Total pelanggan</small>
-                    <strong>{stats.customers}</strong>
-                    <em>Terdaftar di sistem</em>
-                  </div>
-                </article>
-                {/* Shop revenue is owner-level info; staff don't see it. */}
-                {currentUser?.role === "ADMIN" && (
-                  <article>
-                    <span className="statIcon orange">
-                      <CircleDollarSign />
-                    </span>
-                    <div>
-                      <small>Pendapatan selesai</small>
-                      <strong className="moneyStat">
-                        {money(stats.revenue)}
-                      </strong>
-                      <em>Akumulasi layanan</em>
-                    </div>
-                  </article>
-                )}
-              </div>
-
               <section className="ticketPanel">
                 <div className="panelTop">
                   <div>
