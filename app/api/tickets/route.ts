@@ -39,9 +39,9 @@ export async function POST(request: Request) {
   const customer = str(b.customer).trim();
   const phone = str(b.phone).replace(/\D/g, "");
   const device = str(b.device).trim();
-  const brand = str(b.brand).trim();
+  const brand = str(b.brand).trim(); // optional: the single "Nama barang" field carries the full name
   const issue = str(b.issue).trim();
-  if (!customer || phone.length < 9 || phone.length > 15 || !device || !brand || !issue)
+  if (!customer || phone.length < 9 || phone.length > 15 || !device || !issue)
     return NextResponse.json(
       { error: "Data servis tidak lengkap atau nomor WhatsApp tidak valid" },
       { status: 400 },
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
   const downPayment = num(b.downPayment);
   // How the opening DP was paid (cash by default).
-  const dpMethod = str(b.paymentMethod).trim().slice(0, 40) || "Tunai";
+  const dpMethod = str(b.paymentMethod).trim().slice(0, 40) || "Tunai - Cash";
 
   // Server-assigned id: the previous client-side "tickets.length + 17"
   // scheme let two sessions compute the same id and silently overwrite
@@ -78,9 +78,12 @@ export async function POST(request: Request) {
   // then fired a separate unawaited payment request, and a failed/lost
   // second request left the ledger short of the ticket's recorded DP.
   let result: { ticket: Ticket; payment: Payment | null } | null = null;
-  for (let attempt = 0; attempt < 5 && !result; attempt++) {
-    const seq = (Date.now() % 100000) + attempt;
-    const id = `SRV-${datePart}-${String(seq).padStart(5, "0")}`;
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  for (let attempt = 0; attempt < 30 && !result; attempt++) {
+    // Same scheme as the old app: YYMMDD + HHMMSS of the moment of intake. Two
+    // tickets in the same second get the next free second.
+    const at = new Date(now.getTime() + attempt * 1000);
+    const id = `SRV-${datePart}-${pad2(at.getHours())}${pad2(at.getMinutes())}${pad2(at.getSeconds())}`;
     try {
       result = await prisma.$transaction(async (tx) => {
         const ticket = await tx.ticket.create({
@@ -94,6 +97,7 @@ export async function POST(request: Request) {
             issue,
             accessories: str(b.accessories, "Unit only").trim() || "Unit only",
             technician: str(b.technician),
+            receivedBy: str(b.receivedBy).trim() || session.name,
             status: "Belum Cek",
             estimate: num(b.estimate),
             downPayment,

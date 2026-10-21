@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         name,
         category: String(b.category || "User"),
         phone,
-        phoneNormalized: normalizePhone(phone),
+        phoneNormalized: normalizePhone(phone) || null,
         address: String(b.address || "-").trim() || "-",
         rating: Number.isFinite(b.rating) ? Math.round(b.rating) : 0,
         createdAt: typeof b.createdAt === "string" ? b.createdAt : localDate,

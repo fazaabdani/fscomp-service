@@ -3,6 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { normalizePhone } from "@/lib/phone";
+import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
+import { monthlyDaily, technicianMonthly, monthsPresent, handledDate, recognized } from "@/lib/reports";
+import {
+  buildXls,
+  fmtBarang,
+  fmtKali,
+  fmtRp,
+  fmtTelp,
+  fmtTgl,
+  fmtTglPanjang,
+  fmtTglSingkat,
+  fmtWa,
+  monthName,
+  xlsFileName,
+} from "@/lib/export-xls";
 import { finalPrice, isFullyPaid } from "@/lib/ticket-money";
 import {
   WA_TEMPLATE_DEFAULTS,
@@ -111,6 +126,7 @@ type Ticket = {
   notes?: string;
   partCost?: number;
   warrantyOf?: string | null;
+  receivedBy?: string | null;
   pickupBy?: string;
   handedBy?: string;
   version?: number;
@@ -397,23 +413,116 @@ const ageTone = (days: number) =>
 // the UTC date and drifts a day off in Asia/Jakarta between 00:00-06:59 WIB.
 const localDateStr = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-// A scanned/pasted tracking URL or label text should find the ticket just
-// like the bare number does (USB QR scanners type the whole URL).
-const extractServiceCode = (v: string) => v.match(/SRV-\d{6}-\d+/i)?.[0]?.toUpperCase() ?? null;
-const warrantyDaysLeft = (t: { warrantyDays?: number; pickedUpAt?: string; updatedAt: string }) =>
-  (t.warrantyDays || 0) -
-  Math.floor((Date.now() - new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`).getTime()) / 86400000);
-const paymentMethods = ["Tunai", "Transfer BCA", "Transfer BRI", "Transfer Mandiri", "QRIS", "Tempo"];
+// Payment methods and warranty periods exactly as the old app offered them,
+// so history imported from it and new entries read the same.
+const paymentMethods = [
+  "Tunai - Cash",
+  "Transfer QRIS",
+  "Transfer BCA",
+  "Transfer BRI",
+  "Transfer Bank Mandiri",
+  "Transfer DANA",
+  "Transfer BSI",
+];
+const tempoMethods = [
+  "Tempo 1 Hari",
+  "Tempo 2 Hari",
+  "Tempo 3 Hari",
+  "Tempo 1 Minggu",
+  "Tempo 2 Minggu",
+  "Tempo 1 Bulan",
+  "Tempo 3 Bulan",
+];
+const isTempoMethod = (m?: string | null) => /^Tempo\b/i.test(m || "");
+/** Payment term in days encoded in a "Tempo 1 Minggu" style label (0 when not a tempo). */
+const tempoDays = (m?: string | null) => {
+  const x = (m || "").match(/^Tempo\s+(\d+)\s+(Hari|Minggu|Bulan)/i);
+  if (!x) return 0;
+  return Number(x[1]) * ({ hari: 1, minggu: 7, bulan: 30 } as Record<string, number>)[x[2].toLowerCase()];
+};
 const warrantyOptions: [number, string][] = [
   [0, "Tidak ada"],
+  [1, "1 Hari"],
   [3, "3 Hari"],
   [7, "1 Minggu"],
   [14, "2 Minggu"],
+  [21, "3 Minggu"],
   [30, "1 Bulan"],
   [60, "2 Bulan"],
   [90, "3 Bulan"],
+  [150, "5 Bulan"],
+  [180, "6 Bulan"],
+  [365, "1 Tahun"],
+  [1825, "5 Tahun"],
 ];
+// Calendar months/years in the old app resulted in 28-31 / 181-184 day spans; map
+// any stored day count back to the option it came from.
+const warrantyCanon = (days: number) => {
+  const ranges: [number, number, number][] = [
+    [28, 31, 30],
+    [59, 62, 60],
+    [88, 92, 90],
+    [148, 156, 150],
+    [178, 186, 180],
+    [364, 366, 365],
+    [1824, 1827, 1825],
+  ];
+  const hit = ranges.find(([lo, hi]) => days >= lo && days <= hi);
+  return hit ? hit[2] : days;
+};
+const warrantyLabel = (days?: number | null) => {
+  const d = warrantyCanon(days || 0);
+  return warrantyOptions.find(([v]) => v === d)?.[1] ?? `${d} Hari`;
+};
+const warrantyDaysLeft = (t: { warrantyDays?: number; pickedUpAt?: string; updatedAt: string }) =>
+  (t.warrantyDays || 0) -
+  Math.floor((Date.now() - new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`).getTime()) / 86400000);
+/** ISO date a warranty ends (pickup date + warranty days). */
+const warrantyEndDate = (t: { warrantyDays?: number; pickedUpAt?: string; updatedAt: string }) => {
+  const d = new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`);
+  d.setDate(d.getDate() + (t.warrantyDays || 0));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+// Options for a person select: everyone on the staff list plus the value
+// already stored (imported history names people who may have no account).
+const nameOptions = (staffNames: string[], current?: string | null) =>
+  Array.from(new Set([...staffNames, ...(current ? [current] : [])]));
 const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
+function downloadXls(title: string, shopName: string, headers: string[], rows: (string | number)[][], footers?: (string | number)[][]) {
+  const blob = new Blob(["\ufeff", buildXls(headers, rows, footers)], { type: "application/vnd.ms-excel" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = xlsFileName(title, shopName);
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+const itemName = (t: { device: string; brand?: string }) =>
+  t.brand && !t.device.toLowerCase().includes(t.brand.toLowerCase()) ? `${t.device} ${t.brand}` : t.device;
+const PAGE_SIZE = 50;
+// The old database has ~1,300 finished jobs; rendering them all at once makes
+// every screen sluggish, so long lists are paged.
+function Pager({ total, page, onPage }: { total: number; page: number; onPage: (p: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (total <= PAGE_SIZE) return null;
+  return (
+    <div className="pager">
+      <span>
+        Menampilkan {(page - 1) * PAGE_SIZE + 1}–{Math.min(total, page * PAGE_SIZE)} dari {total}
+      </span>
+      <div>
+        <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          Sebelumnya
+        </button>
+        <b>
+          Hal. {page} / {pages}
+        </b>
+        <button type="button" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+          Berikutnya
+        </button>
+      </div>
+    </div>
+  );
+}
 function accessoryItems(value: string) {
   return value
     .split(/[,+;\n]/)
@@ -775,7 +884,7 @@ function PaidNotaBody({
                 <>
                   <li>
                     <ShieldCheck size={10} />
-                    <span>{ticket.warrantyDays} hari sejak tanggal pengambilan</span>
+                    <span>{warrantyLabel(ticket.warrantyDays)} sejak tanggal pengambilan</span>
                   </li>
                   <li>
                     <ShieldCheck size={10} />
@@ -824,6 +933,7 @@ export default function ServiceDesk() {
   const [pwOpen, setPwOpen] = useState(false);
   const [newVersion, setNewVersion] = useState(false);
   const [versionDismissed, setVersionDismissed] = useState(false);
+  const [listPage, setListPage] = useState(1);
   // The original ticket when the intake form is opened as a warranty claim.
   const [warrantyClaim, setWarrantyClaim] = useState<Ticket | null>(null);
   const [notifications, setNotifications] = useState<
@@ -1118,11 +1228,16 @@ export default function ServiceDesk() {
   }, [modal]);
 
   const visible = useMemo(
-    () =>
-      tickets.filter((t) => {
-        const matches = `${t.id} ${t.customer} ${t.device} ${t.issue}`
+    () => {
+      // A scanned/pasted tracking link or an old-style "#260820104141" resolves
+      // to the ticket's id — but only when such a ticket exists, so a phone
+      // number that happens to look like a code still searches as a phone.
+      const code = extractServiceCode(query);
+      const needle = (code && tickets.some((t) => t.id === code) ? code : query).toLowerCase();
+      return tickets.filter((t) => {
+        const matches = `${t.id} ${oldStyleNumber(t.id)} ${t.customer} ${t.phone} ${t.device} ${t.brand || ""} ${t.serial} ${t.issue} ${t.serviceAction || ""}`
           .toLowerCase()
-          .includes((extractServiceCode(query) ?? query).toLowerCase());
+          .includes(needle);
         const statusMatch = filter === "Semua" || t.status === filter;
         const sectionMatch =
           active === "Bisa Diambil"
@@ -1136,9 +1251,25 @@ export default function ServiceDesk() {
                 : true;
         const technicianMatch = technicianFilter === "Semua Teknisi" || t.technician === technicianFilter;
         return matches && statusMatch && sectionMatch && technicianMatch;
-      }),
+      }).sort((a, b) => {
+        // Newest first by the date that matters for the section: when a unit was
+        // collected / finished, otherwise when it came in.
+        const key = (t: Ticket) =>
+          active === "Sudah Diambil"
+            ? `${t.pickedUpAt || t.receivedAt} ${t.pickedUpTime || "00:00"}`
+            : active === "Bisa Diambil"
+              ? `${t.handledAt || t.receivedAt} ${t.handledTime || "00:00"}`
+              : `${t.receivedAt} ${t.receivedTime || "00:00"}`;
+        return key(b).localeCompare(key(a)) || b.id.localeCompare(a.id);
+      });
+    },
     [tickets, query, filter, active, technicianFilter],
   );
+
+  // Back to the first page whenever the list is narrowed or switched.
+  useEffect(() => {
+    setListPage(1);
+  }, [query, filter, active, technicianFilter]);
 
   const stats = {
     process: tickets.filter((t) => processStatuses.includes(t.status)).length,
@@ -1146,9 +1277,10 @@ export default function ServiceDesk() {
     // Count real customer records, not distinct raw phone strings on
     // tickets — "0812…" and "62812…" for one person counted as two.
     customers: customers.length,
+    // Money actually received for collected units (same rule as the reports).
     revenue: tickets
       .filter((t) => t.status === "Sudah Diambil")
-      .reduce((a, t) => a + finalPrice(t), 0),
+      .reduce((a, t) => a + recognized(t).revenue, 0),
   };
 
   function notify(message: string) {
@@ -1234,9 +1366,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       )
         return;
     }
+    const nowHm = new Date().toTimeString().slice(0, 5);
     const patch: Partial<Ticket> = {
       status,
       statusChangedAt: localDateStr(),
+      // Finishing the job stamps when it was handled and by whom (the old
+      // app's "Tgl. Selesai Ditangani" / "Teknisi") unless already set.
+      ...((status === "Bisa Diambil" || status === "Sudah Diambil") && before && !before.handledAt
+        ? { handledAt: localDateStr(), handledTime: nowHm }
+        : {}),
+      ...((status === "Bisa Diambil" || status === "Sudah Diambil") && before && !before.technician && currentUser?.name
+        ? { technician: currentUser.name }
+        : {}),
       // Stamp the pickup date the first time a ticket reaches "Sudah
       // Diambil" via this quick dropdown, since that's the everyday
       // path (not the rarely-used edit form) and warranty countdown
@@ -1325,7 +1466,6 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       customer: String(form.get("customer")),
       phone: String(form.get("phone")).replace(/\D/g, ""),
       device: String(form.get("device")),
-      brand: String(form.get("brand")),
       serial: String(form.get("serial") || "-"),
       accessories: String(form.get("accessories") || "Unit only"),
       issue: String(form.get("issue")),
@@ -1343,7 +1483,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       notes: String(form.get("notes") || ""),
       pickedUpAt: String(form.get("pickedUpAt") || ""),
       pickedUpTime: String(form.get("pickedUpTime") || ""),
-      paymentMethod: String(form.get("paymentMethod") || "Tunai"),
+      paymentMethod: String(form.get("paymentMethod") || "Tunai - Cash"),
       warrantyDays: Number(form.get("warrantyDays") || 0),
       pickupBy: String(form.get("pickupBy") || ""),
       handedBy: String(form.get("handedBy") || currentUser?.name || "Admin"),
@@ -1489,17 +1629,17 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           customer: String(form.get("customer")),
           phone,
           device: String(form.get("device")),
-          brand: String(form.get("brand")),
           serial,
           issue: String(form.get("issue")),
           accessories: String(form.get("accessories") || "Unit only"),
-          technician: String(form.get("technician")),
+          receivedBy: String(form.get("receivedBy") || ""),
           estimate: Number(form.get("estimate") || 0),
           downPayment: Number(form.get("downPayment") || 0),
           category: String(form.get("category")),
           address: String(form.get("address") || "-"),
           paymentTermDays: Number(form.get("paymentTermDays") || 0),
-          paymentMethod: String(form.get("paymentMethod") || "Tunai"),
+          paymentMethod: String(form.get("paymentMethod") || "Tunai - Cash"),
+      ...(isTempoMethod(String(form.get("paymentMethod"))) ? { paymentTermDays: tempoDays(String(form.get("paymentMethod"))) } : {}),
           ...(warrantyClaim ? { warrantyOf: warrantyClaim.id } : {}),
         }),
       });
@@ -1540,44 +1680,46 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       if (cRes.ok && cData?.customer) setCustomers((old) => [cData.customer, ...old]);
     }
   }
-  function exportCsv() {
-    const head = [
-      "No Servis",
-      "Pelanggan",
-      "Telepon",
-      "Perangkat",
-      "Keluhan",
-      "Teknisi",
-      "Status",
-      "Estimasi",
-      "DP",
-      "Tanggal",
+  function exportXls() {
+    const admin = currentUser?.role === "ADMIN";
+    const section = active === "Bisa Diambil" ? "Bisa Diambil" : active === "Sudah Diambil" ? "Sudah Diambil" : "Proses Servis";
+    const base = (t: Ticket) => [
+      oldStyleNumber(t.id),
+      fmtTgl(t.receivedAt, t.receivedTime),
     ];
-    const rows = visible.map((t) => [
-      t.id,
-      t.customer,
-      t.phone,
-      t.device,
-      t.issue,
-      t.technician,
-      t.status,
-      t.estimate,
-      t.downPayment,
-      t.receivedAt,
-    ]);
-    const csv = [head, ...rows]
-      .map((r) =>
-        r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
-      )
-      .join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `laporan-servis-${localDateStr()}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    notify(
-      `${rows.length} servis diunduh sesuai filter yang aktif saat ini`,
-    );
+    const who = (t: Ticket) => [t.customer, fmtTelp(t.phone), fmtWa(t.phone), itemName(t), t.serial && t.serial !== "-" ? t.serial : ""];
+    const dp = (t: Ticket) => (t.downPayment > 0 ? fmtRp(t.downPayment) : "");
+    let headers: string[];
+    let rows: (string | number)[][];
+    if (section === "Proses Servis") {
+      headers = ["No", "No. Servis", "Tgl. Terima", "Penerima", "Pemilik", "Telepon", "WhatsApp", "Nama Barang", "Nomor Serial", "Kelengkapan", "Kerusakan", "DP", "Status", "Lama"];
+      rows = visible.map((t, i) => {
+        const [id, rec] = base(t);
+        const [name, tel, wa, item, serial] = who(t);
+        return [i + 1, id, rec, t.receivedBy || "", name, tel, wa, item, serial, t.accessories === "Unit only" ? "" : t.accessories, t.issue, dp(t), t.status, `${ageDays(t.receivedAt)} Hari`];
+      });
+    } else if (section === "Bisa Diambil") {
+      headers = ["No", "No. Servis", "Tgl. Terima", "Pemilik", "Telepon", "WhatsApp", "Nama Barang", "Nomor Serial", "Kerusakan", "Kondisi", "Ket./Tindakan", "Teknisi", "DP", "Biaya", "Tgl. Selesai Ditangani", "Status"];
+      rows = visible.map((t, i) => {
+        const [id, rec] = base(t);
+        const [name, tel, wa, item, serial] = who(t);
+        return [i + 1, id, rec, name, tel, wa, item, serial, t.issue, t.condition || "", t.serviceAction || "", t.technician || "", dp(t), fmtRp(finalPrice(t)), fmtTgl(t.handledAt, t.handledTime), t.status];
+      });
+    } else {
+      headers = ["No", "No. Servis", "Tgl. Terima", "Pemilik", "Telepon", "WhatsApp", "Nama Barang", "Nomor Serial", "Kerusakan", "Kondisi", "Ket./Tindakan", "Teknisi", "Biaya", ...(admin ? ["Modal", "Profit"] : []), "Status", "Tgl. Ambil", "Garansi"];
+      rows = visible.map((t, i) => {
+        const [id, rec] = base(t);
+        const [name, tel, wa, item, serial] = who(t);
+        const rev = finalPrice(t);
+        return [
+          i + 1, id, rec, name, tel, wa, item, serial, t.issue, t.condition || "", t.serviceAction || "", t.technician || "", fmtRp(rev),
+          ...(admin ? [fmtRp(t.partCost || 0), fmtRp(rev - (t.partCost || 0))] : []),
+          t.status, fmtTgl(t.pickedUpAt, t.pickedUpTime), t.warrantyDays ? warrantyLabel(t.warrantyDays) : "Tidak Ada",
+        ];
+      });
+    }
+    downloadXls(section, shop.name, headers, rows);
+    notify(`${rows.length} servis diunduh sesuai filter yang aktif saat ini`);
   }
   async function startScanner() {
     setModal("scan");
@@ -1809,6 +1951,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         <main className="serviceContent">
           {active === "Pelanggan" ? (
             <CustomersPanel
+              shopName={shop.name}
               tickets={tickets}
               customers={customers}
               isAdmin={currentUser?.role === "ADMIN"}
@@ -1869,6 +2012,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             />
           ) : active === "Status Pembayaran" ? (
             <PaymentsPanel
+              shopName={shop.name}
               tickets={tickets}
               onSettle={(t, method) =>
                 patchTicket(
@@ -1958,11 +2102,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               }}
             />
           ) : active === "Status Garansi" ? (
-            <WarrantyPanel tickets={tickets} onOpen={openDetail} onClaim={startWarrantyClaim} />
+            <WarrantyPanel tickets={tickets} onOpen={openDetail} onClaim={startWarrantyClaim} shopName={shop.name} />
           ) : active === "Laporan Servis" ? (
-            <ServiceReport tickets={tickets} />
+            <ServiceReport tickets={tickets} shopName={shop.name} />
           ) : active === "Laporan Teknisi" ? (
-            <TechnicianReport tickets={tickets} staff={staff} />
+            <TechnicianReport tickets={tickets} shopName={shop.name} />
           ) : (
             <>
               <section className="welcomeCard">
@@ -2063,13 +2207,13 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                       }}
                     >
                       <option>Semua Teknisi</option>
-                      {staff.map((person) => <option key={person.id}>{person.name}</option>)}
+                      {nameOptions([...staff.map((p) => p.name), ...Array.from(new Set(tickets.map((t) => t.technician).filter(Boolean)))]).map((n) => <option key={n}>{n}</option>)}
                     </select>
                     <button className="copyWorkList" onClick={copyServiceList}>
                       <Copy size={17} />
                       <span>Copy WA {selectedJobs.size ? `(${selectedJobs.size})` : ""}</span>
                     </button>
-                    <button onClick={exportCsv}>
+                    <button onClick={exportXls}>
                       <Download size={17} />
                       <span>Export</span>
                     </button>
@@ -2097,7 +2241,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     <span>Biaya</span>
                     <span />
                   </div>
-                  {visible.map((t) => {
+                  {visible.slice((listPage - 1) * PAGE_SIZE, listPage * PAGE_SIZE).map((t) => {
                     const days = ageDays(t.receivedAt);
                     return (
                       <div
@@ -2153,9 +2297,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         </span>
                         <span>
                           <span className="avatarMini">
-                            {t.technician.slice(0, 2).toUpperCase()}
+                            {(t.technician || "?").slice(0, 2).toUpperCase()}
                           </span>
-                          {t.technician}
+                          {t.technician || "—"}
                         </span>
                         <span>
                           <i className={`statusBadge ${tone(t.status)}`}>
@@ -2184,6 +2328,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     </div>
                   )}
                 </div>
+                <Pager total={visible.length} page={listPage} onPage={setListPage} />
               </section>
             </>
           )}
@@ -2282,21 +2427,12 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <input name="address" defaultValue={warrantyClaim?.address && warrantyClaim.address !== "-" ? warrantyClaim.address : ""} placeholder="Desa / kecamatan / kota" />
                 </label>
                 <label>
-                  Jenis / model barang
+                  Nama barang
                   <input
                     name="device"
                     required
-                    defaultValue={warrantyClaim?.device ?? ""}
-                    placeholder="Contoh: Laptop ThinkPad T14"
-                  />
-                </label>
-                <label>
-                  Merek
-                  <input
-                    name="brand"
-                    required
-                    defaultValue={warrantyClaim?.brand ?? ""}
-                    placeholder="Lenovo, ASUS, Epson..."
+                    defaultValue={warrantyClaim ? `${warrantyClaim.device}${warrantyClaim.brand ? ` ${warrantyClaim.brand}` : ""}` : ""}
+                    placeholder="Contoh: Laptop Lenovo ThinkPad T14"
                   />
                 </label>
                 <label>
@@ -2327,9 +2463,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 </label>
                 <label>
                   Penerima
-                  <select name="technician" defaultValue={currentUser?.name}>
-                    {staff.map((x) => (
-                      <option key={x.id}>{x.name}</option>
+                  <select name="receivedBy" defaultValue={currentUser?.name}>
+                    {nameOptions(staff.map((x) => x.name), currentUser?.name).map((n) => (
+                      <option key={n}>{n}</option>
                     ))}
                   </select>
                 </label>
@@ -2353,12 +2489,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 </label>
                 <label>
                   Cara bayar DP
-                  <select name="paymentMethod" defaultValue="Tunai">
-                    {paymentMethods
-                      .filter((m) => m !== "Tempo")
-                      .map((m) => (
-                        <option key={m}>{m}</option>
-                      ))}
+                  <select name="paymentMethod" defaultValue="Tunai - Cash">
+                    {paymentMethods.map((m) => (
+                      <option key={m}>{m}</option>
+                    ))}
                   </select>
                 </label>
                 <label>
@@ -2708,10 +2842,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <select
                     value={selected.paymentMethod || "Tunai"}
                     onChange={(e) =>
-                      patchTicket(selected.id, { paymentMethod: e.target.value }, "Cara pembayaran diperbarui")
+                      patchTicket(
+                        selected.id,
+                        {
+                          paymentMethod: e.target.value,
+                          // "Tempo 1 Minggu" carries its own due term
+                          ...(isTempoMethod(e.target.value) ? { paymentTermDays: tempoDays(e.target.value) } : {}),
+                        },
+                        "Cara pembayaran diperbarui",
+                      )
                     }
                   >
-                    {[...paymentMethods, ...(selected.paymentMethod && !paymentMethods.includes(selected.paymentMethod) ? [selected.paymentMethod] : [])].map((m) => (
+                    {[...paymentMethods, ...tempoMethods, ...(selected.paymentMethod && ![...paymentMethods, ...tempoMethods].includes(selected.paymentMethod) ? [selected.paymentMethod] : [])].map((m) => (
                       <option key={m}>{m}</option>
                     ))}
                   </select>
@@ -2719,14 +2861,40 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>
                   Garansi servis
                   <select
-                    value={selected.warrantyDays || 0}
+                    value={warrantyCanon(selected.warrantyDays || 0)}
                     onChange={(e) =>
                       patchTicket(selected.id, { warrantyDays: Number(e.target.value) }, "Garansi diperbarui")
                     }
                   >
-                    {[...warrantyOptions, ...(warrantyOptions.some(([d]) => d === (selected.warrantyDays || 0)) ? [] : ([[selected.warrantyDays || 0, `${selected.warrantyDays} Hari`]] as [number, string][]))].map(([d, label]) => (
+                    {[...warrantyOptions, ...(warrantyOptions.some(([d]) => d === warrantyCanon(selected.warrantyDays || 0)) ? [] : ([[warrantyCanon(selected.warrantyDays || 0), warrantyLabel(selected.warrantyDays)]] as [number, string][]))].map(([d, label]) => (
                       <option key={d} value={d}>{label}</option>
                     ))}
+                  </select>
+                </label>
+                <label>
+                  Teknisi
+                  <select
+                    value={selected.technician || ""}
+                    onChange={(e) => patchTicket(selected.id, { technician: e.target.value }, "Teknisi diperbarui")}
+                  >
+                    <option value="">— belum ditentukan —</option>
+                    {nameOptions(staff.map((x) => x.name), selected.technician).map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Kondisi servis
+                  <select
+                    value={selected.condition || ""}
+                    onChange={(e) =>
+                      patchTicket(selected.id, { condition: (e.target.value || undefined) as Ticket["condition"] }, "Kondisi servis diperbarui")
+                    }
+                  >
+                    <option value="">Belum ditentukan</option>
+                    <option>Sudah Jadi</option>
+                    <option>Tidak Bisa</option>
+                    <option>Dibatalkan</option>
                   </select>
                 </label>
               </div>
@@ -2738,7 +2906,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <Printer size={17} /> Print tanda terima
                 </button>
                 {!isFullyPaid(selected) && selected.costConfirmed && (
-                  finalPrice(selected) >= selected.downPayment ? (
+                  isTempoMethod(selected.paymentMethod) ? (
+                    <span className="ghost hint" title="Pilih cara pembayaran yang dipakai untuk melunasi (bukan Tempo) di kolom Cara pembayaran">
+                      <CircleDollarSign size={17} /> Pilih cara bayar (bukan Tempo)
+                    </span>
+                  ) : finalPrice(selected) >= selected.downPayment ? (
                     <button
                       className="ghost"
                       onClick={() =>
@@ -2746,7 +2918,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           selected.id,
                           {
                             downPayment: finalPrice(selected),
-                            paymentMethod: selected.paymentMethod || "Tunai",
+                            paymentMethod: selected.paymentMethod || "Tunai - Cash",
                           },
                           `Pembayaran ${selected.id} telah lunas`,
                         )
@@ -2823,16 +2995,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="modalHead"><div><span>UBAH DATA SERVIS</span><h2>{selected.id}</h2><p>Teliti kembali data sebelum menyimpan.</p></div><button type="button" onClick={() => setModal("detail")}><X /></button></div>
               <div className="formGridService editServiceGrid">
                 <label>Tanggal terima<input name="receivedAt" type="date" required defaultValue={selected.receivedAt}/></label>
-                <label>Jam terima<input name="receivedTime" type="time" defaultValue={selected.receivedTime || "09:00"}/></label>
+                <label>Jam terima<input name="receivedTime" type="time" defaultValue={selected.receivedTime || ""}/></label>
                 <label>Nama pemilik<input name="customer" required defaultValue={selected.customer}/></label>
                 <label>Nomor WhatsApp<input name="phone" required defaultValue={selected.phone}/></label>
-                <label>Nama / model barang<input name="device" required defaultValue={selected.device}/></label>
-                <label>Merek<input name="brand" required defaultValue={selected.brand}/></label>
-                <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
+                <label>Nama barang<input name="device" required defaultValue={selected.device}/></label>
+                                <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
                 <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
                 <label className="full">Keluhan pelanggan (saat unit masuk)<textarea name="issue" required defaultValue={selected.issue}/></label>
                 <label>Kondisi servis<select name="condition" defaultValue={selected.condition || ""}><option value="">Belum ditentukan</option><option>Sudah Jadi</option><option>Tidak Bisa</option><option>Dibatalkan</option></select></label>
-                <label>Teknisi<select name="technician" defaultValue={selected.technician}>{staff.map((person) => <option key={person.id}>{person.name}</option>)}</select></label>
+                <label>Teknisi<select name="technician" defaultValue={selected.technician || ""}><option value="">— belum ditentukan —</option>{nameOptions(staff.map((p) => p.name), selected.technician).map((n) => <option key={n}>{n}</option>)}</select></label>
                 <label className="full">Tindakan teknisi<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
                 {currentUser?.role === "ADMIN" && <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>}
@@ -2843,8 +3014,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label className="full">Catatan<textarea name="notes" defaultValue={selected.notes}/></label>
                 <label>Tanggal ambil<input name="pickedUpAt" type="date" defaultValue={selected.pickedUpAt || ""}/></label>
                 <label>Jam ambil<input name="pickedUpTime" type="time" defaultValue={selected.pickedUpTime || ""}/></label>
-                <label>Cara pembayaran<select name="paymentMethod" defaultValue={selected.paymentMethod || "Tunai"}><option>Tunai</option><option>Transfer BCA</option><option>Transfer BRI</option><option>Transfer Mandiri</option><option>QRIS</option><option>Tempo</option></select></label>
-                <label>Garansi servis<select name="warrantyDays" defaultValue={selected.warrantyDays || 0}><option value="0">Tidak ada</option><option value="3">3 Hari</option><option value="7">1 Minggu</option><option value="14">2 Minggu</option><option value="30">1 Bulan</option><option value="60">2 Bulan</option><option value="90">3 Bulan</option>{![0,3,7,14,30,60,90].includes(selected.warrantyDays || 0) && <option value={selected.warrantyDays}>{selected.warrantyDays} Hari</option>}</select></label>
+                <label>Cara pembayaran<select name="paymentMethod" defaultValue={selected.paymentMethod || "Tunai - Cash"}>{[...paymentMethods, ...tempoMethods, ...(selected.paymentMethod && ![...paymentMethods, ...tempoMethods].includes(selected.paymentMethod) ? [selected.paymentMethod] : [])].map((m) => <option key={m}>{m}</option>)}</select></label>
+                <label>Garansi servis<select name="warrantyDays" defaultValue={warrantyCanon(selected.warrantyDays || 0)}>{warrantyOptions.map(([d, label]) => <option key={d} value={d}>{label}</option>)}{!warrantyOptions.some(([d]) => d === warrantyCanon(selected.warrantyDays || 0)) && <option value={selected.warrantyDays}>{warrantyLabel(selected.warrantyDays)}</option>}</select></label>
                 <label>Pengambil<input name="pickupBy" defaultValue={selected.pickupBy || selected.customer}/></label>
                 <label>Penyerah<input name="handedBy" defaultValue={selected.handedBy || currentUser?.name || "Admin"}/></label>
               </div>
@@ -3131,10 +3302,12 @@ function CustomersPanel({
   onDelete,
   onPhoneChanged,
   onOpen,
+  shopName,
 }: {
   tickets: Ticket[];
   customers: Customer[];
   isAdmin: boolean;
+  shopName: string;
   onCreate: (input: {
     name: string;
     category: Customer["category"];
@@ -3185,27 +3358,18 @@ function CustomersPanel({
     await onDelete(customer);
   }
   function exportCustomers() {
-    const rows = [
-      ["Nama", "Kategori", "Telepon", "WhatsApp", "Alamat", "Rating"],
-      ...data.map((c) => [
-        c.name,
-        c.category,
-        c.phone,
-        normalizePhone(c.phone),
-        c.address,
-        c.rating,
-      ]),
-    ];
-    const csv = rows
-      .map((r) =>
-        r.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","),
-      )
-      .join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = "daftar-pelanggan.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
+    const count = (c: Customer) => {
+      const n = normalizePhone(c.phone);
+      return tickets.filter((t) => (n ? normalizePhone(t.phone) === n : t.phone === c.phone && t.customer === c.name)).length;
+    };
+    downloadXls(
+      "Pelanggan",
+      shopName,
+      ["No", "Nama Pelanggan", "Kategori", "Telepon", "WhatsApp", "Alamat Pelanggan", "Total Servis"],
+      [...data]
+        .sort((a, b) => a.name.localeCompare(b.name, "id", { sensitivity: "base" }))
+        .map((c, i) => [i + 1, c.name, c.category, fmtTelp(c.phone), fmtWa(c.phone), c.address === "-" ? "" : c.address, count(c) ? fmtKali(count(c)) : "Belum Ada"]),
+    );
   }
   const filtered = data.filter((c) =>
     `${c.name} ${c.phone} ${c.address} ${c.category}`
@@ -3281,7 +3445,9 @@ function CustomersPanel({
           // — same class of bug already fixed for the delete guard and
           // duplicate check, just missed here.
           const cNorm = normalizePhone(c.phone);
-          const history = tickets.filter((t) => normalizePhone(t.phone) === cNorm);
+          const history = tickets.filter((t) =>
+            cNorm ? normalizePhone(t.phone) === cNorm : t.phone === c.phone && t.customer === c.name,
+          );
           const latest = history[0];
           const process = history.filter((t) =>
             processStatuses.includes(t.status),
@@ -3586,12 +3752,16 @@ function PaymentsPanel({
   tickets,
   onSettle,
   onOpen,
+  shopName,
 }: {
   tickets: Ticket[];
   onSettle: (ticket: Ticket, method: string) => void;
   onOpen: (ticket: Ticket) => void;
+  shopName: string;
 }) {
   const [methods, setMethods] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [mode, setMode] = useState<"Semua" | "Belum Lunas" | "Lunas" | "Dalam Proses">("Semua");
   // Money is only *owed* once the work is done. An open job's estimate is
   // a forecast, not a receivable — mixing them inflated "Sisa Piutang" with
@@ -3600,7 +3770,7 @@ function PaymentsPanel({
   // A cancelled job is neither billable nor owed; its DP (if any) still
   // counts as cash received below.
   const billable = tickets.filter((t) => t.status !== CANCELLED);
-  const rows = billable.filter((t) => {
+  const modeRows = billable.filter((t) => {
     // Same canonical check the paid-nota print gate uses — this panel was
     // using its own looser `downPayment >= total` (also true on an
     // overpayment, and didn't require costConfirmed when total>0), so a
@@ -3612,6 +3782,10 @@ function PaymentsPanel({
     if (mode === "Dalam Proses") return !paid && !isDone(t);
     return true;
   });
+  const q = search.trim().toLowerCase();
+  const rows = q
+    ? modeRows.filter((t) => `${t.id} ${oldStyleNumber(t.id)} ${t.customer} ${t.phone} ${t.device}`.toLowerCase().includes(q))
+    : modeRows;
   const owed = (t: Ticket) => Math.max(0, finalPrice(t) - t.downPayment);
   const receivable = billable.filter(isDone).reduce((a, t) => a + owed(t), 0);
   const inProgress = billable.filter((t) => !isDone(t)).reduce((a, t) => a + owed(t), 0);
@@ -3649,11 +3823,64 @@ function PaymentsPanel({
             <h3>Status Pembayaran</h3>
             <p>Konfirmasi DP, pelunasan, tagihan, dan tempo pelanggan</p>
           </div>
+          <label className="searchBox">
+            <Search size={17} />
+            <input
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Cari nomor, pelanggan, perangkat..."
+            />
+          </label>
+          <button
+            className="paymentExport"
+            onClick={() => {
+              const termOf = (t: Ticket) => t.paymentTermDays || 7;
+              downloadXls(
+                "Status Pembayaran",
+                shopName,
+                ["No", "No. Servis", "Tgl. Terima", "Pemilik", "Telepon", "WhatsApp", "Nama Barang", "Nomor Serial", "Kerusakan", "Kondisi", "Ket./Tindakan", "Status", "Tgl. Ambil", "Biaya", "Cara Pembayaran", "Tagihan", "Jatuh Tempo"],
+                rows.map((t, i) => {
+                  const due = Math.max(0, finalPrice(t) - t.downPayment);
+                  const unpaid = !isFullyPaid(t) && isDone(t) && due > 0;
+                  const overdue = unpaid && ageDays(t.receivedAt) > termOf(t);
+                  const dueDate = new Date(`${t.receivedAt}T00:00:00`);
+                  dueDate.setDate(dueDate.getDate() + termOf(t));
+                  return [
+                    i + 1,
+                    oldStyleNumber(t.id),
+                    fmtTgl(t.receivedAt, t.receivedTime),
+                    t.customer,
+                    fmtTelp(t.phone),
+                    fmtWa(t.phone),
+                    itemName(t),
+                    t.serial && t.serial !== "-" ? t.serial : "",
+                    t.issue,
+                    t.condition || "",
+                    t.serviceAction || "",
+                    t.status,
+                    fmtTgl(t.pickedUpAt, t.pickedUpTime),
+                    fmtRp(finalPrice(t)),
+                    t.paymentMethod || "",
+                    unpaid ? fmtRp(due) : "Tidak Ada",
+                    !unpaid ? "Tidak Ada" : overdue ? "Sudah Jatuh Tempo" : fmtTglSingkat(localDateStr(dueDate)),
+                  ];
+                }),
+              );
+            }}
+          >
+            <Download size={16} /> Export
+          </button>
           <div className="paymentTabs">
             {(["Semua", "Belum Lunas", "Lunas", "Dalam Proses"] as const).map((x) => (
               <button
                 className={mode === x ? "active" : ""}
-                onClick={() => setMode(x)}
+                onClick={() => {
+                  setMode(x);
+                  setPage(1);
+                }}
                 key={x}
               >
                 {x}
@@ -3669,10 +3896,11 @@ function PaymentsPanel({
             <span>Biaya</span>
             <span>DP</span>
             <span>Tagihan</span>
+            <span>Cara Bayar</span>
             <span>Status</span>
             <span>Aksi</span>
           </div>
-          {rows.map((t) => {
+          {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((t) => {
             const total = finalPrice(t);
             const due = Math.max(0, total - t.downPayment);
             const paid = isFullyPaid(t);
@@ -3701,6 +3929,7 @@ function PaymentsPanel({
                 <span>
                   <b>{money(due)}</b>
                 </span>
+                <span>{t.paymentMethod || "—"}</span>
                 <span>
                   <i className={`statusBadge ${paid ? "success" : done ? "warning" : "neutral"}`}>
                     {paid ? "Lunas" : !done ? "Dalam Proses" : isOverdue ? "Jatuh Tempo" : "Belum Lunas"}
@@ -3721,21 +3950,19 @@ function PaymentsPanel({
                     <span className="settleBox">
                       <select
                         aria-label="Cara pembayaran"
-                        value={methods[t.id] ?? (t.paymentMethod && t.paymentMethod !== "Tempo" ? t.paymentMethod : "Tunai")}
+                        value={methods[t.id] ?? (t.paymentMethod && !isTempoMethod(t.paymentMethod) ? t.paymentMethod : "Tunai - Cash")}
                         onChange={(e) => setMethods((old) => ({ ...old, [t.id]: e.target.value }))}
                       >
-                        {paymentMethods
-                          .filter((m) => m !== "Tempo")
-                          .map((m) => (
-                            <option key={m}>{m}</option>
-                          ))}
+                        {paymentMethods.map((m) => (
+                          <option key={m}>{m}</option>
+                        ))}
                       </select>
                       <button
                         className="settleButton"
                         onClick={() =>
                           onSettle(
                             t,
-                            methods[t.id] ?? (t.paymentMethod && t.paymentMethod !== "Tempo" ? t.paymentMethod : "Tunai"),
+                            methods[t.id] ?? (t.paymentMethod && !isTempoMethod(t.paymentMethod) ? t.paymentMethod : "Tunai - Cash"),
                           )
                         }
                       >
@@ -3748,6 +3975,7 @@ function PaymentsPanel({
             );
           })}
         </div>
+        <Pager total={rows.length} page={page} onPage={setPage} />
       </section>
     </div>
   );
@@ -4012,11 +4240,9 @@ function ServicesPanel({
             placeholder="Tarif User"
           />
           <select name="warrantyDays">
-            <option value="0">Tanpa garansi</option>
-            <option value="7">1 Minggu</option>
-            <option value="14">2 Minggu</option>
-            <option value="30">1 Bulan</option>
-            <option value="90">3 Bulan</option>
+            {warrantyOptions.map(([d, label]) => (
+              <option key={d} value={d}>{d === 0 ? "Tanpa garansi" : label}</option>
+            ))}
           </select>
           <button className="newButton" disabled={busy}>{busy ? "Menyimpan..." : "Simpan"}</button>
         </form>
@@ -4039,7 +4265,7 @@ function ServicesPanel({
             <span>{money(s.shopPrice)}</span>
             <span>{money(s.userPrice)}</span>
             <span>
-              {s.warrantyDays ? `${s.warrantyDays} Hari` : "Tidak Ada"}
+              {s.warrantyDays ? warrantyLabel(s.warrantyDays) : "Tidak Ada"}
             </span>
             <span>
               <button onClick={() => onDelete(s)}>
@@ -4057,19 +4283,30 @@ function WarrantyPanel({
   tickets,
   onOpen,
   onClaim,
+  shopName,
 }: {
   tickets: Ticket[];
   onOpen: (ticket: Ticket) => void;
   onClaim: (ticket: Ticket) => void;
+  shopName: string;
 }) {
   const daysLeft = (t: Ticket) =>
     (t.warrantyDays || 0) -
     Math.floor((Date.now() - new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`).getTime()) / 86400000);
   // Only tickets that actually carry a warranty; active ones first (soonest
   // to expire at the top), expired ones after.
+  const [showAll, setShowAll] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const q = search.trim().toLowerCase();
   const rows = tickets
-    .filter((t) => t.status === "Sudah Diambil" && (t.warrantyDays || 0) > 0)
+    .filter((t) => t.status === "Sudah Diambil" && (showAll || (t.warrantyDays || 0) > 0))
+    .filter((t) => !q || `${t.id} ${oldStyleNumber(t.id)} ${t.customer} ${t.phone} ${t.device}`.toLowerCase().includes(q))
     .sort((a, b) => {
+      const wa = (a.warrantyDays || 0) > 0;
+      const wb = (b.warrantyDays || 0) > 0;
+      if (wa !== wb) return wa ? -1 : 1;
+      if (!wa) return (b.pickedUpAt || "").localeCompare(a.pickedUpAt || "");
       const ra = daysLeft(a);
       const rb = daysLeft(b);
       if (ra >= 0 !== rb >= 0) return ra >= 0 ? -1 : 1;
@@ -4086,11 +4323,71 @@ function WarrantyPanel({
           <p>Pantau garansi aktif, hampir habis, dan hangus.</p>
         </div>
         <strong>
-          {rows.filter((t) => daysLeft(t) >= 0).length}
+          {tickets.filter((t) => t.status === "Sudah Diambil" && (t.warrantyDays || 0) > 0 && daysLeft(t) >= 0).length}
           <small>Garansi aktif</small>
         </strong>
+        <button
+          className="heroExport"
+          onClick={() =>
+            downloadXls(
+              "Status Garansi",
+              shopName,
+              ["No", "No. Servis", "Tgl. Terima", "Pemilik", "Telepon", "WhatsApp", "Nama Barang", "Nomor Serial", "Kerusakan", "Kondisi", "Ket./Tindakan", "Status", "Tgl. Ambil", "Garansi", "Tgl. Garansi Berakhir", "Status Garansi"],
+              rows.map((t, i) => [
+                i + 1,
+                oldStyleNumber(t.id),
+                fmtTgl(t.receivedAt, t.receivedTime),
+                t.customer,
+                fmtTelp(t.phone),
+                fmtWa(t.phone),
+                itemName(t),
+                t.serial && t.serial !== "-" ? t.serial : "",
+                t.issue,
+                t.condition || "",
+                t.serviceAction || "",
+                t.status,
+                fmtTgl(t.pickedUpAt, t.pickedUpTime),
+                t.warrantyDays ? warrantyLabel(t.warrantyDays) : "Tidak Ada",
+                t.warrantyDays ? fmtTglSingkat(warrantyEndDate(t)) : "Tidak Ada",
+                !t.warrantyDays ? "Tidak Ada" : daysLeft(t) >= 0 ? `${daysLeft(t)} Hari Lagi` : "Sudah Hangus",
+              ]),
+            )
+          }
+        >
+          <Download size={16} /> Export
+        </button>
       </section>
       <section className="ticketPanel modulePanel">
+        <div className="panelTop">
+          <div>
+            <h3>Daftar Garansi</h3>
+            <p>{showAll ? "Semua servis yang sudah diambil" : "Hanya servis yang punya garansi"} · {rows.length} data</p>
+          </div>
+          <div className="panelTools">
+            <label className="searchBox">
+              <Search size={17} />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Cari nomor, pelanggan, perangkat..."
+              />
+            </label>
+            <label className="checkInline">
+              <input
+                type="checkbox"
+                checked={showAll}
+                onChange={(e) => {
+                  setShowAll(e.target.checked);
+                  setPage(1);
+                }}
+              />
+              Tampilkan yang tanpa garansi
+            </label>
+          </div>
+        </div>
         <div className="simpleDataHead warrantyCols">
           <span>No. Servis</span>
           <span>Pemilik</span>
@@ -4100,7 +4397,7 @@ function WarrantyPanel({
           <span>Status Garansi</span>
           <span>Pilihan</span>
         </div>
-        {rows.map((t) => {
+        {rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((t) => {
           const start = new Date(`${t.pickedUpAt || t.updatedAt}T00:00:00`);
           const elapsed = Math.floor((Date.now() - start.getTime()) / 86400000);
           const remaining = (t.warrantyDays || 0) - elapsed;
@@ -4113,7 +4410,7 @@ function WarrantyPanel({
               <span>{t.device}</span>
               <span>{t.pickedUpAt || t.updatedAt}</span>
               <span>
-                {t.warrantyDays ? `${t.warrantyDays} Hari` : "Tidak Ada"}
+                {t.warrantyDays ? warrantyLabel(t.warrantyDays) : "Tidak Ada"}
               </span>
               <span>
                 <i
@@ -4127,7 +4424,7 @@ function WarrantyPanel({
                 </i>
               </span>
               <span>
-                {remaining >= 0 ? (
+                {t.warrantyDays && remaining >= 0 ? (
                   <button onClick={() => onClaim(t)}>Terima Garansi</button>
                 ) : (
                   "-"
@@ -4143,182 +4440,149 @@ function WarrantyPanel({
             <p>Atur garansi di detail servis sebelum perangkat diambil.</p>
           </div>
         )}
+        <Pager total={rows.length} page={page} onPage={setPage} />
       </section>
     </div>
   );
 }
 
-function ServiceReport({ tickets }: { tickets: Ticket[] }) {
-  const rows = useMemo(
-    () =>
-      Array.from(
-        tickets
-          .reduce((m, t) => {
-            // Each figure lands on the day it actually happened: intake on the
-            // received date, money and "keluar" on the pickup date (a job
-            // received on the 30th and collected on the 2nd is next month's
-            // income), "selesai" on the day it became ready/collected.
-            const bucket = (date: string) => {
-              let r = m.get(date);
-              if (!r) {
-                r = { date, in: 0, done: 0, out: 0, revenue: 0, cash: 0, cost: 0 };
-                m.set(date, r);
-              }
-              return r;
-            };
-            bucket(t.receivedAt).in++;
-            const picked = t.status === "Sudah Diambil";
-            if (picked || t.status === "Bisa Diambil") {
-              const doneDate = (picked ? t.pickedUpAt : t.statusChangedAt) || t.receivedAt;
-              bucket(doneDate).done++;
-            }
-            if (picked) {
-              const r = bucket(t.pickedUpAt || t.receivedAt);
-              r.out++;
-              // "Pemasukan" is the invoiced value (finalPrice, or estimate
-              // if not yet confirmed) — recognized once a job is handed
-              // over, regardless of whether it's fully paid. "Kas Diterima"
-              // is downPayment, which the atomic ticket/payment transaction
-              // now keeps equal to the real ledger sum — a ticket handed
-              // over with an outstanding balance shows up here as less cash
-              // than invoice, instead of counting as full revenue either way.
-              r.revenue += finalPrice(t);
-              r.cash += t.downPayment;
-              r.cost += t.partCost || 0;
-            }
-            return m;
-          }, new Map<string, { date: string; in: number; done: number; out: number; revenue: number; cash: number; cost: number }>())
-          .values(),
-      ).sort((a, b) => b.date.localeCompare(a.date)),
-    [tickets],
+function ServiceReport({ tickets, shopName }: { tickets: Ticket[]; shopName: string }) {
+  const months = useMemo(() => monthsPresent(tickets, localDateStr()), [tickets]);
+  const [month, setMonth] = useState(localDateStr().slice(0, 7));
+  const { rows, total } = useMemo(() => monthlyDaily(tickets, month), [tickets, month]);
+  // Overview of every month, same rules as the day-by-day table.
+  const overview = useMemo(
+    () => months.map((m) => ({ month: m, ...monthlyDaily(tickets, m).total })),
+    [tickets, months],
   );
-  const monthRows = useMemo(
-    () =>
-      Array.from(
-        rows
-          .reduce((m, r) => {
-            const month = r.date.slice(0, 7);
-            const x = m.get(month) || { month, in: 0, done: 0, out: 0, revenue: 0, cash: 0, cost: 0 };
-            x.in += r.in;
-            x.done += r.done;
-            x.out += r.out;
-            x.revenue += r.revenue;
-            x.cash += r.cash;
-            x.cost += r.cost;
-            m.set(month, x);
-            return m;
-          }, new Map<string, { month: string; in: number; done: number; out: number; revenue: number; cash: number; cost: number }>())
-          .values(),
-      ).sort((a, b) => b.month.localeCompare(a.month)),
-    [rows],
-  );
-  const monthLabel = (ym: string) => {
-    const [y, m] = ym.split("-").map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
-  };
+  function exportMonth() {
+    downloadXls(
+      `Laporan Servis {toko} Bulan ${monthName(month)}`,
+      shopName,
+      ["Tanggal", "Barang Servis Masuk", "Barang Servis Telah Ditangani", "Barang Servis Keluar", "Total Pemasukan (Rp)", "Modal Sparepart (Rp)", "Profit (Rp)"],
+      rows.map((r) => [fmtTglPanjang(r.date), fmtBarang(r.in), fmtBarang(r.done), fmtBarang(r.out), fmtRp(r.revenue), fmtRp(r.cost), fmtRp(r.profit)]),
+      [["Total Laporan Servis Bulan Ini", fmtBarang(total.in), fmtBarang(total.done), fmtBarang(total.out), fmtRp(total.revenue), fmtRp(total.cost), fmtRp(total.profit)]],
+    );
+  }
   return (
     <div className="modulePage">
       <section className="reportSummary">
         <article>
-          <small>Total Servis Masuk</small>
-          <strong>{tickets.length}</strong>
+          <small>Servis Masuk</small>
+          <strong>{total.in}</strong>
         </article>
         <article>
-          <small>Selesai Ditangani</small>
-          <strong>
-            {
-              tickets.filter((t) =>
-                ["Bisa Diambil", "Sudah Diambil"].includes(t.status),
-              ).length
-            }
-          </strong>
+          <small>Telah Ditangani</small>
+          <strong>{total.done}</strong>
         </article>
         <article>
           <small>Barang Keluar</small>
-          <strong>
-            {tickets.filter((t) => t.status === "Sudah Diambil").length}
-          </strong>
+          <strong>{total.out}</strong>
         </article>
         <article>
-          <small>Total Profit</small>
-          <strong>
-            {money(rows.reduce((a, r) => a + r.revenue - r.cost, 0))}
-          </strong>
+          <small>Total Pemasukan</small>
+          <strong>{money(total.revenue)}</strong>
         </article>
         <article>
-          <small>Kas Diterima (DP tercatat)</small>
-          <strong>{money(rows.reduce((a, r) => a + r.cash, 0))}</strong>
+          <small>Modal Sparepart</small>
+          <strong>{money(total.cost)}</strong>
         </article>
-      </section>
-      <section className="ticketPanel modulePanel">
-        <div className="panelTop">
-          <div>
-            <h3>Keuntungan per Bulan</h3>
-            <p>
-              Pemasukan = nilai invoice servis yang sudah diambil (termasuk
-              yang belum lunas). Kas Diterima = DP yang benar-benar tercatat
-              di ledger pembayaran — bisa lebih kecil dari Pemasukan kalau ada
-              piutang berjalan.
-            </p>
-          </div>
-        </div>
-        <div className="simpleDataHead reportCols">
-          <span>Bulan</span>
-          <span>Masuk</span>
-          <span>Selesai</span>
-          <span>Keluar</span>
-          <span>Pemasukan</span>
-          <span>Kas Diterima</span>
-          <span>Modal</span>
-          <span>Profit</span>
-        </div>
-        {monthRows.length === 0 && (
-          <div className="emptyState">Belum ada data servis.</div>
-        )}
-        {monthRows.map((r) => (
-          <div className="simpleDataRow reportCols" key={r.month}>
-            <span>{monthLabel(r.month)}</span>
-            <span>{r.in} Barang</span>
-            <span>{r.done} Barang</span>
-            <span>{r.out} Barang</span>
-            <span>{money(r.revenue)}</span>
-            <span>{money(r.cash)}</span>
-            <span>{money(r.cost)}</span>
-            <span>
-              <b>{money(r.revenue - r.cost)}</b>
-            </span>
-          </div>
-        ))}
+        <article>
+          <small>Profit</small>
+          <strong>{money(total.profit)}</strong>
+        </article>
       </section>
       <section className="ticketPanel modulePanel">
         <div className="panelTop">
           <div>
             <h3>Laporan Servis</h3>
             <p>
-              Servis masuk, selesai, keluar, pemasukan, modal, dan profit per
-              hari.
+              Per hari: masuk (tanggal terima), telah ditangani (tanggal selesai), keluar (tanggal
+              diambil). Pemasukan, modal, dan profit dihitung pada tanggal pengambilan dan hanya
+              dari uang yang sudah dibayar — servis tempo yang belum dibayar baru masuk setelah lunas.
             </p>
+          </div>
+          <div className="panelTools">
+            <select aria-label="Pilih bulan" value={month} onChange={(e) => setMonth(e.target.value)}>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {monthName(m)}
+                </option>
+              ))}
+            </select>
+            <button onClick={exportMonth}>
+              <Download size={17} />
+              <span>Export</span>
+            </button>
           </div>
         </div>
         <div className="simpleDataHead reportCols">
           <span>Tanggal</span>
           <span>Masuk</span>
-          <span>Selesai</span>
+          <span>Telah Ditangani</span>
           <span>Keluar</span>
-          <span>Pemasukan</span>
-          <span>Modal</span>
+          <span>Total Pemasukan</span>
+          <span>Modal Sparepart</span>
           <span>Profit</span>
         </div>
         {rows.map((r) => (
           <div className="simpleDataRow reportCols" key={r.date}>
-            <span>{r.date}</span>
-            <span>{r.in} Barang</span>
-            <span>{r.done} Barang</span>
-            <span>{r.out} Barang</span>
+            <span>{fmtTglPanjang(r.date)}</span>
+            <span>{fmtBarang(r.in)}</span>
+            <span>{fmtBarang(r.done)}</span>
+            <span>{fmtBarang(r.out)}</span>
             <span>{money(r.revenue)}</span>
             <span>{money(r.cost)}</span>
             <span>
-              <b>{money(r.revenue - r.cost)}</b>
+              <b>{money(r.profit)}</b>
+            </span>
+          </div>
+        ))}
+        <div className="simpleDataRow reportCols reportTotalRow">
+          <span>Total Laporan Servis Bulan Ini</span>
+          <span>{fmtBarang(total.in)}</span>
+          <span>{fmtBarang(total.done)}</span>
+          <span>{fmtBarang(total.out)}</span>
+          <span>{money(total.revenue)}</span>
+          <span>{money(total.cost)}</span>
+          <span>{money(total.profit)}</span>
+        </div>
+      </section>
+      <section className="ticketPanel modulePanel">
+        <div className="panelTop">
+          <div>
+            <h3>Ringkasan per Bulan</h3>
+            <p>Klik sebuah bulan untuk melihat rincian per harinya.</p>
+          </div>
+        </div>
+        <div className="simpleDataHead reportCols">
+          <span>Bulan</span>
+          <span>Masuk</span>
+          <span>Telah Ditangani</span>
+          <span>Keluar</span>
+          <span>Total Pemasukan</span>
+          <span>Modal Sparepart</span>
+          <span>Profit</span>
+        </div>
+        {overview.map((r) => (
+          <div
+            className={`simpleDataRow reportCols clickableRow${r.month === month ? " activeRow" : ""}`}
+            key={r.month}
+            role="button"
+            tabIndex={0}
+            onClick={() => setMonth(r.month)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setMonth(r.month);
+            }}
+          >
+            <span>{monthName(r.month)}</span>
+            <span>{fmtBarang(r.in)}</span>
+            <span>{fmtBarang(r.done)}</span>
+            <span>{fmtBarang(r.out)}</span>
+            <span>{money(r.revenue)}</span>
+            <span>{money(r.cost)}</span>
+            <span>
+              <b>{money(r.profit)}</b>
             </span>
           </div>
         ))}
@@ -4327,17 +4591,24 @@ function ServiceReport({ tickets }: { tickets: Ticket[] }) {
   );
 }
 
-function TechnicianReport({
-  tickets,
-  staff,
-}: {
-  tickets: Ticket[];
-  staff: Staff[];
-}) {
-  const workDate = (t: Ticket) => t.statusChangedAt || t.updatedAt;
-  const dates = Array.from(new Set(tickets.map(workDate)))
-    .sort()
-    .reverse();
+function TechnicianReport({ tickets, shopName }: { tickets: Ticket[]; shopName: string }) {
+  const months = useMemo(() => monthsPresent(tickets, localDateStr()), [tickets]);
+  const [month, setMonth] = useState(localDateStr().slice(0, 7));
+  const rep = useMemo(() => technicianMonthly(tickets, month), [tickets, month]);
+  const cols = `150px repeat(${Math.max(rep.names.length, 1)}, minmax(110px, 1fr))`;
+  function exportMonth() {
+    downloadXls(
+      `Laporan Teknisi {toko} Bulan ${monthName(month)}`,
+      shopName,
+      ["Tanggal", ...rep.names],
+      rep.rows.map((r) => [fmtTglPanjang(r.date), ...rep.names.map((n) => fmtKali(r.counts[n] || 0))]),
+      [
+        ["Total Menangani Servis Bulan Ini", ...rep.names.map((n) => fmtKali(rep.handled[n] || 0))],
+        ["Total Pemasukan Oleh Teknisi Bulan Ini", ...rep.names.map((n) => fmtRp(rep.revenue[n] || 0))],
+        ["Total Profit Oleh Teknisi Bulan Ini", ...rep.names.map((n) => fmtRp(rep.profit[n] || 0))],
+      ],
+    );
+  }
   return (
     <div className="modulePage">
       <section className="moduleHero techReportHero">
@@ -4346,32 +4617,61 @@ function TechnicianReport({
             <Users size={14} /> PRODUKTIVITAS
           </span>
           <h2>Laporan Teknisi</h2>
-          <p>Jumlah servis yang ditangani setiap teknisi per tanggal.</p>
+          <p>Jumlah servis yang selesai ditangani setiap teknisi per tanggal, dan profit dari servis yang diambil.</p>
         </div>
       </section>
       <section className="ticketPanel modulePanel">
+        <div className="panelTop">
+          <div>
+            <h3>Bulan {monthName(month)}</h3>
+          </div>
+          <div className="panelTools">
+            <select aria-label="Pilih bulan" value={month} onChange={(e) => setMonth(e.target.value)}>
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {monthName(m)}
+                </option>
+              ))}
+            </select>
+            <button onClick={exportMonth}>
+              <Download size={17} />
+              <span>Export</span>
+            </button>
+          </div>
+        </div>
         <div className="techReportTable">
-          <div className="techReportHead">
+          <div className="techReportHead" style={{ display: "grid", gridTemplateColumns: cols }}>
             <span>Tanggal</span>
-            {staff.map((s) => (
-              <span key={s.id}>{s.name}</span>
+            {rep.names.map((n) => (
+              <span key={n}>{n}</span>
             ))}
           </div>
-          {dates.map((d) => (
-            <div className="techReportRow" key={d}>
-              <span>{d}</span>
-              {staff.map((s) => (
-                <span key={s.id}>
-                  {
-                    tickets.filter(
-                      (t) => workDate(t) === d && t.technician === s.name,
-                    ).length
-                  }{" "}
-                  Kali
-                </span>
+          {rep.rows.map((r) => (
+            <div className="techReportRow" key={r.date} style={{ display: "grid", gridTemplateColumns: cols }}>
+              <span>{fmtTglPanjang(r.date)}</span>
+              {rep.names.map((n) => (
+                <span key={n}>{fmtKali(r.counts[n] || 0)}</span>
               ))}
             </div>
           ))}
+          <div className="techReportRow reportTotalRow" style={{ display: "grid", gridTemplateColumns: cols }}>
+            <span>Total Menangani Servis Bulan Ini</span>
+            {rep.names.map((n) => (
+              <span key={n}>{fmtKali(rep.handled[n] || 0)}</span>
+            ))}
+          </div>
+          <div className="techReportRow reportTotalRow" style={{ display: "grid", gridTemplateColumns: cols }}>
+            <span>Total Pemasukan Oleh Teknisi Bulan Ini</span>
+            {rep.names.map((n) => (
+              <span key={n}>{money(rep.revenue[n] || 0)}</span>
+            ))}
+          </div>
+          <div className="techReportRow reportTotalRow" style={{ display: "grid", gridTemplateColumns: cols }}>
+            <span>Total Profit Oleh Teknisi Bulan Ini</span>
+            {rep.names.map((n) => (
+              <span key={n}>{money(rep.profit[n] || 0)}</span>
+            ))}
+          </div>
         </div>
       </section>
     </div>

@@ -16,3 +16,11 @@ describe("normalizePhone", () => {
     expect(normalizePhone("081234567890")).toBe(normalizePhone("6281234567890"));
   });
 });
+
+describe("normalizePhone without a usable number", () => {
+  it("returns an empty string for blank or placeholder values", () => {
+    expect(normalizePhone("")).toBe("");
+    expect(normalizePhone("-")).toBe("");
+    expect(normalizePhone("0")).toBe("");
+  });
+});

@@ -32,7 +32,7 @@ export async function PATCH(
     if (phone.length < 9 || phone.length > 15)
       return NextResponse.json({ error: "Nomor telepon harus 9-15 digit" }, { status: 400 });
     data.phone = phone;
-    data.phoneNormalized = normalizePhone(phone);
+    data.phoneNormalized = normalizePhone(phone) || null;
   }
   if (Object.keys(data).length === 0)
     return NextResponse.json({ error: "Tidak ada field yang diubah" }, { status: 400 });
@@ -86,11 +86,12 @@ export async function DELETE(
   // customer's own phone was "62812..." (or vice versa) — silently letting
   // a customer with real service history get deleted.
   const targetNorm = existing.phoneNormalized || normalizePhone(existing.phone);
+  // A customer without a usable number can't be linked to tickets by phone.
   const candidates = await prisma.ticket.findMany({
     where: { phone: { contains: existing.phone.replace(/\D/g, "").slice(-8) } },
     select: { id: true, phone: true },
   });
-  const inUse = candidates.find((t) => normalizePhone(t.phone) === targetNorm);
+  const inUse = targetNorm ? candidates.find((t) => normalizePhone(t.phone) === targetNorm) : undefined;
   if (inUse)
     return NextResponse.json(
       { error: "Pelanggan masih punya riwayat servis, tidak bisa dihapus" },

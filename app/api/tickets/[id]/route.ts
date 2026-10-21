@@ -9,7 +9,7 @@ import { clientIp } from "@/lib/audit";
 
 const FIELDS = new Set([
   "customer", "phone", "device", "brand", "serial", "issue", "accessories",
-  "technician", "status", "estimate", "downPayment", "finalCost",
+  "technician", "receivedBy", "status", "estimate", "downPayment", "finalCost",
   "receivedAt", "receivedTime", "updatedAt", "statusChangedAt", "rating",
   "customerConfirmed", "costConfirmed", "category", "address", "condition",
   "serviceAction", "paymentMethod", "paymentTermDays", "warrantyDays",

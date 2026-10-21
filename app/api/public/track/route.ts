@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizePhone } from "@/lib/phone";
+import { extractServiceCode } from "@/lib/service-code";
 import { isRateLimited, clientKey } from "@/lib/rate-limit";
 
 // This is unauthenticated and public — return only what the /track page
@@ -33,7 +34,9 @@ export async function GET(request: Request) {
     );
 
   const params = new URL(request.url).searchParams;
-  const id = params.get("id")?.trim();
+  const rawId = params.get("id")?.trim();
+  // Old-app numbers ("#260820104141") resolve to the same ticket.
+  const id = rawId ? extractServiceCode(rawId) ?? rawId : rawId;
   const phone = params.get("phone")?.trim();
   if (!id && !phone)
     return NextResponse.json(

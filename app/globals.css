@@ -4321,10 +4321,10 @@ textarea {
   grid-template-columns: 135px minmax(155px, 1fr) minmax(
       170px,
       1.1fr
-    ) 100px 100px 100px 100px 200px;
+    ) 100px 100px 100px 130px 100px 200px;
   align-items: center;
   gap: 12px;
-  min-width: 1160px;
+  min-width: 1300px;
   padding: 0 20px;
 }
 .paymentServiceRow {
@@ -6741,4 +6741,76 @@ textarea {
   display: block;
   margin-top: 5px;
   font-size: 13px;
+}
+
+.reportTotalRow {
+  background: #f3f6fd;
+  font-weight: 800;
+  color: #1f2f6b;
+}
+.clickableRow {
+  cursor: pointer;
+}
+.clickableRow:hover,
+.activeRow {
+  background: #f1f4ff;
+}
+.heroExport,
+.paymentExport {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #c9d4f5;
+  border-radius: 10px;
+  background: #fff;
+  color: #3347b8;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.paymentExport {
+  margin-right: 8px;
+}
+.techReportTable .techReportRow.reportTotalRow {
+  font-weight: 800;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--svc-line);
+  color: #667287;
+  font-size: 12.5px;
+}
+.pager > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pager button {
+  padding: 6px 14px;
+  border: 1px solid var(--svc-line);
+  border-radius: 9px;
+  background: #fff;
+  color: #3347b8;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.checkInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #566277;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
 }

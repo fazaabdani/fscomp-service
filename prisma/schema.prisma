@@ -62,6 +62,8 @@ model Ticket {
   partCost          Int?
   pickupBy          String?
   handedBy          String?
+  // Who took the unit in (the old app's "Penerima"); `technician` is who worked on it.
+  receivedBy        String?
   // Set when this ticket is a warranty claim: the id of the original service.
   warrantyOf        String?
   version           Int      @default(1)
