@@ -1503,9 +1503,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       estimasi: money(ticket.estimate),
       sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
       pembayaran:
-        finalPrice(ticket) - ticket.downPayment > 0
-          ? `Sisa pembayaran: *${money(finalPrice(ticket) - ticket.downPayment)}*`
-          : "Pembayaran sudah *lunas*.",
+        finalPrice(ticket) - ticket.downPayment <= 0
+          ? "Pembayaran sudah *lunas*."
+          : ticket.downPayment > 0
+            ? `Sisa pembayaran: *${money(finalPrice(ticket) - ticket.downPayment)}*`
+            : `Biaya servis sejumlah *${money(finalPrice(ticket))}*`,
     };
     const body =
       kind === "received"

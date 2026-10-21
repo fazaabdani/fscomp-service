@@ -56,7 +56,7 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
     { token: "{toko}", label: "Nama toko" },
     { token: "{perangkat}", label: "Perangkat" },
     { token: "{nomor_servis}", label: "Nomor servis" },
-    { token: "{pembayaran}", label: "Info sisa/lunas" },
+    { token: "{pembayaran}", label: "Info biaya / sisa / lunas" },
     { token: "{sisa}", label: "Sisa pembayaran" },
     { token: "{link_tracking}", label: "Link tracking" },
   ],
