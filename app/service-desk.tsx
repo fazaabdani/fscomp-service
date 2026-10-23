@@ -561,12 +561,15 @@ const printDateLabel = (d: string) =>
 
 function QcPanel({
   check,
+  closed,
   canReview,
   onFill,
   onReview,
   onUseFindings,
 }: {
   check: QcCheckData | null;
+  // A picked-up or cancelled job keeps its QC for reference but can't be redone.
+  closed: boolean;
   canReview: boolean;
   onFill: () => void;
   onReview: (c: QcCheckData) => void;
@@ -630,13 +633,17 @@ function QcPanel({
         <button type="button" className="ghost" onClick={() => setShowAll((x) => !x)}>
           {showAll ? "Sembunyikan daftar lengkap" : "Lihat daftar lengkap"}
         </button>
-        <button type="button" className="ghost" onClick={() => onUseFindings(check)}>
-          Salin temuan ke Tindakan
-        </button>
-        <button type="button" className="ghost" onClick={onFill}>
-          Isi ulang QC
-        </button>
-        {canReview && !check.reviewedAt && (
+        {!closed && (
+          <button type="button" className="ghost" onClick={() => onUseFindings(check)}>
+            Salin temuan ke Tindakan
+          </button>
+        )}
+        {!closed && (
+          <button type="button" className="ghost" onClick={onFill}>
+            Isi ulang QC
+          </button>
+        )}
+        {canReview && !closed && !check.reviewedAt && (
           <button type="button" className="newButton" onClick={() => onReview(check)}>
             <CheckCircle2 size={16} /> Tandai sudah ditinjau
           </button>
@@ -989,6 +996,8 @@ function PaidNotaBody({
   issuer: string;
 }) {
   const total = finalPrice(ticket);
+  // A warranty claim handled free of charge has nothing to "receive".
+  const freeClaim = !!ticket.warrantyOf && total === 0;
   const pickedAt = ticket.pickedUpAt || localDateStr();
   const warrantyUntil = ticket.warrantyDays
     ? printDateLabel(
@@ -1078,11 +1087,13 @@ function PaidNotaBody({
               </div>
               <div className="trxMoneyDue trxPaidBar">
                 <span>Status pembayaran</span>
-                <b>LUNAS</b>
+                <b>{freeClaim ? "TANPA BIAYA" : "LUNAS"}</b>
               </div>
             </div>
             <p className="trxFine">
-              Pembayaran sebesar {money(total)} telah diterima secara penuh.
+              {freeClaim
+                ? "Servis ini klaim garansi dari servis sebelumnya, tanpa biaya."
+                : `Pembayaran sebesar ${money(total)} telah diterima secara penuh.`}
             </p>
           </section>
           <section>
@@ -1787,8 +1798,12 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     patchTicket(selected.id, patch, `Data servis ${selected.id} berhasil diubah`);
     setModal("detail");
   }
+  // The greeting already says "Kak", so a typed honorific ("Bapak Joko") would
+  // come out as "Kak Bapak Joko".
   const salutation = (name: string) =>
-    renderWaTemplate(shop.waSalutation, { nama: name });
+    renderWaTemplate(shop.waSalutation, {
+      nama: name.replace(/^\s*(bapak|pak|ibu|bu|mas|mbak|mba|kak|bang|abang|om|tante|haji|hj\.?|h\.)\s+/i, "").trim() || name,
+    });
   function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
@@ -1810,7 +1825,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       })(),
       sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
       pembayaran:
-        finalPrice(ticket) - ticket.downPayment <= 0
+        ticket.warrantyOf && finalPrice(ticket) === 0 && ticket.downPayment === 0
+          ? "Servis ini klaim garansi, *tanpa biaya*."
+          : finalPrice(ticket) - ticket.downPayment <= 0
           ? "Pembayaran sudah *lunas*."
           : ticket.downPayment > 0
             ? `Sisa pembayaran: *${money(finalPrice(ticket) - ticket.downPayment)}*`
@@ -2920,9 +2937,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <small>Keluhan pelanggan (saat unit masuk)</small>
                 <strong>{selected.issue}</strong>
               </div>
-              {qcOn && (
+              {qcOn && !((selected.status === "Sudah Diambil" || selected.status === CANCELLED) && !qcByTicket.get(selected.id)) && (
               <QcPanel
                 check={qcByTicket.get(selected.id) || null}
+                closed={selected.status === "Sudah Diambil" || selected.status === CANCELLED}
                 canReview
                 onFill={() => setQcTicket(selected)}
                 onReview={async (c) => {
@@ -3227,7 +3245,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <button
                   className="ghost"
                   disabled={!isFullyPaid(selected)}
-                  title={isFullyPaid(selected) ? undefined : "Tandai lunas dulu — saldo masih tersisa"}
+                  title={isFullyPaid(selected) ? undefined : selected.costConfirmed ? "Tandai lunas dulu — saldo masih tersisa" : "Konfirmasi biaya dulu"}
                   onClick={() => printTicket("paid")}
                 >
                   <Banknote size={17} /> Print nota lunas

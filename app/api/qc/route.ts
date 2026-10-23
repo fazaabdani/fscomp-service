@@ -31,8 +31,9 @@ function cleanItems(raw: unknown): Item[] | string {
   return items;
 }
 
-/** Latest QC per job that is still open — enough for the technician's review
- * badge and the detail panel. */
+/** Latest QC per job, for open jobs and anything checked in the last 180 days
+ * (so a picked-up job's detail still shows what was found) — enough for the
+ * technician's review badge and the detail panel. */
 export async function GET() {
   const session = await currentSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,8 +41,9 @@ export async function GET() {
     where: { status: { notIn: CLOSED } },
     select: { id: true },
   });
+  const since = new Date(Date.now() - 180 * 86400000);
   const rows = await prisma.qcCheck.findMany({
-    where: { ticketId: { in: open.map((t) => t.id) } },
+    where: { OR: [{ ticketId: { in: open.map((t) => t.id) } }, { createdAt: { gte: since } }] },
     orderBy: { createdAt: "desc" },
   });
   const seen = new Set<string>();
@@ -96,6 +98,8 @@ export async function POST(request: Request) {
         submittedBy: session.id,
         badCount,
         unsureCount,
+        // A technician/Admin filling the checklist is the reviewer already.
+        ...(session.role !== "INTERN" ? { reviewedBy: session.name, reviewedAt: new Date() } : {}),
       },
     });
     // First check moves the job from "Belum Cek" to "Sedang Cek".
