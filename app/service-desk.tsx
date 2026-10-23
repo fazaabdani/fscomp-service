@@ -65,6 +65,7 @@ import {
   MapPin,
   Globe,
   Instagram,
+  Trash2,
   Landmark,
   LogOut,
   KeyRound,
@@ -1034,7 +1035,10 @@ export default function ServiceDesk() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Status | "Semua">("Semua");
   const [active, setActive] = useState("Proses Servis");
-  const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "handoff" | "scan" | null>(null);
+  const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "handoff" | "scan" | "delete" | null>(null);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [toast, setToast] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1525,6 +1529,29 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         : {}),
     };
     patchTicket(id, patch, `Status diperbarui: ${status}`);
+  }
+  async function deleteTicket() {
+    if (!selected || deleting) return;
+    const target = selected;
+    setDeleting(true);
+    setDeleteError("");
+    writeEpoch.current++;
+    try {
+      const res = await fetch(`/api/tickets/${target.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setDeleteError(data?.error || "Gagal menghapus servis");
+        return;
+      }
+      setTickets((old) => old.filter((t) => t.id !== target.id));
+      setSelected(null);
+      setModal(null);
+      notify(`Servis ${target.id} dihapus`);
+    } catch {
+      setDeleteError("Tidak terhubung ke server — servis TIDAK dihapus");
+    } finally {
+      setDeleting(false);
+    }
   }
   async function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
     writeEpoch.current++;
@@ -3049,6 +3076,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <button className="ghost" onClick={() => setModal("edit")}>
                   <FileText size={17} /> Ubah Data Lainnya
                 </button>
+                {currentUser?.role === "ADMIN" && selected.status !== "Sudah Diambil" && (
+                  <button
+                    className="ghost dangerAction"
+                    onClick={() => {
+                      setDeleteText("");
+                      setDeleteError("");
+                      setModal("delete");
+                    }}
+                  >
+                    <Trash2 size={17} /> Hapus servis
+                  </button>
+                )}
                 <button className="waButton" onClick={() => setModal("chat")}>
                   <MessageCircle size={17} /> Chat pelanggan
                 </button>
@@ -3102,6 +3141,50 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               </div>
               <div className="modalFoot"><button type="button" className="ghost" onClick={() => setModal("detail")}>Batal</button><button className="newButton"><CheckCircle2 size={17}/> Simpan Perubahan</button></div>
             </form>
+          )}
+          {modal === "delete" && selected && (
+            <div className="serviceModal deleteModal">
+              <div className="modalHead">
+                <div>
+                  <span>HAPUS SERVIS</span>
+                  <h2>{selected.id}</h2>
+                </div>
+                <button type="button" onClick={() => setModal("detail")}>
+                  <X />
+                </button>
+              </div>
+              <div className="formGridService single">
+              <p className="deleteLead">
+                Servis <b>{selected.customer}</b> · {selected.device} akan dihapus <b>permanen</b>
+                {selected.downPayment > 0 && ` beserta catatan DP ${money(selected.downPayment)}`}. Ini cocok untuk
+                servis yang salah input. Jika servisnya batal tetapi perlu tetap tercatat, ubah statusnya menjadi
+                Dibatalkan.
+              </p>
+              <label>
+                Ketik nomor servis untuk melanjutkan
+                <input
+                  value={deleteText}
+                  autoFocus
+                  placeholder={selected.id}
+                  onChange={(e) => setDeleteText(e.target.value)}
+                />
+              </label>
+              {deleteError && <div className="authError">{deleteError}</div>}
+              </div>
+              <div className="modalFoot">
+                <button type="button" className="ghost" onClick={() => setModal("detail")}>
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  className="dangerSolid"
+                  disabled={deleting || deleteText.trim().toUpperCase() !== selected.id.toUpperCase()}
+                  onClick={deleteTicket}
+                >
+                  <Trash2 size={16} /> {deleting ? "Menghapus..." : "Hapus permanen"}
+                </button>
+              </div>
+            </div>
           )}
           {modal === "chat" && selected && (
             <div className="serviceModal chatChoiceModal">

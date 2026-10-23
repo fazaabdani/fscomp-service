@@ -6928,3 +6928,15 @@ textarea {
 @media print {
   .versionPill { display: none !important; }
 }
+
+/* ===== Admin: delete a mistaken service ===== */
+.ghost.dangerAction { color: #b3261e; border-color: #f0c9c5; }
+.ghost.dangerAction:hover { background: #fdf0ef; }
+.deleteModal { width: min(480px, 100%); }
+.deleteModal .deleteLead { margin: 0; color: #44526b; font-size: 14px; line-height: 1.55; }
+.dangerSolid {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 40px; padding: 0 16px; border: 0; border-radius: 10px;
+  background: #c62828; color: #fff; font-weight: 700; cursor: pointer;
+}
+.dangerSolid:disabled { opacity: 0.45; cursor: not-allowed; }

@@ -147,3 +147,75 @@ export async function PATCH(
   if (payment) pushPaymentToDashboard(payment);
   return NextResponse.json({ ticket });
 }
+
+// Admin-only removal of a job entered by mistake. Deliberately narrow: only a
+// job that has not been picked up, with no money recorded except its opening
+// DP, and that no warranty claim points at. Anything else keeps its history
+// (use status "Dibatalkan" instead). The opening DP row goes with the job.
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const session = await currentSession();
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN")
+    return NextResponse.json(
+      { error: "Hanya Admin yang dapat menghapus servis" },
+      { status: 403 },
+    );
+
+  let blocked: string | null = null;
+  let deleted: Ticket | null = null;
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.ticket.findUnique({ where: { id } });
+    if (!existing) return;
+    if (existing.status === "Sudah Diambil" || existing.pickedUpAt) {
+      blocked = "Servis yang sudah diambil tidak bisa dihapus. Gunakan status Dibatalkan jika perlu.";
+      return;
+    }
+    const claims = await tx.ticket.count({ where: { warrantyOf: id } });
+    if (claims > 0) {
+      blocked = "Servis ini dirujuk klaim garansi servis lain, jadi tidak bisa dihapus.";
+      return;
+    }
+    const payments = await tx.payment.findMany({ where: { ticketId: id } });
+    if (payments.some((p) => !(p.note ?? "").startsWith("DP awal saat servis"))) {
+      blocked =
+        "Servis ini punya catatan pembayaran selain DP awal, jadi tidak bisa dihapus. Gunakan status Dibatalkan.";
+      return;
+    }
+    await tx.payment.deleteMany({ where: { ticketId: id } });
+    await tx.chatLog.deleteMany({ where: { ticketId: id } });
+    await tx.notification.deleteMany({ where: { ticketId: id } });
+    await tx.ticket.delete({ where: { id } });
+    await tx.auditLog.create({
+      data: {
+        id: randomUUID(),
+        userId: session.id,
+        ipAddress: clientIp(request),
+        action: "DELETE",
+        entity: "Ticket",
+        entityId: id,
+        // Enough to recognise what was removed if someone asks later.
+        detail: JSON.stringify({
+          customer: existing.customer,
+          phone: existing.phone,
+          device: existing.device,
+          issue: existing.issue,
+          status: existing.status,
+          receivedAt: existing.receivedAt,
+          downPayment: existing.downPayment,
+          dpPayments: payments.map((p) => ({ amount: p.amount, method: p.method })),
+        }),
+      },
+    });
+    deleted = existing;
+  });
+
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
+  if (!deleted)
+    return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
+  return NextResponse.json({ ok: true, id });
+}
