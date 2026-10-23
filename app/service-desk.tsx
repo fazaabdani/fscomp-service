@@ -1097,6 +1097,12 @@ function PaidNotaBody({
             </p>
           </section>
           <section>
+            <h4 className="trxSecHead">Ada Kendala?</h4>
+            <p className="trxFine">
+              Mohon hubungi kami lebih dulu lewat WhatsApp{shop.whatsapp || shop.phone ? ` ${shop.whatsapp || shop.phone}` : ""} sebelum memberi ulasan — kami siap membantu dan mencarikan solusinya.
+            </p>
+          </section>
+          <section>
             <h4 className="trxSecHead">Garansi Servis</h4>
             <ul className="trxBank">
               {ticket.warrantyDays ? (
@@ -1804,7 +1810,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     renderWaTemplate(shop.waSalutation, {
       nama: name.replace(/^\s*(bapak|pak|ibu|bu|mas|mbak|mba|kak|bang|abang|om|tante|haji|hj\.?|h\.)\s+/i, "").trim() || name,
     });
-  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready") {
+  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready" | "picked") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
@@ -1819,6 +1825,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       keluhan: ticket.issue,
       tindakan: ticket.serviceAction?.trim() || "perbaikan sesuai hasil pengecekan",
       estimasi: money(ticket.estimate),
+      garansi:
+        ticket.warrantyDays && ticket.warrantyDays > 0
+          ? `\n\nGaransi servis: ${warrantyLabel(ticket.warrantyDays)}, berlaku sampai ${printDateLabel(warrantyEndDate(ticket))}.`
+          : "",
       temuan: (() => {
         const q = qcByTicket.get(ticket.id);
         return q ? qcFindingsText(q.items) || "tidak ditemukan masalah lain" : "";
@@ -1840,7 +1850,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           ? shop.waCost
           : kind === "ready"
             ? shop.waReady
-            : shop.waCostOptions;
+            : kind === "picked"
+              ? shop.waPickedUp || WA_TEMPLATE_DEFAULTS.waPickedUp
+              : shop.waCostOptions;
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
     return `${base}?text=${encodeURIComponent(message)}`;
   }
@@ -3415,6 +3427,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <a target="_blank" href={whatsappUrl(selected, "empty")}><MessageCircle/><span><b>Chat WhatsApp Kosong</b><small>Hanya membuka percakapan pelanggan tanpa isi pesan.</small></span></a>
                 <a target="_blank" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
                 <a target="_blank" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
+                <a target="_blank" href={whatsappUrl(selected, "picked")}><ShieldCheck/><span><b>Servis Diambil — Terima Kasih</b><small>Ucapan terima kasih, info garansi, dan ajakan chat WA dulu jika ada kendala.</small></span></a>
                 <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.{!selected.serviceAction?.trim() && " Tindakan teknisi belum diisi — isi dulu di detail servis agar pesan lebih jelas."}</small><span className="costChatVariants"><a target="_blank" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
               </div>
             </div>

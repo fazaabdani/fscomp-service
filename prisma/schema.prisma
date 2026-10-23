@@ -138,6 +138,7 @@ model ShopSettings {
   waCost         String @default("Kami sudah melakukan pengecekan {perangkat}. Untuk penanganan *{tindakan}*, estimasi biaya servisnya adalah *{estimasi}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.")
   waCostOptions  String @default("Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.")
   waReady        String @default("Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{pembayaran}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.")
+  waPickedUp     String @default("Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Unit dengan nomor servis *{nomor_servis}* sudah diambil.{garansi}\n\nJika ada kendala, pertanyaan, atau hal yang kurang berkenan, mohon kabari kami lebih dulu lewat chat WhatsApp ini. Insya Allah segera kami bantu dan carikan solusinya. Masukan Kakak sangat berarti untuk perbaikan layanan kami.")
   version     Int      @default(1)
   dbUpdatedAt DateTime @updatedAt
 }

@@ -6,7 +6,7 @@ import { clientIp } from "@/lib/audit";
 const FIELDS = new Set([
   "name", "phone", "whatsapp", "address", "description", "terms", "bank", "lockEnabled",
   "instagram", "tiktok", "qcEnabled",
-  "waSalutation", "waClosing", "waReceived", "waCost", "waCostOptions", "waReady",
+  "waSalutation", "waClosing", "waReceived", "waCost", "waCostOptions", "waReady", "waPickedUp",
 ]);
 
 export async function GET() {

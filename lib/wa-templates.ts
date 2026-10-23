@@ -8,7 +8,8 @@ export type WaTemplateKey =
   | "waReceived"
   | "waCost"
   | "waCostOptions"
-  | "waReady";
+  | "waReady"
+  | "waPickedUp";
 
 export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
   waSalutation: "Assalamu'alaikum warahmatullahi wabarakatuh, Kak {nama}",
@@ -21,6 +22,8 @@ export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
     "Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.",
   waReady:
     "Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{pembayaran}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.",
+  waPickedUp:
+    "Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Unit dengan nomor servis *{nomor_servis}* sudah diambil.{garansi}\n\nJika ada kendala, pertanyaan, atau hal yang kurang berkenan, mohon kabari kami lebih dulu lewat chat WhatsApp ini. Insya Allah segera kami bantu dan carikan solusinya. Masukan Kakak sangat berarti untuk perbaikan layanan kami.",
 };
 
 export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
@@ -30,6 +33,7 @@ export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
   waCost: "Konfirmasi Biaya — Satu Nominal",
   waCostOptions: "Konfirmasi Biaya — Beberapa Pilihan",
   waReady: "Servis Selesai — Siap Diambil",
+  waPickedUp: "Servis Diambil — Terima Kasih & Jalur Komplain",
 };
 
 export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: string }[]> = {
@@ -60,6 +64,13 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
     { token: "{nomor_servis}", label: "Nomor servis" },
     { token: "{pembayaran}", label: "Info biaya / sisa / lunas" },
     { token: "{sisa}", label: "Sisa pembayaran" },
+    { token: "{link_tracking}", label: "Link tracking" },
+  ],
+  waPickedUp: [
+    { token: "{toko}", label: "Nama toko" },
+    { token: "{perangkat}", label: "Perangkat" },
+    { token: "{nomor_servis}", label: "Nomor servis" },
+    { token: "{garansi}", label: "Info garansi (kosong jika tanpa garansi)" },
     { token: "{link_tracking}", label: "Link tracking" },
   ],
 };
