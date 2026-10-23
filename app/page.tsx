@@ -11,7 +11,7 @@ export default async function HomePage() {
   // screen rather than the full app with menus hidden.
   if (session?.role === "INTERN") {
     const shop = await prisma.shopSettings.findUnique({ where: { id: "default" } });
-    return <QcDesk userName={session.name} shopName={shop?.name || "FS COMP"} />;
+    return <QcDesk userName={session.name} shopName={shop?.name || "FS COMP"} enabled={shop?.qcEnabled ?? true} />;
   }
   return <ServiceDesk />;
 }

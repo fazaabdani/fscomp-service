@@ -182,6 +182,7 @@ type ShopSettings = {
   bank: string;
   instagram: string;
   tiktok: string;
+  qcEnabled?: boolean;
   // One kind of item per line; changed only via /api/shop/device-types.
   deviceTypes: string;
   lockEnabled: boolean;
@@ -197,6 +198,7 @@ const defaultSettings: ShopSettings = {
   bank: "BCA 251-029-8724 a/n Faza Abdani Auni Robbi",
   instagram: "fscomp_id",
   tiktok: "fscomp_id",
+  qcEnabled: true,
   deviceTypes: "Laptop\nKomputer / PC\nMonitor\nPrinter\nLainnya",
   lockEnabled: false,
   ...WA_TEMPLATE_DEFAULTS,
@@ -1315,7 +1317,12 @@ export default function ServiceDesk() {
       window.removeEventListener("focus", onVisible);
     };
   }, []);
-  const qcByTicket = useMemo(() => new Map(qcChecks.map((c) => [c.ticketId as string, c])), [qcChecks]);
+  // QC can be switched off in Profil Toko; saved checks are kept but not shown.
+  const qcOn = shop.qcEnabled !== false;
+  const qcByTicket = useMemo(
+    () => new Map(qcOn ? qcChecks.map((c) => [c.ticketId as string, c]) : []),
+    [qcChecks, qcOn],
+  );
   const loadQc = () =>
     fetch("/api/qc", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -2885,6 +2892,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <small>Keluhan pelanggan (saat unit masuk)</small>
                 <strong>{selected.issue}</strong>
               </div>
+              {qcOn && (
               <QcPanel
                 check={qcByTicket.get(selected.id) || null}
                 canReview
@@ -2908,6 +2916,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   );
                 }}
               />
+              )}
               <div className="actionNote">
                 <label>
                   <b>Tindakan teknisi</b>
@@ -5098,6 +5107,25 @@ function SettingsPanel({
               />
             </label>
           </div>
+        </section>
+        <section className="settingsCard lockCard">
+          <div className="settingsTitle">
+            <span>
+              <ClipboardCheck />
+            </span>
+            <div>
+              <h3>Cek Awal (QC)</h3>
+              <p>Checklist pengecekan unit oleh magang dan tinjauan teknisi. Jika dimatikan, panel QC, notifikasi, dan antrean QC magang tidak aktif (data QC tetap tersimpan).</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`switchControl ${form.qcEnabled !== false ? "on" : ""}`}
+            onClick={() => field("qcEnabled", form.qcEnabled === false)}
+          >
+            <i />
+            <span>{form.qcEnabled !== false ? "AKTIF" : "NONAKTIF"}</span>
+          </button>
         </section>
         <section className="settingsCard lockCard">
           <div className="settingsTitle">

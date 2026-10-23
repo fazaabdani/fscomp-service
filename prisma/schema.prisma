@@ -124,6 +124,9 @@ model ShopSettings {
   // PATCH: it is changed only through /api/shop/device-types so a stale
   // settings form can never overwrite a type someone just added.
   deviceTypes String   @default("Laptop\nKomputer / PC\nMonitor\nPrinter\nLainnya")
+  // Master switch for the QC (cek awal) feature. Off: the checklist, review panel,
+  // review alerts and the intern desk are all inactive; saved QC data is kept.
+  qcEnabled   Boolean  @default(true)
   lockEnabled Boolean  @default(false)
   // Editable WhatsApp message templates (see lib/wa-templates.ts for the
   // {placeholder} substitution and defaults matching the previous

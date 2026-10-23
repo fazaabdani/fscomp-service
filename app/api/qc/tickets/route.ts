@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
+import { qcEnabled } from "@/lib/qc-enabled";
 
 /** The intern's work list: jobs still at the checking stage, with no money
  * fields and no phone number — interns only need to see the unit and the
@@ -8,6 +9,7 @@ import { currentSession } from "@/lib/session";
 export async function GET() {
   const session = await currentSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await qcEnabled())) return NextResponse.json({ enabled: false, tickets: [] });
   const tickets = await prisma.ticket.findMany({
     where: { status: { in: ["Belum Cek", "Sedang Tes", "Sedang Cek"] } },
     orderBy: [{ receivedAt: "asc" }, { receivedTime: "asc" }],
@@ -32,6 +34,7 @@ export async function GET() {
   const latest = new Map<string, (typeof rows)[number]>();
   for (const r of rows) if (!latest.has(r.ticketId)) latest.set(r.ticketId, r);
   return NextResponse.json({
+    enabled: true,
     tickets: tickets.map((t) => {
       const q = latest.get(t.id);
       return {

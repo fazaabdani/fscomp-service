@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { finalPrice } from "@/lib/ticket-money";
+import { qcEnabled } from "@/lib/qc-enabled";
 
 const daysSince = (dateStr: string, now: number) =>
   Math.floor((now - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
@@ -15,7 +16,9 @@ export async function GET() {
   if (u.role === "INTERN") return NextResponse.json({ alerts: [] });
   // QC finished by an intern and waiting for a technician to look at it.
   const openIds = tickets.filter((t) => !["Sudah Diambil", "Dibatalkan"].includes(t.status)).map((t) => t.id);
-  const qcRows = await prisma.qcCheck.findMany({
+  const qcRows = !(await qcEnabled())
+    ? []
+    : await prisma.qcCheck.findMany({
     where: { ticketId: { in: openIds } },
     orderBy: { createdAt: "desc" },
   });

@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { clientIp } from "@/lib/audit";
+import { qcEnabled } from "@/lib/qc-enabled";
 
 const RESULTS = new Set(["ok", "bad", "unsure", "na"]);
 // A QC can only be (re)filled while the job is still being looked at.
@@ -55,6 +56,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await currentSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await qcEnabled()))
+    return NextResponse.json({ error: "Fitur QC sedang dinonaktifkan oleh Admin" }, { status: 409 });
   const body = await request.json().catch(() => null);
   const ticketId = String(body?.ticketId ?? "");
   const checkedBy = String(body?.checkedBy ?? "").replace(/\s+/g, " ").trim().slice(0, 60);

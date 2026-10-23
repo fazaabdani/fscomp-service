@@ -251,7 +251,7 @@ export function QcForm({
 type QueueTicket = QcTicket & { qc: QcCheckData | null };
 
 /** What an intern sees: only the QC queue. No prices, phones or other menus. */
-export default function QcDesk({ userName, shopName }: { userName: string; shopName: string }) {
+export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: { userName: string; shopName: string; enabled: boolean }) {
   const [tickets, setTickets] = useState<QueueTicket[]>([]);
   const [tab, setTab] = useState<"todo" | "done">("todo");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -259,6 +259,7 @@ export default function QcDesk({ userName, shopName }: { userName: string; shopN
   const [online, setOnline] = useState(true);
   const [pwOpen, setPwOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [enabled, setEnabled] = useState(enabledAtLoad);
 
   const load = useCallback(async () => {
     try {
@@ -270,6 +271,7 @@ export default function QcDesk({ userName, shopName }: { userName: string; shopN
       if (!r.ok) return;
       const d = await r.json();
       setTickets(d.tickets);
+      setEnabled(d.enabled !== false);
       setOnline(true);
       setLoaded(true);
     } catch {
@@ -334,7 +336,9 @@ export default function QcDesk({ userName, shopName }: { userName: string; shopN
           </button>
         </div>
 
-        {!loaded ? (
+        {!enabled ? (
+          <p className="qcxEmpty">Fitur QC sedang dinonaktifkan oleh Admin. Tidak ada yang perlu dicek saat ini.</p>
+        ) : !loaded ? (
           <p className="qcxEmpty">Memuat…</p>
         ) : shown.length === 0 ? (
           <p className="qcxEmpty">
