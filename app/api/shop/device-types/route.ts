@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { clientIp } from "@/lib/audit";
+import { isShopLocked } from "@/lib/shop-lock";
 
 const DEFAULT_DEVICE_TYPES = ["Laptop", "Komputer / PC", "Monitor", "Printer", "Lainnya"];
 
@@ -30,6 +31,11 @@ async function save(types: string[]) {
 export async function POST(request: Request) {
   const session = await currentSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.role !== "ADMIN" && (await isShopLocked()))
+    return NextResponse.json(
+      { error: "Toko sedang dikunci Admin — perubahan data ditunda sementara" },
+      { status: 423 },
+    );
   const body = await request.json().catch(() => null);
   const name = String(body?.name ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
   if (!name) return NextResponse.json({ error: "Nama jenis barang wajib diisi" }, { status: 400 });

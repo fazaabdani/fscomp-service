@@ -254,7 +254,7 @@ type QueueTicket = QcTicket & { qc: QcCheckData | null };
 export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: { userName: string; shopName: string; enabled: boolean }) {
   const [tickets, setTickets] = useState<QueueTicket[]>([]);
   const [tab, setTab] = useState<"todo" | "done">("todo");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [opened, setOpened] = useState<QueueTicket | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
   const [pwOpen, setPwOpen] = useState(false);
@@ -294,7 +294,9 @@ export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: {
   const todo = tickets.filter((t) => !t.qc);
   const done = tickets.filter((t) => t.qc);
   const shown = tab === "todo" ? todo : done;
-  const open = tickets.find((t) => t.id === openId) || null;
+  // Latest server copy while it is still in the queue, else the snapshot taken
+  // on open — a refresh must not close a form someone is filling in.
+  const open = opened ? tickets.find((t) => t.id === opened.id) || opened : null;
   const age = (d?: string) => {
     if (!d) return "";
     const days = Math.floor((Date.now() - new Date(`${d}T00:00:00`).getTime()) / 86400000);
@@ -347,7 +349,7 @@ export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: {
         ) : (
           <div className="qcxList">
             {shown.map((t) => (
-              <button key={t.id} className="qcxCard" onClick={() => setOpenId(t.id)}>
+              <button key={t.id} className="qcxCard" onClick={() => setOpened(t)}>
                 <div>
                   <b>{t.customer}</b>
                   <span>{t.id}</span>
@@ -380,9 +382,9 @@ export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: {
           key={open.id}
           ticket={open}
           existing={open.qc}
-          onClose={() => setOpenId(null)}
+          onClose={() => setOpened(null)}
           onSaved={() => {
-            setOpenId(null);
+            setOpened(null);
             setToast(`QC ${open.id} terkirim ke teknisi`);
             setTimeout(() => setToast(""), 3500);
             load();
