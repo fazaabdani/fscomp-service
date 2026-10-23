@@ -4121,19 +4121,11 @@ textarea {
      the unused bottom half can be trimmed if a physical A5 nota is
      wanted, without that being required. */
   .servicePrint.receipt,
+  .servicePrint.receipt2,
   .servicePrint.paid {
     width: 200mm;
     padding: 0;
     page: notaPortraitCard;
-  }
-  .servicePrint.receipt2 {
-    width: 200mm;
-    padding: 0;
-    page: notaA5Landscape;
-  }
-  @page notaA5Landscape {
-    size: A5 landscape;
-    margin: 4mm;
   }
   @page notaPortraitCard {
     size: A4 portrait;
@@ -6931,4 +6923,8 @@ textarea {
     line-height: 1.3;
   }
   .trxBrand .trxAddr svg { flex: none; margin-top: 0.3mm; }
+}
+
+@media print {
+  .versionPill { display: none !important; }
 }
