@@ -7102,3 +7102,46 @@ textarea {
 }
 .costEye:hover { background: #eef2fb; color: #1d4fd8; }
 .costMasked { -webkit-text-security: disc; text-security: disc; }
+
+/* ===== Follow-up list, itemised cost editor, nota review QR ===== */
+.followCols { grid-template-columns: 1.1fr 1.2fr 1.3fr 1.3fr 0.8fr 1.6fr; }
+.followCols .statusBadge { margin-left: 8px; }
+.followActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.followActions .ghost { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.costItemsPanel {
+  display: grid; gap: 8px; margin: 0 24px 10px; padding: 14px 16px;
+  border: 1px solid #d9e1f3; border-radius: 12px; background: #fbfcff;
+}
+.costItemsPanel.closed { grid-template-columns: 1fr auto; align-items: center; }
+.costItemsPanel b { font-size: 14px; }
+.costItemsPanel span { font-size: 12.5px; color: #6b7a99; }
+.costItemsPanel.closed > div { display: grid; gap: 2px; }
+.costItemsHead { display: grid; gap: 2px; }
+.costItemRow { display: grid; grid-template-columns: 1fr 140px 32px; gap: 8px; }
+.costItemRow input {
+  padding: 8px 10px; border: 1px solid #cfd6e4; border-radius: 8px; background: #fff;
+  font: inherit; font-size: 13.5px; min-width: 0;
+}
+.costItemRow button {
+  border: 0; border-radius: 8px; background: #eef2fb; color: #6b7a99; font-size: 18px; cursor: pointer;
+}
+.costItemRow button:hover { background: #fde8e6; color: #b3261e; }
+.costItemsTools { display: flex; gap: 8px; flex-wrap: wrap; }
+.costItemsTools select {
+  padding: 7px 10px; border: 1px solid #cfd6e4; border-radius: 8px; background: #fff; font: inherit; font-size: 13px;
+}
+.costItemsTotal { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.costItemsTotal em { font-style: normal; color: #9a5b00; }
+.costItemsTotal > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.trackNote { margin: 12px 0 0; font-size: 12.5px; color: #6b7a99; line-height: 1.5; }
+@media print {
+  .trxMoney > .trxItemRow { padding: 0.7mm 3mm; }
+  .trxMoney .trxItemRow span { color: #44526b; font-weight: 500; font-size: 6.4pt; }
+  .trxMoney .trxItemRow b { color: #44526b; font-weight: 600; font-size: 7.2pt; }
+}
+@media print {
+  .trxKendala { display: flex; align-items: center; gap: 3mm; margin-top: 1.2mm; }
+  .trxKendala p { margin: 0; color: var(--trx-muted); font-size: 6.2pt; line-height: 1.4; }
+  .trxKendala p b { color: var(--trx-navy); }
+  .trxKendala svg { flex: none; width: 10mm; height: 10mm; }
+}

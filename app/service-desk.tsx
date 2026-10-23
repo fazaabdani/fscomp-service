@@ -6,6 +6,7 @@ import { normalizePhone } from "@/lib/phone";
 import { PasswordModal } from "./password-modal";
 import { QcForm, type QcCheckData } from "./qc-desk";
 import { qcFindingsText } from "@/lib/qc-templates";
+import { costItemsWaText, costLines, parseCostItems, sumCostItems, type CostItem } from "@/lib/cost-items";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
 import {
@@ -71,6 +72,7 @@ import {
   Instagram,
   Trash2,
   ClipboardCheck,
+  HeartHandshake,
   Landmark,
   LogOut,
   KeyRound,
@@ -98,6 +100,10 @@ type Ticket = {
   phone: string;
   device: string;
   deviceType?: string | null;
+  // JSON text [{name, amount}] — itemised price lines for printed documents.
+  costItems?: string | null;
+  // Date the customer was asked how the unit is doing after pickup.
+  followedUpAt?: string | null;
   brand: string;
   serial: string;
   issue: string;
@@ -184,6 +190,7 @@ type ShopSettings = {
   instagram: string;
   tiktok: string;
   qcEnabled?: boolean;
+  reviewUrl?: string;
   // One kind of item per line; changed only via /api/shop/device-types.
   deviceTypes: string;
   lockEnabled: boolean;
@@ -200,6 +207,7 @@ const defaultSettings: ShopSettings = {
   instagram: "fscomp_id",
   tiktok: "fscomp_id",
   qcEnabled: true,
+  reviewUrl: "",
   deviceTypes: "Laptop\nKomputer / PC\nMonitor\nPrinter\nLainnya",
   lockEnabled: false,
   ...WA_TEMPLATE_DEFAULTS,
@@ -387,6 +395,7 @@ const nav = [
   [Wrench, "Proses Servis"],
   [PackageCheck, "Bisa Diambil"],
   [CheckCircle2, "Sudah Diambil"],
+  [HeartHandshake, "Tindak Lanjut"],
   [Shield, "Status Garansi"],
   [Banknote, "Status Pembayaran"],
   [BarChart3, "Laporan Servis"],
@@ -395,6 +404,7 @@ const nav = [
 
 const NOTIF_META: Record<string, { icon: typeof Clock3; label: string; tone: string }> = {
   QC_REVIEW: { icon: ClipboardCheck, label: "QC Perlu Ditinjau", tone: "info" },
+  FOLLOW_UP: { icon: HeartHandshake, label: "Tindak Lanjut", tone: "info" },
   SERVICE_OLD: { icon: Clock3, label: "Servis Lama", tone: "warn" },
   READY_NOT_PICKED_UP: { icon: PackageCheck, label: "Belum Diambil", tone: "info" },
   WAITING_CONFIRMATION_STUCK: { icon: MessageCircle, label: "Menunggu Konfirmasi", tone: "info" },
@@ -558,6 +568,190 @@ const printDateLabel = (d: string) =>
     month: "long",
     year: "numeric",
   });
+
+function FollowUpPanel({
+  tickets,
+  waUrl,
+  onMark,
+  onOpen,
+}: {
+  tickets: Ticket[];
+  waUrl: (t: Ticket) => string;
+  onMark: (t: Ticket) => void;
+  onOpen: (t: Ticket) => void;
+}) {
+  const rows = tickets
+    .filter((t) => t.status === "Sudah Diambil" && t.pickedUpAt && !t.followedUpAt && ageDays(t.pickedUpAt) <= 14)
+    .sort((a, b) => (a.pickedUpAt || "").localeCompare(b.pickedUpAt || ""));
+  const due = rows.filter((t) => ageDays(t.pickedUpAt as string) >= 2).length;
+  return (
+    <div className="modulePage">
+      <section className="moduleHero warrantyHero">
+        <div>
+          <span className="miniTag">
+            <HeartHandshake size={14} /> PURNA JUAL
+          </span>
+          <h2>Tindak Lanjut Pelanggan</h2>
+          <p>
+            Tanyakan kabar unit 2 hari setelah diambil, selagi masalah kecil masih mudah dibereskan. Kirim ke semua
+            pelanggan dengan pesan yang sama.
+          </p>
+        </div>
+        <strong>
+          {due}
+          <small>Perlu ditanya</small>
+        </strong>
+      </section>
+      <section className="ticketPanel modulePanel">
+        <div className="panelTop">
+          <div>
+            <h3>Daftar Tindak Lanjut</h3>
+            <p>Diambil dalam 14 hari terakhir dan belum ditanya · {rows.length} data</p>
+          </div>
+        </div>
+        <div className="simpleDataHead followCols">
+          <span>No. Servis</span>
+          <span>Pelanggan</span>
+          <span>Barang</span>
+          <span>Diambil</span>
+          <span>Teknisi</span>
+          <span>Aksi</span>
+        </div>
+        {rows.length === 0 && <p className="qcxEmpty">Semua pelanggan terbaru sudah ditanya kabarnya.</p>}
+        {rows.map((t) => {
+          const d = ageDays(t.pickedUpAt as string);
+          return (
+            <div className="simpleDataRow followCols" key={t.id}>
+              <span>
+                <button onClick={() => onOpen(t)}>{t.id}</button>
+              </span>
+              <span>{t.customer}</span>
+              <span>{t.device}</span>
+              <span>
+                {t.pickedUpAt}
+                <i className={`statusBadge ${d >= 2 ? "warning" : "neutral"}`}>{d >= 2 ? `H+${d}` : "Belum waktunya"}</i>
+              </span>
+              <span>{t.technician || "-"}</span>
+              <span className="followActions">
+                <a className="ghost" target="_blank" rel="noreferrer" href={waUrl(t)} onClick={() => onMark(t)}>
+                  <MessageCircle size={15} /> Tanya kabar
+                </a>
+                <button className="ghost" onClick={() => onMark(t)}>
+                  Sudah / lewati
+                </button>
+              </span>
+            </div>
+          );
+        })}
+      </section>
+    </div>
+  );
+}
+
+function CostItemsPanel({
+  ticket,
+  services,
+  onSave,
+  onApply,
+}: {
+  ticket: Ticket;
+  services: ServiceItem[];
+  onSave: (items: CostItem[]) => void;
+  onApply: (field: "estimate" | "finalCost", total: number) => void;
+}) {
+  const [items, setItems] = useState<CostItem[]>(() => parseCostItems(ticket.costItems));
+  const [open, setOpen] = useState(() => parseCostItems(ticket.costItems).length > 0);
+  const saved = JSON.stringify(parseCostItems(ticket.costItems));
+  // Pick up changes saved elsewhere (another tab); applying a total to the
+  // estimate must not wipe rows that are still being typed.
+  useEffect(() => {
+    setItems(parseCostItems(ticket.costItems));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved]);
+  const dirty = JSON.stringify(items.filter((i) => i.name.trim())) !== saved;
+  const total = sumCostItems(items.filter((i) => i.name.trim()));
+  const price = ticket.finalCost || ticket.estimate || 0;
+  const priceOf = (sv: ServiceItem) => (ticket.category === "Toko" ? sv.shopPrice : sv.userPrice);
+  const setRow = (i: number, patch: Partial<CostItem>) => setItems((old) => old.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  if (!open)
+    return (
+      <div className="costItemsPanel closed">
+        <div>
+          <b>Rincian biaya</b>
+          <span>Pecah biaya jadi beberapa item agar pelanggan paham apa yang dibayar (tampil di nota dan pesan WA).</span>
+        </div>
+        <button type="button" className="ghost" onClick={() => setOpen(true)}>
+          + Isi rincian
+        </button>
+      </div>
+    );
+  return (
+    <div className="costItemsPanel">
+      <div className="costItemsHead">
+        <b>Rincian biaya</b>
+        <span>Tampil di tanda terima, nota lunas, dan pesan WA biaya.</span>
+      </div>
+      {items.map((r, i) => (
+        <div className="costItemRow" key={i}>
+          <input
+            value={r.name}
+            maxLength={80}
+            placeholder="Nama item, mis. Keyboard Acer Aspire 5"
+            onChange={(e) => setRow(i, { name: e.target.value })}
+          />
+          <input
+            type="number"
+            min="0"
+            value={r.amount || ""}
+            placeholder="0"
+            onChange={(e) => setRow(i, { amount: Number(e.target.value) || 0 })}
+          />
+          <button type="button" aria-label="Hapus baris" onClick={() => setItems((old) => old.filter((_, j) => j !== i))}>
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="costItemsTools">
+        <button type="button" className="ghost" onClick={() => setItems((old) => [...old, { name: "", amount: 0 }])}>
+          + Tambah baris
+        </button>
+        {services.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              const sv = services.find((x) => x.id === e.target.value);
+              if (sv) setItems((old) => [...old, { name: sv.name, amount: priceOf(sv) }]);
+            }}
+          >
+            <option value="">+ Dari Jasa Servis…</option>
+            {services.map((sv) => (
+              <option key={sv.id} value={sv.id}>
+                {sv.name} — {money(priceOf(sv))}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className="costItemsTotal">
+        <span>
+          Total rincian <b>{money(total)}</b>
+          {price > 0 && total !== price && <em> · biaya sekarang {money(price)} (selisih tampil sebagai &quot;penyesuaian&quot; di nota)</em>}
+        </span>
+        <div>
+          <button type="button" className="ghost" disabled={total <= 0} onClick={() => onApply("estimate", total)}>
+            Pakai sebagai Estimasi
+          </button>
+          <button type="button" className="ghost" disabled={total <= 0} onClick={() => onApply("finalCost", total)}>
+            Pakai sebagai Biaya final
+          </button>
+          <button type="button" className="newButton" disabled={!dirty} onClick={() => onSave(items.filter((i) => i.name.trim()))}>
+            Simpan rincian
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function QcPanel({
   check,
@@ -933,6 +1127,12 @@ function ServiceReceiptBody({
           <section>
             <h4 className="trxSecHead">Rincian Biaya</h4>
             <div className="trxMoney">
+              {costLines(parseCostItems(ticket.costItems), ticket.estimate, 5).map((l, i) => (
+                <div className="trxItemRow" key={i}>
+                  <span>{l.name}</span>
+                  <b>{l.amount < 0 ? "-" : ""}{money(Math.abs(l.amount))}</b>
+                </div>
+              ))}
               <div>
                 <span>Estimasi biaya</span>
                 <b>{ticket.estimate ? money(ticket.estimate) : "Belum diestimasi"}</b>
@@ -1043,6 +1243,10 @@ function PaidNotaBody({
                 <dd className="trxMono">{ticket.serial || "-"}</dd>
               </div>
               <div>
+                <dt>Teknisi</dt>
+                <dd>{ticket.technician || "-"}</dd>
+              </div>
+              <div>
                 <dt>Tanggal Ambil</dt>
                 <dd>
                   {printDateLabel(pickedAt)}
@@ -1073,6 +1277,12 @@ function PaidNotaBody({
           <section>
             <h4 className="trxSecHead">Ringkasan Pembayaran</h4>
             <div className="trxMoney">
+              {costLines(parseCostItems(ticket.costItems), total, 5).map((l, i) => (
+                <div className="trxItemRow" key={i}>
+                  <span>{l.name}</span>
+                  <b>{l.amount < 0 ? "-" : ""}{money(Math.abs(l.amount))}</b>
+                </div>
+              ))}
               <div>
                 <span>Biaya servis (final)</span>
                 <b>{money(total)}</b>
@@ -1094,12 +1304,6 @@ function PaidNotaBody({
               {freeClaim
                 ? "Servis ini klaim garansi dari servis sebelumnya, tanpa biaya."
                 : `Pembayaran sebesar ${money(total)} telah diterima secara penuh.`}
-            </p>
-          </section>
-          <section>
-            <h4 className="trxSecHead">Ada Kendala?</h4>
-            <p className="trxFine">
-              Mohon hubungi kami lebih dulu lewat WhatsApp{shop.whatsapp || shop.phone ? ` ${shop.whatsapp || shop.phone}` : ""} sebelum memberi ulasan — kami siap membantu dan mencarikan solusinya.
             </p>
           </section>
           <section>
@@ -1135,6 +1339,13 @@ function PaidNotaBody({
               ? "Garansi hanya untuk keluhan yang sama, tidak mencakup kerusakan baru akibat kelalaian pemakaian. Simpan nota ini sebagai bukti pembayaran dan klaim garansi."
               : "Servis ini tanpa garansi. Simpan nota ini sebagai bukti pembayaran."}
           </p>
+          <div className="trxKendala">
+            <p>
+              <b>Ada kendala?</b> Kami siap membantu lewat WhatsApp{shop.whatsapp || shop.phone ? ` ${shop.whatsapp || shop.phone}` : ""}.
+              {shop.reviewUrl ? " Puas atau kurang puas, ulasan jujur Anda di Google Maps (pindai QR) sangat berarti bagi kami." : ""}
+            </p>
+            {shop.reviewUrl && <QRCodeSVG value={shop.reviewUrl} size={48} level="M" />}
+          </div>
         </div>
         <DocSign
           left={{ label: "Diserahkan oleh", name: issuer }}
@@ -1353,6 +1564,16 @@ export default function ServiceDesk() {
   }, [showCost]);
   // QC can be switched off in Profil Toko; saved checks are kept but not shown.
   const qcOn = shop.qcEnabled !== false;
+  // Picked up 2-14 days ago and nobody has asked how the unit is doing yet.
+  const followDue = useMemo(
+    () =>
+      tickets.filter((t) => {
+        if (t.status !== "Sudah Diambil" || !t.pickedUpAt || t.followedUpAt) return false;
+        const d = ageDays(t.pickedUpAt);
+        return d >= 2 && d <= 14;
+      }).length,
+    [tickets],
+  );
   const qcByTicket = useMemo(
     () => new Map(qcOn ? qcChecks.map((c) => [c.ticketId as string, c]) : []),
     [qcChecks, qcOn],
@@ -1810,7 +2031,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     renderWaTemplate(shop.waSalutation, {
       nama: name.replace(/^\s*(bapak|pak|ibu|bu|mas|mbak|mba|kak|bang|abang|om|tante|haji|hj\.?|h\.)\s+/i, "").trim() || name,
     });
-  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready" | "picked") {
+  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready" | "picked" | "followup") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
@@ -1825,6 +2046,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       keluhan: ticket.issue,
       tindakan: ticket.serviceAction?.trim() || "perbaikan sesuai hasil pengecekan",
       estimasi: money(ticket.estimate),
+      rincian: costItemsWaText(parseCostItems(ticket.costItems), ticket.estimate, money),
       garansi:
         ticket.warrantyDays && ticket.warrantyDays > 0
           ? `\n\nGaransi servis: ${warrantyLabel(ticket.warrantyDays)}, berlaku sampai ${printDateLabel(warrantyEndDate(ticket))}.`
@@ -1852,7 +2074,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
             ? shop.waReady
             : kind === "picked"
               ? shop.waPickedUp || WA_TEMPLATE_DEFAULTS.waPickedUp
-              : shop.waCostOptions;
+              : kind === "followup"
+                ? shop.waFollowUp || WA_TEMPLATE_DEFAULTS.waFollowUp
+                : shop.waCostOptions;
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
     return `${base}?text=${encodeURIComponent(message)}`;
   }
@@ -2172,6 +2396,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <span>{label}</span>
               {label === "Proses Servis" && <b>{stats.process}</b>}
               {label === "Bisa Diambil" && <b>{stats.ready}</b>}
+              {label === "Tindak Lanjut" && followDue > 0 && <b>{followDue}</b>}
               {label === "Status Pembayaran" && (
                 <b>
                   {
@@ -2434,6 +2659,13 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   notify(data?.error || "Gagal menyimpan template pesan");
                 }
               }}
+            />
+          ) : active === "Tindak Lanjut" ? (
+            <FollowUpPanel
+              tickets={tickets}
+              waUrl={(t) => whatsappUrl(t, "followup")}
+              onMark={(t) => patchTicket(t.id, { followedUpAt: localDateStr() }, "Ditandai sudah ditanya")}
+              onOpen={openDetail}
             />
           ) : active === "Status Garansi" ? (
             <WarrantyPanel tickets={tickets} onOpen={openDetail} onClaim={startWarrantyClaim} shopName={shop.name} />
@@ -2991,6 +3223,21 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   />
                 </label>
               </div>
+              <CostItemsPanel
+                key={`items-${selected.id}`}
+                ticket={selected}
+                services={services}
+                onSave={(items) =>
+                  patchTicket(selected.id, { costItems: JSON.stringify(items) }, "Rincian biaya disimpan")
+                }
+                onApply={(field, total) =>
+                  patchTicket(
+                    selected.id,
+                    { [field]: total } as Partial<Ticket>,
+                    field === "estimate" ? "Estimasi diisi dari rincian" : "Biaya final diisi dari rincian",
+                  )
+                }
+              />
               <div className="detailGrid">
                 <div>
                   <small>Kelengkapan</small>
@@ -5108,6 +5355,18 @@ function SettingsPanel({
                 placeholder="tanpa @"
                 onChange={(e) => field("tiktok", e.target.value)}
               />
+            </label>
+            <label className="full">
+              Link ulasan Google Maps
+              <input
+                value={form.reviewUrl || ""}
+                placeholder="https://g.page/r/…/review"
+                onChange={(e) => field("reviewUrl", e.target.value)}
+              />
+              <small className="fieldHint">
+                Opsional. Jika diisi, kode QR ke halaman ulasan dicetak di nota lunas untuk semua pelanggan. Ambil dari
+                Google Business Profile → &quot;Minta ulasan&quot;.
+              </small>
             </label>
             <label className="full">
               Alamat toko

@@ -6,7 +6,7 @@ import { clientIp } from "@/lib/audit";
 const FIELDS = new Set([
   "name", "phone", "whatsapp", "address", "description", "terms", "bank", "lockEnabled",
   "instagram", "tiktok", "qcEnabled",
-  "waSalutation", "waClosing", "waReceived", "waCost", "waCostOptions", "waReady", "waPickedUp",
+  "waSalutation", "waClosing", "waReceived", "waCost", "waCostOptions", "waReady", "waPickedUp", "waFollowUp", "reviewUrl",
 ]);
 
 export async function GET() {
@@ -32,6 +32,13 @@ export async function PATCH(request: Request) {
   const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(body)) {
     if (FIELDS.has(k)) data[k] = v;
+  }
+  if ("reviewUrl" in data) {
+    const u = String(data.reviewUrl ?? "").trim();
+    // Printed as a QR on every nota, so it must be a real web link.
+    if (u && !/^https?:\/\/\S+$/i.test(u))
+      return NextResponse.json({ error: "Link ulasan harus diawali http:// atau https://" }, { status: 400 });
+    data.reviewUrl = u;
   }
   const shop = await prisma.shopSettings.upsert({
     where: { id: "default" },

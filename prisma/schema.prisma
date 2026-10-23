@@ -34,6 +34,10 @@ model Ticket {
   // Kind of item (Laptop, Komputer / PC, Monitor, ...), picked from the shop's
   // editable list (ShopSettings.deviceTypes). Null on jobs imported from the old app.
   deviceType        String?
+  // JSON [{name, amount}]: itemised price lines for the receipt, nota and cost message.
+  costItems         String?
+  // Date the customer was asked how the unit is doing after pickup (follow-up list).
+  followedUpAt      String?
   brand             String
   serial            String   @default("-")
   issue             String
@@ -127,6 +131,8 @@ model ShopSettings {
   // Master switch for the QC (cek awal) feature. Off: the checklist, review panel,
   // review alerts and the intern desk are all inactive; saved QC data is kept.
   qcEnabled   Boolean  @default(true)
+  // Google Maps "write a review" link; when set, a QR for it is printed on the nota for every customer.
+  reviewUrl   String   @default("")
   lockEnabled Boolean  @default(false)
   // Editable WhatsApp message templates (see lib/wa-templates.ts for the
   // {placeholder} substitution and defaults matching the previous
@@ -135,10 +141,11 @@ model ShopSettings {
   waSalutation   String @default("Assalamu'alaikum warahmatullahi wabarakatuh, Kak {nama}")
   waClosing      String @default("Jazakallahu khoiron 🤲😊")
   waReceived     String @default("Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Semoga Allah membalas kepercayaan Kakak dengan kebaikan. Barang Kakak sudah kami terima dengan nomor servis *{nomor_servis}* pada {tanggal_terima}.\n\nPerkembangan servis dapat dicek kapan saja melalui link berikut:\n{link_tracking}\n\nJika link belum dapat dibuka, silakan simpan nomor WhatsApp kami terlebih dahulu. Insya Allah kami akan mengabari kembali saat ada perkembangan.")
-  waCost         String @default("Kami sudah melakukan pengecekan {perangkat}. Untuk penanganan *{tindakan}*, estimasi biaya servisnya adalah *{estimasi}*.\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.")
+  waCost         String @default("Kami sudah melakukan pengecekan {perangkat}. Untuk penanganan *{tindakan}*, estimasi biaya servisnya adalah *{estimasi}*.{rincian}\n\nApakah servisnya boleh kami lanjutkan? Mohon balas *LANJUT* atau *TIDAK*. Jika ada yang ingin ditanyakan, silakan sampaikan ya, insya Allah kami bantu.")
   waCostOptions  String @default("Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.")
   waReady        String @default("Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{pembayaran}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.")
   waPickedUp     String @default("Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Unit dengan nomor servis *{nomor_servis}* sudah diambil.{garansi}\n\nJika ada kendala, pertanyaan, atau hal yang kurang berkenan, mohon kabari kami lebih dulu lewat chat WhatsApp ini. Insya Allah segera kami bantu dan carikan solusinya. Masukan Kakak sangat berarti untuk perbaikan layanan kami.")
+  waFollowUp     String @default("Kami dari *{toko}*. Unit {perangkat} (no. servis {nomor_servis}) sudah beberapa hari kembali ke Kakak, apakah berfungsi dengan baik?\n\nJika masih ada kendala atau ada yang kurang berkenan, kabari kami lewat chat ini ya. Insya Allah kami bantu secepatnya.")
   version     Int      @default(1)
   dbUpdatedAt DateTime @updatedAt
 }

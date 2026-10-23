@@ -9,6 +9,7 @@ type TrackTicket = {
   receivedAt: string;
   updatedAt: string;
   serviceAction?: string;
+  technician?: string;
 };
 
 export default function TrackPage() {
@@ -86,7 +87,17 @@ export default function TrackPage() {
                 <dt>Tindakan</dt>
                 <dd>{t.serviceAction || "Belum ada tindakan"}</dd>
               </div>
+              {t.technician && (
+                <div>
+                  <dt>Teknisi</dt>
+                  <dd>{t.technician}</dd>
+                </div>
+              )}
             </dl>
+            <p className="trackNote">
+              Setiap perbaikan dikerjakan dan diputuskan oleh teknisi kami. Tim magang hanya membantu pengecekan awal,
+              dan hasilnya selalu ditinjau teknisi.
+            </p>
           </div>
         ))}
       </section>

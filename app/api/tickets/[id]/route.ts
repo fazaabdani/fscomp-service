@@ -6,6 +6,7 @@ import { currentSession } from "@/lib/session";
 import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
+import { serializeCostItems } from "@/lib/cost-items";
 
 const FIELDS = new Set([
   "customer", "phone", "device", "deviceType", "brand", "serial", "issue", "accessories",
@@ -14,7 +15,7 @@ const FIELDS = new Set([
   "customerConfirmed", "costConfirmed", "category", "address", "condition",
   "serviceAction", "paymentMethod", "paymentTermDays", "warrantyDays",
   "pickedUpAt", "pickedUpTime", "handledAt", "handledTime", "notes",
-  "partCost", "pickupBy", "handedBy",
+  "partCost", "pickupBy", "handedBy", "costItems", "followedUpAt",
 ]);
 
 // Fields that represent money, day counts, or a rating — must never go
@@ -51,6 +52,8 @@ export async function PATCH(
   for (const [k, v] of Object.entries(body)) {
     if (FIELDS.has(k)) data[k] = v;
   }
+  // The editor sends a list; it is stored as normalised JSON text.
+  if ("costItems" in data) data.costItems = serializeCostItems(data.costItems);
   if (Object.keys(data).length === 0)
     return NextResponse.json({ error: "Tidak ada field yang diubah" }, { status: 400 });
 

@@ -17,6 +17,7 @@ function toSafeTicket(t: Record<string, unknown>) {
     receivedAt: t.receivedAt,
     updatedAt: t.updatedAt,
     serviceAction: t.serviceAction,
+    technician: t.technician,
   };
 }
 

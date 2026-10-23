@@ -77,6 +77,14 @@ export async function GET() {
         title: `Sisa Rp ${(total - t.downPayment).toLocaleString("id-ID")}, lewat tempo ${days - term} hari`,
       });
 
+    // Ask how the unit is doing a couple of days after pickup, while a small
+    // problem can still be fixed quietly (the follow-up list in the app).
+    if (t.status === "Sudah Diambil" && t.pickedUpAt && !t.followedUpAt) {
+      const since = daysSince(t.pickedUpAt, now);
+      if (since >= 2 && since <= 14)
+        alerts.push({ ...base, type: "FOLLOW_UP", title: `Tanya kabar pelanggan (diambil ${since} hari lalu)` });
+    }
+
     if (t.status === "Sudah Diambil" && t.warrantyDays && t.pickedUpAt) {
       const remain = t.warrantyDays - daysSince(t.pickedUpAt, now);
       if (remain > 0 && remain <= 3)
@@ -92,6 +100,7 @@ export async function GET() {
     PAYMENT_DUE: 0,
     WAITING_CONFIRMATION_STUCK: 1,
     READY_NOT_PICKED_UP: 2,
+    FOLLOW_UP: 2.5,
     WARRANTY_END: 3,
     SERVICE_OLD: 4,
   };
