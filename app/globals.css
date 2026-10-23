@@ -7093,3 +7093,12 @@ textarea {
 .qcAllOk, .qcSummary { margin: 0; font-size: 13px; color: #44526b; }
 .qcActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .actionLine.qcLine { color: #9a5b00; font-weight: 700; }
+
+/* ===== Modal / profit hidden by default (screen may face the customer) ===== */
+.costLabel { display: inline-flex; align-items: center; gap: 6px; }
+.costEye {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0;
+  border: 1px solid #d5ddee; border-radius: 6px; background: #fff; color: #6b7a99; cursor: pointer;
+}
+.costEye:hover { background: #eef2fb; color: #1d4fd8; }
+.costMasked { -webkit-text-security: disc; text-security: disc; }

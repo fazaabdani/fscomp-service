@@ -38,6 +38,7 @@ import {
   Clock3,
   Download,
   Eye,
+  EyeOff,
   FileText,
   LayoutDashboard,
   Menu,
@@ -657,10 +658,14 @@ function DeviceTypeField({
   types,
   defaultValue,
   onAdd,
+  optional = false,
 }: {
   types: string[];
   defaultValue?: string | null;
   onAdd: (name: string) => Promise<string | null>;
+  // Editing an old job (imported from the old app, no kind recorded) must not
+  // be blocked just because the kind was never filled in.
+  optional?: boolean;
 }) {
   const [value, setValue] = useState(defaultValue || "");
   const [adding, setAdding] = useState(false);
@@ -683,9 +688,9 @@ function DeviceTypeField({
     <label>
       Jenis barang
       <span className="deviceTypeRow">
-        <select name="deviceType" required value={value} onChange={(e) => setValue(e.target.value)}>
-          <option value="" disabled>
-            Pilih jenis barang
+        <select name="deviceType" required={!optional} value={value} onChange={(e) => setValue(e.target.value)}>
+          <option value="" disabled={!optional}>
+            {optional ? "— belum diisi —" : "Pilih jenis barang"}
           </option>
           {options.map((t) => (
             <option key={t}>{t}</option>
@@ -1130,6 +1135,10 @@ export default function ServiceDesk() {
   const [filter, setFilter] = useState<Status | "Semua">("Semua");
   const [active, setActive] = useState("Proses Servis");
   const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "handoff" | "scan" | "delete" | null>(null);
+  // Cost (modal) and profit are hidden by default: the screen is often turned
+  // toward the customer while the receipt is made. Revealed on request, and
+  // hidden again on any modal change or after a minute.
+  const [showCost, setShowCost] = useState(false);
   const [qcChecks, setQcChecks] = useState<QcCheckData[]>([]);
   const [qcTicket, setQcTicket] = useState<Ticket | null>(null);
   const [deleteText, setDeleteText] = useState("");
@@ -1317,6 +1326,14 @@ export default function ServiceDesk() {
       window.removeEventListener("focus", onVisible);
     };
   }, []);
+  useEffect(() => {
+    setShowCost(false);
+  }, [modal, selected?.id]);
+  useEffect(() => {
+    if (!showCost) return;
+    const id = setTimeout(() => setShowCost(false), 60_000);
+    return () => clearTimeout(id);
+  }, [showCost]);
   // QC can be switched off in Profil Toko; saved checks are kept but not shown.
   const qcOn = shop.qcEnabled !== false;
   const qcByTicket = useMemo(
@@ -2847,13 +2864,24 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     {currentUser?.role === "ADMIN" && (
                       <>
                         <span>
-                          Modal
-                          <strong>{money(selected.partCost || 0)}</strong>
+                          <span className="costLabel">
+                            Modal
+                            <button
+                              type="button"
+                              className="costEye"
+                              title={showCost ? "Sembunyikan modal & profit" : "Tampilkan modal & profit"}
+                              aria-label={showCost ? "Sembunyikan modal dan profit" : "Tampilkan modal dan profit"}
+                              onClick={() => setShowCost((v) => !v)}
+                            >
+                              {showCost ? <EyeOff size={13} /> : <Eye size={13} />}
+                            </button>
+                          </span>
+                          <strong>{showCost ? money(selected.partCost || 0) : "••••••"}</strong>
                         </span>
                         <span>
                           Profit
                           <strong>
-                            {money(finalPrice(selected) - (selected.partCost || 0))}
+                            {showCost ? money(finalPrice(selected) - (selected.partCost || 0)) : "••••••"}
                           </strong>
                         </span>
                       </>
@@ -3269,7 +3297,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Jam terima<input name="receivedTime" type="time" defaultValue={selected.receivedTime || ""}/></label>
                 <label>Nama pemilik<input name="customer" required defaultValue={selected.customer}/></label>
                 <label>Nomor WhatsApp<input name="phone" required defaultValue={selected.phone}/></label>
-                <DeviceTypeField types={deviceTypeList(shop)} defaultValue={selected.deviceType} onAdd={addDeviceType} />
+                <DeviceTypeField types={deviceTypeList(shop)} defaultValue={selected.deviceType} onAdd={addDeviceType} optional />
                 <label>Nama barang<input name="device" required defaultValue={selected.device}/></label>
                                 <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
                 <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
@@ -3278,7 +3306,31 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Teknisi<select name="technician" defaultValue={selected.technician || ""}><option value="">— belum ditentukan —</option>{nameOptions(staff.map((p) => p.name), selected.technician).map((n) => <option key={n}>{n}</option>)}</select></label>
                 <label className="full">Tindakan teknisi<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
-                {currentUser?.role === "ADMIN" && <label>Modal sparepart<input name="partCost" type="number" min="0" defaultValue={selected.partCost || 0}/></label>}
+                {currentUser?.role === "ADMIN" && (
+                  <label>
+                    <span className="costLabel">
+                      Modal sparepart
+                      <button
+                        type="button"
+                        className="costEye"
+                        title={showCost ? "Sembunyikan angka" : "Tampilkan angka"}
+                        aria-label={showCost ? "Sembunyikan angka modal" : "Tampilkan angka modal"}
+                        onClick={() => setShowCost((v) => !v)}
+                      >
+                        {showCost ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                    </span>
+                    <input
+                      name="partCost"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      autoComplete="off"
+                      className={showCost ? "" : "costMasked"}
+                      defaultValue={selected.partCost || 0}
+                    />
+                  </label>
+                )}
                 <label>Estimasi biaya<input name="estimate" type="number" min="0" defaultValue={selected.estimate}/></label>
                 <label>Biaya servis final<input name="finalCost" type="number" min="0" defaultValue={selected.finalCost || 0}/></label>
                 <label>Tanggal ditangani<input name="handledAt" type="date" defaultValue={selected.handledAt || ""}/></label>
