@@ -6867,3 +6867,68 @@ textarea {
     height: 15px;
   }
 }
+
+/* ===== Jenis barang picker, receipt address under the logo ===== */
+.deviceTypeRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+.deviceTypeRow:first-of-type { margin-top: 0; }
+.deviceTypeRow select,
+.deviceTypeRow input { flex: 1; min-width: 0; }
+.deviceTypeAdd {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #cfd6e4;
+  border-radius: 8px;
+  background: #fff;
+  color: #3f4d68;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.deviceTypeAdd:disabled { opacity: 0.5; cursor: not-allowed; }
+.deviceTypeManage { display: grid; gap: 8px; }
+.deviceTypeManage > span { font-size: 13px; font-weight: 600; color: #3f4d68; }
+.deviceTypeManage > div:first-of-type { display: flex; flex-wrap: wrap; gap: 6px; }
+.deviceTypeManage i {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 11px;
+  border-radius: 999px;
+  background: #eef2fb;
+  color: #2b3a63;
+  font-style: normal;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.deviceTypeManage i button {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #6b7a99;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.deviceTypeManage i button:hover { background: #dbe3f5; color: #b3261e; }
+@media print {
+  .trxBrand .trxAddr {
+    display: flex;
+    align-items: flex-start;
+    gap: 1mm;
+    max-width: 92mm;
+    margin-top: 1.1mm;
+    color: var(--trx-muted);
+    font-size: 6.3pt;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  .trxBrand .trxAddr svg { flex: none; margin-top: 0.3mm; }
+}

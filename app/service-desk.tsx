@@ -64,6 +64,7 @@ import {
   Phone,
   MapPin,
   Globe,
+  Instagram,
   Landmark,
   LogOut,
   KeyRound,
@@ -90,6 +91,7 @@ type Ticket = {
   customer: string;
   phone: string;
   device: string;
+  deviceType?: string | null;
   brand: string;
   serial: string;
   issue: string;
@@ -173,17 +175,24 @@ type ShopSettings = {
   description: string;
   terms: string;
   bank: string;
+  instagram: string;
+  tiktok: string;
+  // One kind of item per line; changed only via /api/shop/device-types.
+  deviceTypes: string;
   lockEnabled: boolean;
 } & Record<WaTemplateKey, string>;
 const defaultSettings: ShopSettings = {
   name: "FS COMP",
-  phone: "0816692428",
-  whatsapp: "0816692428",
+  phone: "0816660056",
+  whatsapp: "0816660056",
   address: "Jalan Raya Wiradesa No. 1, Pekalongan",
   description: "Service, upgrade, jual beli laptop dan komputer",
   terms:
     "Barang yang tidak diambil lebih dari 30 hari setelah konfirmasi bukan tanggung jawab toko.",
   bank: "BCA 251-029-8724 a/n Faza Abdani Auni Robbi",
+  instagram: "fscomp_id",
+  tiktok: "fscomp_id",
+  deviceTypes: "Laptop\nKomputer / PC\nMonitor\nPrinter\nLainnya",
   lockEnabled: false,
   ...WA_TEMPLATE_DEFAULTS,
 };
@@ -541,6 +550,90 @@ const printDateLabel = (d: string) =>
     year: "numeric",
   });
 
+const deviceTypeList = (shop: { deviceTypes?: string }) =>
+  (shop.deviceTypes ?? defaultSettings.deviceTypes)
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+// Kind-of-item picker with an inline "add a new kind" box, shared by the intake
+// form and the edit form. New kinds are saved to the shop list straight away
+// (any signed-in user may add one) and selected.
+function DeviceTypeField({
+  types,
+  defaultValue,
+  onAdd,
+}: {
+  types: string[];
+  defaultValue?: string | null;
+  onAdd: (name: string) => Promise<string | null>;
+}) {
+  const [value, setValue] = useState(defaultValue || "");
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  // A job saved with a kind that was later removed from the list still shows it.
+  const options = value && !types.includes(value) ? [...types, value] : types;
+  async function add() {
+    if (!draft.trim() || busy) return;
+    setBusy(true);
+    const saved = await onAdd(draft);
+    setBusy(false);
+    if (saved) {
+      setValue(saved);
+      setDraft("");
+      setAdding(false);
+    }
+  }
+  return (
+    <label>
+      Jenis barang
+      <span className="deviceTypeRow">
+        <select name="deviceType" required value={value} onChange={(e) => setValue(e.target.value)}>
+          <option value="" disabled>
+            Pilih jenis barang
+          </option>
+          {options.map((t) => (
+            <option key={t}>{t}</option>
+          ))}
+        </select>
+        <button type="button" className="deviceTypeAdd" onClick={() => setAdding((x) => !x)}>
+          {adding ? "Batal" : "+ Tambah"}
+        </button>
+      </span>
+      {adding && (
+        <span className="deviceTypeRow">
+          <input
+            value={draft}
+            maxLength={40}
+            autoFocus
+            placeholder="Jenis baru, mis. Proyektor"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <button type="button" className="deviceTypeAdd" disabled={busy || !draft.trim()} onClick={add}>
+            Simpan
+          </button>
+        </span>
+      )}
+    </label>
+  );
+}
+
+const handle = (v: string) => v.trim().replace(/^@+/, "");
+
+function TikTokIcon({ size = 9 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.6 2h-3.2v13.2a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9.1a6.1 6.1 0 1 0 5.2 6.1V8.6a7.9 7.9 0 0 0 4.6 1.5V6.9a4.7 4.7 0 0 1-4.6-4.9z" />
+    </svg>
+  );
+}
+
 function DocHeader({
   ticket,
   shop,
@@ -570,6 +663,11 @@ function DocHeader({
               {brandRest.length ? ` ${brandRest.join(" ")}` : ""}
             </b>
             <small>Solusi teknologi, untuk masa depan</small>
+            {shop.address && (
+              <span className="trxAddr">
+                <MapPin size={8} /> {shop.address}
+              </span>
+            )}
           </div>
         </div>
         <div className="trxDoc">
@@ -602,14 +700,20 @@ function DocFooter({ shop }: { shop: ShopSettings }) {
             <Phone size={9} /> {shop.phone}
           </span>
         )}
-        {shop.whatsapp && (
+        {/* Same number for call and chat: print it once. */}
+        {shop.whatsapp && normalizePhone(shop.whatsapp) !== normalizePhone(shop.phone) && (
           <span>
             <MessageCircle size={9} /> {shop.whatsapp}
           </span>
         )}
-        {shop.address && (
+        {handle(shop.instagram || "") && (
           <span>
-            <MapPin size={9} /> {shop.address}
+            <Instagram size={9} /> @{handle(shop.instagram)}
+          </span>
+        )}
+        {handle(shop.tiktok || "") && (
+          <span>
+            <TikTokIcon /> @{handle(shop.tiktok)}
           </span>
         )}
         <span>
@@ -689,7 +793,9 @@ function ServiceReceiptBody({
                 <dt>Perangkat</dt>
                 <dd>
                   <b>{ticket.device}</b>
-                  {ticket.brand && <span>{ticket.brand}</span>}
+                  {(ticket.deviceType || ticket.brand) && (
+                    <span>{[ticket.deviceType, ticket.brand].filter(Boolean).join(" · ")}</span>
+                  )}
                 </dd>
               </div>
               <div>
@@ -818,7 +924,9 @@ function PaidNotaBody({
                 <dt>Perangkat</dt>
                 <dd>
                   <b>{ticket.device}</b>
-                  {ticket.brand && <span>{ticket.brand}</span>}
+                  {(ticket.deviceType || ticket.brand) && (
+                    <span>{[ticket.deviceType, ticket.brand].filter(Boolean).join(" · ")}</span>
+                  )}
                 </dd>
               </div>
               <div>
@@ -1276,6 +1384,37 @@ export default function ServiceDesk() {
     ready: tickets.filter((t) => t.status === "Bisa Diambil").length,
   };
 
+  async function addDeviceType(name: string): Promise<string | null> {
+    try {
+      const res = await fetch("/api/shop/device-types", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.deviceTypes) {
+        notify(data?.error || "Gagal menambah jenis barang");
+        return null;
+      }
+      setShop((old) => ({ ...old, deviceTypes: (data.deviceTypes as string[]).join("\n") }));
+      return data.name as string;
+    } catch {
+      notify("Tidak terhubung ke server — jenis barang belum tersimpan");
+      return null;
+    }
+  }
+  async function removeDeviceType(name: string) {
+    const res = await fetch("/api/shop/device-types", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.deviceTypes) {
+      setShop((old) => ({ ...old, deviceTypes: (data.deviceTypes as string[]).join("\n") }));
+      notify(`Jenis barang "${name}" dihapus dari pilihan`);
+    } else notify(data?.error || "Gagal menghapus jenis barang");
+  }
   function notify(message: string) {
     setToast(message);
   }
@@ -1459,6 +1598,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       customer: String(form.get("customer")),
       phone: String(form.get("phone")).replace(/\D/g, ""),
       device: String(form.get("device")),
+      deviceType: String(form.get("deviceType") || "") || null,
       serial: String(form.get("serial") || "-"),
       accessories: String(form.get("accessories") || "Unit only"),
       issue: String(form.get("issue")),
@@ -1624,6 +1764,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           customer: String(form.get("customer")),
           phone,
           device: String(form.get("device")),
+          deviceType: String(form.get("deviceType") || ""),
           serial,
           issue: String(form.get("issue")),
           accessories: String(form.get("accessories") || "Unit only"),
@@ -2024,6 +2165,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           ) : active === "Profil Toko" ? (
             <SettingsPanel
               shop={shop}
+              onAddType={addDeviceType}
+              onRemoveType={removeDeviceType}
               onSave={async (value) => {
                 setShop(value);
                 const res = await fetch("/api/shop", {
@@ -2358,6 +2501,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   Alamat pelanggan
                   <input name="address" defaultValue={warrantyClaim?.address && warrantyClaim.address !== "-" ? warrantyClaim.address : ""} placeholder="Desa / kecamatan / kota" />
                 </label>
+                <DeviceTypeField
+                  types={deviceTypeList(shop)}
+                  defaultValue={warrantyClaim?.deviceType}
+                  onAdd={addDeviceType}
+                />
                 <label>
                   Nama barang
                   <input
@@ -2930,6 +3078,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Jam terima<input name="receivedTime" type="time" defaultValue={selected.receivedTime || ""}/></label>
                 <label>Nama pemilik<input name="customer" required defaultValue={selected.customer}/></label>
                 <label>Nomor WhatsApp<input name="phone" required defaultValue={selected.phone}/></label>
+                <DeviceTypeField types={deviceTypeList(shop)} defaultValue={selected.deviceType} onAdd={addDeviceType} />
                 <label>Nama barang<input name="device" required defaultValue={selected.device}/></label>
                                 <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
                 <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
@@ -4613,10 +4762,15 @@ function TechnicianReport({ tickets, shopName }: { tickets: Ticket[]; shopName: 
 function SettingsPanel({
   shop,
   onSave,
+  onAddType,
+  onRemoveType,
 }: {
   shop: ShopSettings;
   onSave: (shop: ShopSettings) => void;
+  onAddType: (name: string) => Promise<string | null>;
+  onRemoveType: (name: string) => void;
 }) {
+  const [newType, setNewType] = useState("");
   const [form, setForm] = useState(shop);
   // Skip re-syncing from the shop prop while the user has unsaved edits,
   // so a cross-tab conflict-merge (useAutosave's setShop on a 409) can't
@@ -4684,13 +4838,68 @@ function SettingsPanel({
                 onChange={(e) => field("whatsapp", e.target.value)}
               />
             </label>
+            <label>
+              Instagram
+              <input
+                value={form.instagram}
+                placeholder="tanpa @"
+                onChange={(e) => field("instagram", e.target.value)}
+              />
+            </label>
+            <label>
+              TikTok
+              <input
+                value={form.tiktok}
+                placeholder="tanpa @"
+                onChange={(e) => field("tiktok", e.target.value)}
+              />
+            </label>
             <label className="full">
               Alamat toko
               <textarea
                 value={form.address}
                 onChange={(e) => field("address", e.target.value)}
               />
+              <small className="fieldHint">
+                Tampil di bawah logo pada tanda terima dan nota. Instagram &amp; TikTok tampil di bagian bawah.
+              </small>
             </label>
+            <div className="full deviceTypeManage">
+              <span>Jenis barang saat input servis</span>
+              <div>
+                {deviceTypeList(shop).map((t) => (
+                  <i key={t}>
+                    {t}
+                    <button type="button" title={`Hapus ${t}`} onClick={() => onRemoveType(t)}>
+                      ×
+                    </button>
+                  </i>
+                ))}
+              </div>
+              <div className="deviceTypeRow">
+                <input
+                  value={newType}
+                  maxLength={40}
+                  placeholder="Tambah jenis baru, mis. Proyektor"
+                  onChange={(e) => setNewType(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onAddType(newType).then((ok) => ok && setNewType(""));
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="deviceTypeAdd"
+                  disabled={!newType.trim()}
+                  onClick={() => onAddType(newType).then((ok) => ok && setNewType(""))}
+                >
+                  + Tambah
+                </button>
+              </div>
+              <small className="fieldHint">Berlaku langsung tanpa menekan Simpan. Servis lama tidak berubah.</small>
+            </div>
             <label className="full">
               Deskripsi usaha
               <textarea

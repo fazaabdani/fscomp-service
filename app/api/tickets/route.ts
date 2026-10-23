@@ -92,6 +92,7 @@ export async function POST(request: Request) {
             customer,
             phone,
             device,
+            deviceType: str(b.deviceType).trim().slice(0, 40) || null,
             brand,
             serial: str(b.serial, "-").trim() || "-",
             issue,

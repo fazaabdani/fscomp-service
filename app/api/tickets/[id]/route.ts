@@ -8,7 +8,7 @@ import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
 
 const FIELDS = new Set([
-  "customer", "phone", "device", "brand", "serial", "issue", "accessories",
+  "customer", "phone", "device", "deviceType", "brand", "serial", "issue", "accessories",
   "technician", "receivedBy", "status", "estimate", "downPayment", "finalCost",
   "receivedAt", "receivedTime", "updatedAt", "statusChangedAt", "rating",
   "customerConfirmed", "costConfirmed", "category", "address", "condition",
