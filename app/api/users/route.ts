@@ -5,7 +5,7 @@ import { currentSession } from "@/lib/session";
 import { makePasswordHash, generateTempPassword } from "@/lib/password";
 import { clientIp } from "@/lib/audit";
 
-const ROLES = new Set(["ADMIN", "TECHNICIAN"]);
+const ROLES = new Set(["ADMIN", "TECHNICIAN", "INTERN"]);
 
 export async function GET() {
   const session = await currentSession();

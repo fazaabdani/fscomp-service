@@ -188,6 +188,7 @@ export async function DELETE(
     }
     await tx.payment.deleteMany({ where: { ticketId: id } });
     await tx.chatLog.deleteMany({ where: { ticketId: id } });
+    await tx.qcCheck.deleteMany({ where: { ticketId: id } });
     await tx.notification.deleteMany({ where: { ticketId: id } });
     await tx.ticket.delete({ where: { id } });
     await tx.auditLog.create({

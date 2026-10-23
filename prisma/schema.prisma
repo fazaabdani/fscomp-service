@@ -189,3 +189,27 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
+// One QC (cek awal / diagnosa) submission for a job. Interns fill the
+// checklist; a technician reviews it. Resubmitting adds a new row — the latest
+// row per ticket is the current one.
+model QcCheck {
+  id          String    @id @default(cuid())
+  ticketId    String
+  stage       String    @default("DIAGNOSA")
+  // Which checklist was used (Laptop, Komputer / PC, ...). Items are stored with
+  // their labels so later template edits never rewrite history.
+  template    String
+  // JSON: [{ id, group, label, result: ok|bad|unsure|na, note }]
+  items       String
+  summary     String?
+  // Typed name of whoever did the checking — interns share one login.
+  checkedBy   String
+  submittedBy String
+  badCount    Int       @default(0)
+  unsureCount Int       @default(0)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  @@index([ticketId])
+}

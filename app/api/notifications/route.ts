@@ -11,6 +11,16 @@ export async function GET() {
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const tickets = await prisma.ticket.findMany();
   const now = Date.now();
+  // Interns only do QC; the rest of the alerts are business information.
+  if (u.role === "INTERN") return NextResponse.json({ alerts: [] });
+  // QC finished by an intern and waiting for a technician to look at it.
+  const openIds = tickets.filter((t) => !["Sudah Diambil", "Dibatalkan"].includes(t.status)).map((t) => t.id);
+  const qcRows = await prisma.qcCheck.findMany({
+    where: { ticketId: { in: openIds } },
+    orderBy: { createdAt: "desc" },
+  });
+  const latestQc = new Map<string, (typeof qcRows)[number]>();
+  for (const q of qcRows) if (!latestQc.has(q.ticketId)) latestQc.set(q.ticketId, q);
   const alerts = [] as Array<{
     type: string;
     title: string;
@@ -21,6 +31,13 @@ export async function GET() {
   for (const t of tickets) {
     const days = daysSince(t.receivedAt, now);
     const base = { ticketId: t.id, customer: t.customer, device: t.device };
+    const qc = latestQc.get(t.id);
+    if (qc && !qc.reviewedAt)
+      alerts.push({
+        ...base,
+        type: "QC_REVIEW",
+        title: `QC selesai oleh ${qc.checkedBy}: ${qc.badCount} bermasalah${qc.unsureCount ? `, ${qc.unsureCount} tidak yakin` : ""} — tinjau`,
+      });
     if (!["Bisa Diambil", "Sudah Diambil", "Dibatalkan"].includes(t.status) && days > 7)
       alerts.push({ ...base, type: "SERVICE_OLD", title: `Servis ${days} hari, belum siap` });
 
@@ -68,6 +85,7 @@ export async function GET() {
   // type the numbers in the title (days/amount) are already the signal, so a
   // stable order by type is enough.
   const rank: Record<string, number> = {
+    QC_REVIEW: -1,
     PAYMENT_DUE: 0,
     WAITING_CONFIRMATION_STUCK: 1,
     READY_NOT_PICKED_UP: 2,

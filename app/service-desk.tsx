@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { normalizePhone } from "@/lib/phone";
+import { PasswordModal } from "./password-modal";
+import { QcForm, type QcCheckData } from "./qc-desk";
+import { qcFindingsText } from "@/lib/qc-templates";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
 import {
@@ -66,6 +69,7 @@ import {
   Globe,
   Instagram,
   Trash2,
+  ClipboardCheck,
   Landmark,
   LogOut,
   KeyRound,
@@ -154,7 +158,7 @@ type UserAccount = {
   id: string;
   name: string;
   username: string;
-  role: "ADMIN" | "TECHNICIAN";
+  role: "ADMIN" | "TECHNICIAN" | "INTERN";
   active: boolean;
 };
 type Customer = {
@@ -387,6 +391,7 @@ const nav = [
 ] as const;
 
 const NOTIF_META: Record<string, { icon: typeof Clock3; label: string; tone: string }> = {
+  QC_REVIEW: { icon: ClipboardCheck, label: "QC Perlu Ditinjau", tone: "info" },
   SERVICE_OLD: { icon: Clock3, label: "Servis Lama", tone: "warn" },
   READY_NOT_PICKED_UP: { icon: PackageCheck, label: "Belum Diambil", tone: "info" },
   WAITING_CONFIRMATION_STUCK: { icon: MessageCircle, label: "Menunggu Konfirmasi", tone: "info" },
@@ -550,6 +555,93 @@ const printDateLabel = (d: string) =>
     month: "long",
     year: "numeric",
   });
+
+function QcPanel({
+  check,
+  canReview,
+  onFill,
+  onReview,
+  onUseFindings,
+}: {
+  check: QcCheckData | null;
+  canReview: boolean;
+  onFill: () => void;
+  onReview: (c: QcCheckData) => void;
+  onUseFindings: (c: QcCheckData) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  if (!check)
+    return (
+      <div className="qcPanel empty">
+        <div>
+          <b>Cek awal / QC</b>
+          <span>Belum ada hasil pengecekan untuk servis ini.</span>
+        </div>
+        <button type="button" className="ghost" onClick={onFill}>
+          <ClipboardCheck size={16} /> Mulai QC
+        </button>
+      </div>
+    );
+  const problems = check.items.filter((i) => i.result === "bad" || i.result === "unsure");
+  return (
+    <div className={`qcPanel ${check.reviewedAt ? "reviewed" : "pending"}`}>
+      <div className="qcPanelHead">
+        <div>
+          <b>Hasil QC · {check.template}</b>
+          <span>
+            Dicek {check.checkedBy} · {new Date(check.createdAt).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            {check.reviewedAt ? ` · ditinjau ${check.reviewedBy}` : ""}
+          </span>
+        </div>
+        <div className="qcCounts">
+          <i className="bad">{check.badCount} bermasalah</i>
+          {check.unsureCount > 0 && <i className="unsure">{check.unsureCount} tidak yakin</i>}
+          <i className="ok">{check.items.filter((i) => i.result === "ok").length} baik</i>
+        </div>
+      </div>
+      {problems.length > 0 ? (
+        <ul className="qcProblems">
+          {problems.map((i) => (
+            <li key={i.id} className={i.result}>
+              <b>{i.label.replace(/[:?].*$/, "")}</b>
+              <span>{i.note}</span>
+              <em>{i.result === "bad" ? "Bermasalah" : "Tidak yakin"}</em>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="qcAllOk">Tidak ada item bermasalah.</p>
+      )}
+      {check.summary && <p className="qcSummary">Catatan: {check.summary}</p>}
+      {showAll && (
+        <ul className="qcAll">
+          {check.items.map((i) => (
+            <li key={i.id} className={i.result}>
+              <span>{i.label}</span>
+              <em>{i.result === "ok" ? "Baik" : i.result === "bad" ? "Bermasalah" : i.result === "unsure" ? "Tidak yakin" : "Tidak dites"}</em>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="qcActions">
+        <button type="button" className="ghost" onClick={() => setShowAll((x) => !x)}>
+          {showAll ? "Sembunyikan daftar lengkap" : "Lihat daftar lengkap"}
+        </button>
+        <button type="button" className="ghost" onClick={() => onUseFindings(check)}>
+          Salin temuan ke Tindakan
+        </button>
+        <button type="button" className="ghost" onClick={onFill}>
+          Isi ulang QC
+        </button>
+        {canReview && !check.reviewedAt && (
+          <button type="button" className="newButton" onClick={() => onReview(check)}>
+            <CheckCircle2 size={16} /> Tandai sudah ditinjau
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const deviceTypeList = (shop: { deviceTypes?: string }) =>
   (shop.deviceTypes ?? defaultSettings.deviceTypes)
@@ -1036,6 +1128,8 @@ export default function ServiceDesk() {
   const [filter, setFilter] = useState<Status | "Semua">("Semua");
   const [active, setActive] = useState("Proses Servis");
   const [modal, setModal] = useState<"new" | "detail" | "edit" | "chat" | "handoff" | "scan" | "delete" | null>(null);
+  const [qcChecks, setQcChecks] = useState<QcCheckData[]>([]);
+  const [qcTicket, setQcTicket] = useState<Ticket | null>(null);
   const [deleteText, setDeleteText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -1063,7 +1157,8 @@ export default function ServiceDesk() {
   const staff = useMemo<Staff[]>(
     () =>
       users
-        .filter((u) => u.active)
+        // Interns only do QC; they are never a technician or receiver.
+        .filter((u) => u.active && u.role !== "INTERN")
         .map((u) => ({
           id: u.id,
           name: u.name,
@@ -1094,7 +1189,7 @@ export default function ServiceDesk() {
   // True when reloading would not interrupt anything (no open modal/form, no
   // save in flight). Kept in a ref so the version-check listeners can read it.
   const idleRef = useRef(true);
-  idleRef.current = modal === null && !pwOpen && pendingWrites.current === 0;
+  idleRef.current = modal === null && !pwOpen && !qcTicket && pendingWrites.current === 0;
   const [serverReady, setServerReady] = useState(false);
   // Distinct from serverReady (which only reflects the initial load): this
   // tracks live reachability so a banner can warn the operator the moment a
@@ -1218,6 +1313,23 @@ export default function ServiceDesk() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
+    };
+  }, []);
+  const qcByTicket = useMemo(() => new Map(qcChecks.map((c) => [c.ticketId as string, c])), [qcChecks]);
+  const loadQc = () =>
+    fetch("/api/qc", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setQcChecks(data.checks))
+      .catch(() => {});
+  useEffect(() => {
+    loadQc();
+    const id = setInterval(() => {
+      if (!document.hidden) loadQc();
+    }, 30_000);
+    window.addEventListener("focus", loadQc);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", loadQc);
     };
   }, []);
   useEffect(() => {
@@ -1668,6 +1780,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       keluhan: ticket.issue,
       tindakan: ticket.serviceAction?.trim() || "perbaikan sesuai hasil pengecekan",
       estimasi: money(ticket.estimate),
+      temuan: (() => {
+        const q = qcByTicket.get(ticket.id);
+        return q ? qcFindingsText(q.items) || "tidak ditemukan masalah lain" : "";
+      })(),
       sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
       pembayaran:
         finalPrice(ticket) - ticket.downPayment <= 0
@@ -2393,6 +2509,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           <b>{t.issue}</b>
                           {t.serviceAction?.trim() ? (
                             <small className="actionLine">Tindakan: {t.serviceAction}</small>
+                          ) : qcByTicket.get(t.id) && !qcByTicket.get(t.id)!.reviewedAt ? (
+                            <small className="actionLine qcLine">
+                              QC selesai oleh {qcByTicket.get(t.id)!.checkedBy} · {qcByTicket.get(t.id)!.badCount} bermasalah — tinjau
+                            </small>
                           ) : (
                             <small>{t.accessories}</small>
                           )}
@@ -2765,6 +2885,29 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <small>Keluhan pelanggan (saat unit masuk)</small>
                 <strong>{selected.issue}</strong>
               </div>
+              <QcPanel
+                check={qcByTicket.get(selected.id) || null}
+                canReview
+                onFill={() => setQcTicket(selected)}
+                onReview={async (c) => {
+                  const res = await fetch(`/api/qc/${c.id}`, { method: "PATCH" });
+                  const data = await res.json().catch(() => null);
+                  if (res.ok && data?.check) {
+                    setQcChecks((old) => old.map((x) => (x.ticketId === selected.id ? { ...data.check, ticketId: selected.id } : x)));
+                    notify("QC ditandai sudah ditinjau");
+                  } else notify(data?.error || "Gagal menandai QC");
+                }}
+                onUseFindings={(c) => {
+                  const text = qcFindingsText(c.items);
+                  if (!text) return notify("Tidak ada temuan bermasalah di QC ini");
+                  const cur = (selected.serviceAction || "").trim();
+                  patchTicket(
+                    selected.id,
+                    { serviceAction: cur ? `${cur}\nTemuan QC: ${text}` : `Temuan QC: ${text}` },
+                    "Temuan QC disalin ke tindakan teknisi",
+                  );
+                }}
+              />
               <div className="actionNote">
                 <label>
                   <b>Tindakan teknisi</b>
@@ -3242,6 +3385,24 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           )}
         </div>
       )}
+      {qcTicket && (
+        <QcForm
+          key={qcTicket.id}
+          ticket={qcTicket}
+          existing={qcByTicket.get(qcTicket.id) || null}
+          defaultChecker={currentUser?.name}
+          onClose={() => setQcTicket(null)}
+          onSaved={(check) => {
+            const id = qcTicket.id;
+            setQcChecks((old) => [{ ...check, ticketId: id }, ...old.filter((c) => c.ticketId !== id)]);
+            // The first check moves a "Belum Cek" job to "Sedang Cek" server-side.
+            setTickets((old) => old.map((t) => (t.id === id && t.status === "Belum Cek" ? { ...t, status: "Sedang Cek" } : t)));
+            setSelected((old) => (old?.id === id && old.status === "Belum Cek" ? { ...old, status: "Sedang Cek" } : old));
+            setQcTicket(null);
+            notify("QC tersimpan");
+          }}
+        />
+      )}
       {printMode === "receipt" && selected && (
         <div className="servicePrint receipt">
           <div className="receiptCopyPage compact">
@@ -3371,88 +3532,6 @@ function PaymentHistory({ ticketId, version }: { ticketId: string; version: numb
         <span>Total diterima</span>
         <b>{money(total)}</b>
       </div>
-    </div>
-  );
-}
-
-function PasswordModal({
-  onClose,
-  onDone,
-}: {
-  onClose: () => void;
-  onDone: () => void;
-}) {
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const current = String(form.get("current") || "");
-    const next = String(form.get("next") || "");
-    if (next.length < 8) return setError("Password baru minimal 8 karakter");
-    if (next !== String(form.get("confirm") || ""))
-      return setError("Konfirmasi password tidak sama");
-    setBusy(true);
-    setError("");
-    try {
-      const res = await fetch("/api/auth/password", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ current, next }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError(data?.error || "Gagal mengganti password");
-        return;
-      }
-      onDone();
-    } catch {
-      setError("Tidak bisa terhubung ke server");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div
-      className="modalBackdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <form className="serviceModal passwordModal" onSubmit={submit}>
-        <div className="modalHead">
-          <div>
-            <span>AKUN SAYA</span>
-            <h2>Ganti Password</h2>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Tutup">
-            <X />
-          </button>
-        </div>
-        <div className="formGridService single">
-          <label>
-            Password saat ini
-            <input name="current" type="password" required autoComplete="current-password" />
-          </label>
-          <label>
-            Password baru (min. 8 karakter)
-            <input name="next" type="password" required minLength={8} autoComplete="new-password" />
-          </label>
-          <label>
-            Ulangi password baru
-            <input name="confirm" type="password" required minLength={8} autoComplete="new-password" />
-          </label>
-          {error && <div className="authError">{error}</div>}
-        </div>
-        <div className="modalFoot">
-          <button type="button" className="ghost" onClick={onClose}>
-            Batal
-          </button>
-          <button className="newButton" disabled={busy}>
-            <CheckCircle2 size={17} /> Simpan Password
-          </button>
-        </div>
-      </form>
     </div>
   );
 }
@@ -4176,7 +4255,7 @@ function AccountsPanel({
       body: JSON.stringify({
         name: String(f.get("name")),
         username: String(f.get("username")),
-        role: String(f.get("role")) === "Admin" ? "ADMIN" : "TECHNICIAN",
+        role: String(f.get("role")) === "Admin" ? "ADMIN" : String(f.get("role")).startsWith("Magang") ? "INTERN" : "TECHNICIAN",
       }),
     });
     const data = await res.json().catch(() => null);
@@ -4262,6 +4341,7 @@ function AccountsPanel({
           />
           <select name="role">
             <option>Teknisi/Pegawai</option>
+            <option>Magang (hanya QC)</option>
             <option>Admin</option>
           </select>
           <button className="newButton" disabled={busy === "create"}>
@@ -4290,7 +4370,7 @@ function AccountsPanel({
                 <i
                   className={`statusBadge ${u.role === "ADMIN" ? "primary" : "neutral"}`}
                 >
-                  {u.role === "ADMIN" ? "Admin" : "Teknisi/Pegawai"}
+                  {u.role === "ADMIN" ? "Admin" : u.role === "INTERN" ? "Magang (QC)" : "Teknisi/Pegawai"}
                 </i>
               </span>
               <span className="customerStars">

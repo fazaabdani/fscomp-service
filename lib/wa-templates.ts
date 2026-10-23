@@ -46,10 +46,12 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
     { token: "{perangkat}", label: "Perangkat" },
     { token: "{keluhan}", label: "Keluhan pelanggan" },
     { token: "{tindakan}", label: "Tindakan teknisi" },
+    { token: "{temuan}", label: "Temuan QC (item bermasalah)" },
     { token: "{estimasi}", label: "Estimasi biaya" },
   ],
   waCostOptions: [
     { token: "{perangkat}", label: "Perangkat" },
+    { token: "{temuan}", label: "Temuan QC (item bermasalah)" },
     { token: "{estimasi}", label: "Estimasi biaya" },
   ],
   waReady: [

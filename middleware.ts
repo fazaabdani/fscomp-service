@@ -32,6 +32,12 @@ export async function middleware(req:NextRequest){
     if(path.startsWith("/api")){const res=NextResponse.json({error:"Unauthorized"},{status:401});res.cookies.delete("fs_session");return res}
     const url=req.nextUrl.clone();url.pathname="/login";url.searchParams.set("next",path);const res=NextResponse.redirect(url);res.cookies.delete("fs_session");return res
   }
+  // Interns (Magang) work only in the QC checklist: the QC endpoints and the
+  // page itself. Every other API — money, customers, settings, tickets — is
+  // closed to them here, not just hidden in the UI.
+  if(user.role==="INTERN"&&path.startsWith("/api")&&!path.startsWith("/api/qc")){
+    return NextResponse.json({error:"Akun Magang hanya dapat mengakses menu QC"},{status:403});
+  }
   return NextResponse.next();
 }
 export const config={matcher:["/((?!favicon.ico).*)"]};
