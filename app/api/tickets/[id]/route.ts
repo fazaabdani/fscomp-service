@@ -7,6 +7,7 @@ import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
 import { serializeCostItems } from "@/lib/cost-items";
+import { WA_GATE, WA_GATE_LABEL, canMessage } from "@/lib/wa-gate";
 
 const FIELDS = new Set([
   "customer", "phone", "device", "deviceType", "brand", "serial", "issue", "accessories",
@@ -72,6 +73,7 @@ export async function PATCH(
   let payment: Payment | null = null;
   let conflict = false;
   let cancelBlocked = false;
+  let waBlocked: string | null = null;
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.ticket.findUnique({ where: { id } });
@@ -85,6 +87,19 @@ export async function PATCH(
     if (data.status === "Dibatalkan" && existing.status === "Sudah Diambil") {
       cancelBlocked = true;
       return;
+    }
+
+    // Moving to "Bisa Diambil" / "Sudah Diambil" requires that the customer was
+    // messaged (see lib/wa-gate.ts), unless there is no usable WhatsApp number.
+    const gate = typeof data.status === "string" && data.status !== existing.status ? WA_GATE[data.status] : undefined;
+    if (gate && canMessage(existing.phone)) {
+      const sent = await tx.chatLog.count({
+        where: { ticketId: id, template: { in: [gate, `SKIP_${gate}`] } },
+      });
+      if (!sent) {
+        waBlocked = gate;
+        return;
+      }
     }
 
     const updated = await tx.ticket.update({
@@ -138,6 +153,15 @@ export async function PATCH(
     ticket = updated;
   });
 
+  if (waBlocked)
+    return NextResponse.json(
+      {
+        error: `Kabari pelanggan dulu lewat WhatsApp (${WA_GATE_LABEL[waBlocked]}) sebelum mengubah status.`,
+        code: "WA_REQUIRED",
+        kind: waBlocked,
+      },
+      { status: 409 },
+    );
   if (cancelBlocked)
     return NextResponse.json(
       { error: "Servis yang sudah diambil tidak bisa dibatalkan" },

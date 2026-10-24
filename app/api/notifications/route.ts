@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { finalPrice } from "@/lib/ticket-money";
 import { qcEnabled } from "@/lib/qc-enabled";
+import { WA_RECEIVED_FROM, canMessage } from "@/lib/wa-gate";
 
 const daysSince = (dateStr: string, now: number) =>
   Math.floor((now - new Date(`${dateStr}T00:00:00`).getTime()) / 86400000);
@@ -22,6 +23,12 @@ export async function GET() {
     where: { ticketId: { in: openIds } },
     orderBy: { createdAt: "desc" },
   });
+  // Jobs whose "received" WhatsApp was never sent (or skipped by an Admin).
+  const recvLogs = await prisma.chatLog.findMany({
+    where: { ticketId: { in: openIds }, template: { in: ["RECEIVED", "SKIP_RECEIVED"] } },
+    select: { ticketId: true },
+  });
+  const recvSent = new Set(recvLogs.map((l) => l.ticketId));
   const latestQc = new Map<string, (typeof qcRows)[number]>();
   for (const q of qcRows) if (!latestQc.has(q.ticketId)) latestQc.set(q.ticketId, q);
   const alerts = [] as Array<{
@@ -34,6 +41,13 @@ export async function GET() {
   for (const t of tickets) {
     const days = daysSince(t.receivedAt, now);
     const base = { ticketId: t.id, customer: t.customer, device: t.device };
+    if (
+      t.receivedAt >= WA_RECEIVED_FROM &&
+      !["Sudah Diambil", "Dibatalkan"].includes(t.status) &&
+      canMessage(t.phone) &&
+      !recvSent.has(t.id)
+    )
+      alerts.push({ ...base, type: "WA_MISSING", title: "Pelanggan belum dikabari lewat WhatsApp (servis diterima)" });
     const qc = latestQc.get(t.id);
     if (qc && !qc.reviewedAt)
       alerts.push({
@@ -96,6 +110,7 @@ export async function GET() {
   // type the numbers in the title (days/amount) are already the signal, so a
   // stable order by type is enough.
   const rank: Record<string, number> = {
+    WA_MISSING: -2,
     QC_REVIEW: -1,
     PAYMENT_DUE: 0,
     WAITING_CONFIRMATION_STUCK: 1,

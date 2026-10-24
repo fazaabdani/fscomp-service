@@ -20,3 +20,20 @@ Latar: dua ulasan Google Maps negatif dalam sebulan (soal harga "mahal" dan anak
 
 Template baru bisa diedit di menu *Pesan WhatsApp*. Pesan biaya yang sudah tersimpan di database produksi diberi
 `{rincian}` satu kali lewat skrip (hanya jika belum ada).
+
+## Chat WhatsApp wajib (24 Okt 2026)
+Pernah terlewat mengabari pelanggan saat servis diterima dan saat pengambilan, sehingga sekarang wajib:
+
+| Kapan | Pesan | Penegakan |
+|---|---|---|
+| Servis diterima | konfirmasi + link tracking | Layar serah terima: tombol "Lewati" tidak ada sebelum WA dibuka (Admin bisa lewati dengan alasan). Servis yang belum dikabari muncul di lonceng ("Belum Dikabari"). |
+| Status → **Bisa Diambil** | kabar siap diambil | **Server menolak** (409 `WA_REQUIRED`) sampai ada log chat `READY`; aplikasi membuka jendela "Wajib kabari pelanggan". |
+| Status → **Sudah Diambil** | terima kasih + garansi + jalur komplain | Sama, log `PICKED`. |
+
+- Yang dicatat adalah **membuka tautan WhatsApp** dari aplikasi (ChatLog dengan `template` = jenis pesan). Sistem tidak bisa
+  memastikan tombol Kirim di WhatsApp benar-benar ditekan; yang dicegah adalah lupa total.
+- Admin dapat melewati dengan alasan wajib (tercatat sebagai `SKIP_<jenis>`); staf lain tidak bisa.
+- Nomor WA tidak valid (<5 digit) otomatis dibebaskan.
+- Tidak berlaku surut: hanya perpindahan status baru yang diperiksa; peringatan "Belum Dikabari" hanya untuk servis
+  yang diterima mulai 24 Okt 2026 (`lib/wa-gate.ts`).
+- Detail servis menampilkan kartu **Kabar ke pelanggan** (Diterima / Siap diambil / Sudah diambil) dengan tombol kirim.

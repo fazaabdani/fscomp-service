@@ -6,6 +6,7 @@ import { normalizePhone } from "@/lib/phone";
 import { PasswordModal } from "./password-modal";
 import { QcForm, type QcCheckData } from "./qc-desk";
 import { qcFindingsText } from "@/lib/qc-templates";
+import { canMessage, WA_GATE_LABEL } from "@/lib/wa-gate";
 import { costItemsWaText, costLines, parseCostItems, sumCostItems, type CostItem } from "@/lib/cost-items";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
@@ -405,6 +406,7 @@ const nav = [
 const NOTIF_META: Record<string, { icon: typeof Clock3; label: string; tone: string }> = {
   QC_REVIEW: { icon: ClipboardCheck, label: "QC Perlu Ditinjau", tone: "info" },
   FOLLOW_UP: { icon: HeartHandshake, label: "Tindak Lanjut", tone: "info" },
+  WA_MISSING: { icon: MessageCircle, label: "Belum Dikabari", tone: "danger" },
   SERVICE_OLD: { icon: Clock3, label: "Servis Lama", tone: "warn" },
   READY_NOT_PICKED_UP: { icon: PackageCheck, label: "Belum Diambil", tone: "info" },
   WAITING_CONFIRMATION_STUCK: { icon: MessageCircle, label: "Menunggu Konfirmasi", tone: "info" },
@@ -569,6 +571,54 @@ const printDateLabel = (d: string) =>
     year: "numeric",
   });
 
+// The three WhatsApp messages every job needs, with what has been logged so far.
+function ChatChecklist({
+  ticket,
+  kinds,
+  urlFor,
+}: {
+  ticket: Ticket;
+  kinds: string[];
+  urlFor: (k: "received" | "ready" | "picked") => string;
+}) {
+  if (!canMessage(ticket.phone)) return null;
+  const done = (k: string) => kinds.includes(k) || kinds.includes(`SKIP_${k}`);
+  const rows: { k: "RECEIVED" | "READY" | "PICKED"; label: string; kind: "received" | "ready" | "picked"; applies: boolean }[] = [
+    { k: "RECEIVED", label: "Servis diterima", kind: "received", applies: true },
+    { k: "READY", label: "Siap diambil", kind: "ready", applies: ["Bisa Diambil", "Sudah Diambil"].includes(ticket.status) },
+    { k: "PICKED", label: "Sudah diambil", kind: "picked", applies: ticket.status === "Sudah Diambil" },
+  ];
+  return (
+    <div className="chatChecklist">
+      <b>Kabar ke pelanggan</b>
+      <div>
+        {rows.map((r) => {
+          const ok = done(r.k);
+          return ok ? (
+            <span key={r.k} className="ok">
+              <Check size={13} /> {r.label}
+            </span>
+          ) : (
+            <a
+              key={r.k}
+              className={r.applies ? "need" : "later"}
+              target="_blank"
+              rel="noreferrer"
+              data-ticket={ticket.id}
+              data-wa-kind={r.k}
+              href={urlFor(r.kind)}
+              title={r.applies ? "Belum dikirim — klik untuk mengirim" : "Belum waktunya; bisa dikirim lebih awal"}
+            >
+              <MessageCircle size={13} /> {r.label}
+              {r.applies ? " · belum" : ""}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FollowUpPanel({
   tickets,
   waUrl,
@@ -633,7 +683,7 @@ function FollowUpPanel({
               </span>
               <span>{t.technician || "-"}</span>
               <span className="followActions">
-                <a className="ghost" target="_blank" rel="noreferrer" href={waUrl(t)} onClick={() => onMark(t)}>
+                <a className="ghost" target="_blank" rel="noreferrer" data-ticket={t.id} data-wa-kind="FOLLOWUP" href={waUrl(t)} onClick={() => onMark(t)}>
                   <MessageCircle size={15} /> Tanya kabar
                 </a>
                 <button className="ghost" onClick={() => onMark(t)}>
@@ -1367,6 +1417,11 @@ export default function ServiceDesk() {
   // toward the customer while the receipt is made. Revealed on request, and
   // hidden again on any modal change or after a minute.
   const [showCost, setShowCost] = useState(false);
+  // Which required WhatsApp messages were logged per job (RECEIVED / READY / PICKED ...).
+  const [chatKinds, setChatKinds] = useState<Record<string, string[]>>({});
+  // Message links opened this session ("ticket:KIND"), to enable "continue" in the gate.
+  const [waGateOpened, setWaGateOpened] = useState<Record<string, boolean>>({});
+  const [waGate, setWaGate] = useState<{ id: string; kind: "READY" | "PICKED"; status: Status } | null>(null);
   const [qcChecks, setQcChecks] = useState<QcCheckData[]>([]);
   const [qcTicket, setQcTicket] = useState<Ticket | null>(null);
   const [deleteText, setDeleteText] = useState("");
@@ -1574,6 +1629,22 @@ export default function ServiceDesk() {
       }).length,
     [tickets],
   );
+  useEffect(() => {
+    const id = selected?.id;
+    if (!id) return;
+    let cancelled = false;
+    fetch(`/api/chat?ticketId=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || cancelled) return;
+        const kinds = Array.from(new Set((d.chats as { template: string }[]).map((c) => c.template)));
+        setChatKinds((old) => ({ ...old, [id]: Array.from(new Set([...(old[id] || []), ...kinds])) }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.id]);
   const qcByTicket = useMemo(
     () => new Map(qcOn ? qcChecks.map((c) => [c.ticketId as string, c]) : []),
     [qcChecks, qcOn],
@@ -1673,11 +1744,16 @@ export default function ServiceDesk() {
         "a[href*='wa.me'],a[href*='whatsapp.com']",
       ) as HTMLAnchorElement | null;
       if (!anchor) return;
+      // Links carry their ticket and message kind (data-ticket / data-wa-kind);
+      // guessing the ticket from the phone number mixed up a customer's several jobs.
       const ticket =
-        tickets.find(
-          (t) => t.phone && anchor.href.includes(t.phone.replace(/^0/, "")),
-        ) || selected;
-      if (ticket)
+        tickets.find((t) => t.id === anchor.dataset.ticket) ||
+        tickets.find((t) => t.phone && anchor.href.includes(t.phone.replace(/^0/, ""))) ||
+        selected;
+      const kind = anchor.dataset.waKind || "STATUS";
+      if (ticket) {
+        setChatKinds((old) => ({ ...old, [ticket.id]: Array.from(new Set([...(old[ticket.id] || []), kind])) }));
+        setWaGateOpened((old) => ({ ...old, [`${ticket.id}:${kind}`]: true }));
         fetch("/api/chat", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -1687,9 +1763,10 @@ export default function ServiceDesk() {
             message: decodeURIComponent(
               anchor.href.split("text=")[1] || "Chat pelanggan",
             ),
-            template: "STATUS",
+            template: kind,
           }),
         });
+      }
     };
     document.addEventListener("click", log);
     return () => document.removeEventListener("click", log);
@@ -1985,8 +2062,32 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     } else if (!res.ok) {
       setTickets((old) => old.map((t) => (t.id === id ? before : t)));
       setSelected((old) => (old?.id === id ? before : old));
+      if (data?.code === "WA_REQUIRED" && patch.status) {
+        // Not an error: the customer has to be messaged first.
+        setWaGate({ id, kind: data.kind, status: patch.status as Status });
+        return;
+      }
       notify(data?.error ? `Gagal menyimpan: ${data.error}` : "Gagal menyimpan perubahan ke server");
     }
+  }
+  // A job with an unusable WhatsApp number can't be messaged, so nothing is required.
+  const waWaived = !!selected && !canMessage(selected.phone);
+  async function skipReceivedChat() {
+    if (!selected) return;
+    const reason = window.prompt("Alasan tidak mengirim chat konfirmasi (dicatat):", "");
+    if (!reason || !reason.trim()) return;
+    const r = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ticketId: selected.id,
+        phone: selected.phone || "-",
+        message: `Dilewati Admin: ${reason.trim()}`,
+        template: "SKIP_RECEIVED",
+      }),
+    });
+    if (r.ok) setHandoffDone((x) => ({ ...x, whatsapp: true }));
+    else notify("Gagal mencatat alasan");
   }
   function saveTicketEdit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -3181,6 +3282,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <small>Keluhan pelanggan (saat unit masuk)</small>
                 <strong>{selected.issue}</strong>
               </div>
+              <ChatChecklist
+                ticket={selected}
+                kinds={chatKinds[selected.id] || []}
+                urlFor={(k) => whatsappUrl(selected, k)}
+              />
               {qcOn && !((selected.status === "Sudah Diambil" || selected.status === CANCELLED) && !qcByTicket.get(selected.id)) && (
               <QcPanel
                 check={qcByTicket.get(selected.id) || null}
@@ -3559,11 +3665,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="handoffProgress"><span>{Object.values(handoffDone).filter(Boolean).length}/4 selesai</span><i><b style={{width:`${Object.values(handoffDone).filter(Boolean).length*25}%`}} /></i></div>
               <div className="handoffSteps">
                 <button className={handoffDone.receipt ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,receipt:true})); printTicket("receipt2"); }}><span>{handoffDone.receipt ? <Check /> : "1"}</span><div><b>Cetak nota 2 rangkap</b><small>1 lembar untuk pelanggan dan 1 lembar untuk arsip toko.</small></div><Printer /></button>
-                <a className={handoffDone.whatsapp ? "done" : ""} target="_blank" href={whatsappUrl(selected,"received")} onClick={() => setHandoffDone((x) => ({...x,whatsapp:true}))}><span>{handoffDone.whatsapp ? <Check /> : "2"}</span><div><b>Kirim konfirmasi WhatsApp</b><small>Pesan ramah berisi nomor servis dan link tracking.</small></div><MessageCircle /></a>
+                <a className={handoffDone.whatsapp ? "done" : ""} target="_blank" data-ticket={selected.id} data-wa-kind="RECEIVED" href={whatsappUrl(selected,"received")} onClick={() => setHandoffDone((x) => ({...x,whatsapp:true}))}><span>{handoffDone.whatsapp ? <Check /> : "2"}</span><div><b>Kirim konfirmasi WhatsApp</b><small>Pesan ramah berisi nomor servis dan link tracking.</small></div><MessageCircle /></a>
                 <button className={handoffDone.qr ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,qr:true})); printTicket("qr"); }}><span>{handoffDone.qr ? <Check /> : "3"}</span><div><b>Cetak QR barang utama</b><small>Tempelkan label pada perangkat servis.</small></div><QrCode /></button>
                 <button disabled={accessoryItems(selected.accessories).length===0} className={handoffDone.accessories ? "done" : ""} onClick={() => { setHandoffDone((x) => ({...x,accessories:true})); printTicket("accessories"); }}><span>{handoffDone.accessories ? <Check /> : "4"}</span><div><b>Cetak QR perlengkapan</b><small>{accessoryItems(selected.accessories).length ? `${accessoryItems(selected.accessories).length} label: ${accessoryItems(selected.accessories).join(", ")}` : "Tidak ada perlengkapan tambahan."}</small></div><PackageCheck /></button>
               </div>
-              <div className="handoffFoot"><button className="skipSop" onClick={() => setModal("detail")}>Lewati SOP kali ini</button><button className="finishSop" disabled={!Object.values(handoffDone).every(Boolean)} onClick={() => setModal("detail")}><CheckCircle2 /> Selesai & buka detail servis</button></div>
+              <div className="handoffFoot">{waWaived || handoffDone.whatsapp ? <button className="skipSop" onClick={() => setModal("detail")}>Lewati sisa SOP kali ini</button> : currentUser?.role === "ADMIN" ? <button className="skipSop" onClick={skipReceivedChat}>Lewati chat (Admin, wajib alasan)</button> : <span className="skipSop waNeed">Kirim konfirmasi WhatsApp dulu — wajib</span>}<button className="finishSop" disabled={!Object.values(handoffDone).every(Boolean)} onClick={() => setModal("detail")}><CheckCircle2 /> Selesai & buka detail servis</button></div>
             </div>
           )}
           {modal === "edit" && selected && (
@@ -3672,10 +3778,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="modalHead"><div><span>CHAT WHATSAPP</span><h2>Pilih pesan untuk {selected.customer}</h2><p>Nomor tujuan: {selected.phone}</p></div><button onClick={() => setModal("detail")}><X /></button></div>
               <div className="chatChoices">
                 <a target="_blank" href={whatsappUrl(selected, "empty")}><MessageCircle/><span><b>Chat WhatsApp Kosong</b><small>Hanya membuka percakapan pelanggan tanpa isi pesan.</small></span></a>
-                <a target="_blank" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
-                <a target="_blank" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
-                <a target="_blank" href={whatsappUrl(selected, "picked")}><ShieldCheck/><span><b>Servis Diambil — Terima Kasih</b><small>Ucapan terima kasih, info garansi, dan ajakan chat WA dulu jika ada kendala.</small></span></a>
-                <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.{!selected.serviceAction?.trim() && " Tindakan teknisi belum diisi — isi dulu di detail servis agar pesan lebih jelas."}</small><span className="costChatVariants"><a target="_blank" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
+                <a target="_blank" data-ticket={selected.id} data-wa-kind="RECEIVED" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
+                <a target="_blank" data-ticket={selected.id} data-wa-kind="READY" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
+                <a target="_blank" data-ticket={selected.id} data-wa-kind="PICKED" href={whatsappUrl(selected, "picked")}><ShieldCheck/><span><b>Servis Diambil — Terima Kasih</b><small>Ucapan terima kasih, info garansi, dan ajakan chat WA dulu jika ada kendala.</small></span></a>
+                <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.{!selected.serviceAction?.trim() && " Tindakan teknisi belum diisi — isi dulu di detail servis agar pesan lebih jelas."}</small><span className="costChatVariants"><a target="_blank" data-ticket={selected.id} data-wa-kind="COST" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" data-ticket={selected.id} data-wa-kind="COST" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
               </div>
             </div>
           )}
@@ -3724,6 +3830,91 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           )}
         </div>
       )}
+      {waGate && (() => {
+        const t = tickets.find((x) => x.id === waGate.id);
+        if (!t) return null;
+        const kindOf = waGate.kind === "READY" ? "ready" : "picked";
+        const opened = !!waGateOpened[`${t.id}:${waGate.kind}`] || (chatKinds[t.id] || []).includes(waGate.kind);
+        return (
+          <div className="modalBackdrop">
+            <div className="serviceModal waGateModal">
+              <div className="modalHead">
+                <div>
+                  <span>WAJIB KABARI PELANGGAN</span>
+                  <h2>{t.customer}</h2>
+                  <p>
+                    {t.id} · {WA_GATE_LABEL[waGate.kind]}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setWaGate(null)} aria-label="Tutup">
+                  <X />
+                </button>
+              </div>
+              <div className="formGridService single">
+                <p className="deleteLead">
+                  Status tidak bisa diubah ke <b>{waGate.status}</b> sebelum pelanggan dikabari lewat WhatsApp. Klik
+                  tombol di bawah, <b>kirim pesannya</b>, lalu kembali ke sini dan lanjutkan.
+                </p>
+                <a
+                  className="newButton waGateLink"
+                  target="_blank"
+                  rel="noreferrer"
+                  data-ticket={t.id}
+                  data-wa-kind={waGate.kind}
+                  href={whatsappUrl(t, kindOf)}
+                >
+                  <MessageCircle size={17} /> Buka WhatsApp & kirim pesan
+                </a>
+              </div>
+              <div className="modalFoot">
+                {currentUser?.role === "ADMIN" && (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={async () => {
+                      const reason = window.prompt("Alasan tidak mengirim chat (dicatat):", "");
+                      if (!reason || !reason.trim()) return;
+                      const r = await fetch("/api/chat", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          ticketId: t.id,
+                          phone: t.phone,
+                          message: `Dilewati Admin: ${reason.trim()}`,
+                          template: `SKIP_${waGate.kind}`,
+                        }),
+                      });
+                      if (r.ok) {
+                        const g = waGate;
+                        setWaGate(null);
+                        updateStatus(g.id, g.status);
+                      } else notify("Gagal mencatat alasan");
+                    }}
+                  >
+                    Lewati (Admin)
+                  </button>
+                )}
+                <button type="button" className="ghost" onClick={() => setWaGate(null)}>
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  className="newButton"
+                  disabled={!opened}
+                  onClick={async () => {
+                    const g = waGate;
+                    await new Promise((r) => setTimeout(r, 500));
+                    setWaGate(null);
+                    updateStatus(g.id, g.status);
+                  }}
+                >
+                  <CheckCircle2 size={17} /> Sudah terkirim, lanjutkan
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {qcTicket && (
         <QcForm
           key={qcTicket.id}

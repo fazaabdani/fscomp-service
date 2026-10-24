@@ -7145,3 +7145,21 @@ textarea {
   .trxKendala p b { color: var(--trx-navy); }
   .trxKendala svg { flex: none; width: 10mm; height: 10mm; }
 }
+
+/* ===== Required WhatsApp messages ===== */
+.chatChecklist {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 24px 10px;
+  padding: 9px 14px; border: 1px solid #d9e1f3; border-radius: 12px; background: #fbfcff;
+}
+.chatChecklist b { font-size: 13px; }
+.chatChecklist > div { display: flex; gap: 6px; flex-wrap: wrap; }
+.chatChecklist span, .chatChecklist a {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; text-decoration: none;
+}
+.chatChecklist .ok { background: #e3f4ea; color: #1b7a47; }
+.chatChecklist .need { background: #fde8e6; color: #b3261e; }
+.chatChecklist .later { background: #eef2fb; color: #6b7a99; font-weight: 600; }
+.waGateModal { width: min(460px, 100%); }
+.waGateLink { display: inline-flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
+.skipSop.waNeed { color: #b3261e; font-weight: 700; cursor: default; text-decoration: none; }

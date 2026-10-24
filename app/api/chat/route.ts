@@ -26,12 +26,16 @@ export async function POST(request: Request) {
   const ticket = await prisma.ticket.findUnique({ where: { id: b.ticketId } });
   if (!ticket)
     return NextResponse.json({ error: "Tiket tidak ditemukan" }, { status: 404 });
+  const template = String(b.template || "CUSTOM").toUpperCase().slice(0, 24);
+  // SKIP_* stands in for a required message; only an Admin may use it.
+  if (template.startsWith("SKIP_") && u.role !== "ADMIN")
+    return NextResponse.json({ error: "Hanya Admin yang dapat melewati chat wajib" }, { status: 403 });
   const chat = await prisma.chatLog.create({
     data: {
       id: randomUUID(),
       ticketId: b.ticketId,
       phone: b.phone,
-      template: b.template || "CUSTOM",
+      template,
       message: String(b.message).slice(0, 4000),
       createdBy: u.id,
     },
