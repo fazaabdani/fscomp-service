@@ -22,7 +22,7 @@ export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
   waCostOptions:
     "Alhamdulillah, hasil pengecekan {perangkat} sudah selesai. Kami menawarkan pilihan penanganan berikut:\n\n1. Perbaikan utama — *{estimasi}*\n2. Perbaikan tanpa penggantian komponen — silakan konfirmasi\n3. Tidak dilanjutkan\n\nMohon balas nomor pilihan yang diinginkan. Kami belum mengerjakan sebelum mendapat persetujuan dari Kakak.",
   waReady:
-    "Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{pembayaran}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.",
+    "Alhamdulillah, servis {perangkat} Kakak dengan nomor *{nomor_servis}* sudah selesai dan siap diambil.\n\n{detail}{pembayaran}\n\nDetail dan status servis dapat dicek kapan saja di:\n{link_tracking}\n\nSilakan datang ke *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Terima kasih atas kepercayaannya.",
   waPickedUp:
     "Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Unit dengan nomor servis *{nomor_servis}* sudah diambil.{garansi}\n\nJika ada kendala, pertanyaan, atau hal yang kurang berkenan, mohon kabari kami lebih dulu lewat chat WhatsApp ini. Insya Allah segera kami bantu dan carikan solusinya. Masukan Kakak sangat berarti untuk perbaikan layanan kami.",
   waFollowUp:
@@ -67,6 +67,9 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
     { token: "{toko}", label: "Nama toko" },
     { token: "{perangkat}", label: "Perangkat" },
     { token: "{nomor_servis}", label: "Nomor servis" },
+    { token: "{detail}", label: "Detail pengerjaan + rincian biaya (kosong jika belum diisi)" },
+    { token: "{tindakan}", label: "Detail pengerjaan / tindakan teknisi" },
+    { token: "{rincian_akhir}", label: "Rincian biaya per item (kosong jika belum diisi)" },
     { token: "{pembayaran}", label: "Info biaya / sisa / lunas" },
     { token: "{sisa}", label: "Sisa pembayaran" },
     { token: "{link_tracking}", label: "Link tracking" },

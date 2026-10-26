@@ -517,7 +517,9 @@ const warrantyEndDate = (t: { warrantyDays?: number; pickedUpAt?: string; update
 // already stored (imported history names people who may have no account).
 const nameOptions = (staffNames: string[], current?: string | null) =>
   Array.from(new Set([...staffNames, ...(current ? [current] : [])]));
-const waLink = (phone: string) => `https://wa.me/${normalizePhone(phone)}`;
+// NOT wa.me: its redirect replaces every emoji in the prefilled text with "�".
+// api.whatsapp.com/send hands the text over intact (checked 26 Okt 2026).
+const waLink = (phone: string) => `https://api.whatsapp.com/send?phone=${normalizePhone(phone)}`;
 function downloadXls(title: string, shopName: string, headers: string[], rows: (string | number)[][], footers?: (string | number)[][]) {
   const blob = new Blob(["\ufeff", buildXls(headers, rows, footers)], { type: "application/vnd.ms-excel" });
   const a = document.createElement("a");
@@ -1483,7 +1485,10 @@ export default function ServiceDesk() {
   // True when reloading would not interrupt anything (no open modal/form, no
   // save in flight). Kept in a ref so the version-check listeners can read it.
   const idleRef = useRef(true);
-  idleRef.current = modal === null && !pwOpen && !qcTicket && pendingWrites.current === 0;
+  // True once anything was typed into a field (other than the search boxes) on
+  // the current screen: a quiet auto-reload would throw that input away.
+  const typedRef = useRef(false);
+  idleRef.current = modal === null && !pwOpen && !qcTicket && !waGate && pendingWrites.current === 0;
   const [serverReady, setServerReady] = useState(false);
   // Distinct from serverReady (which only reflects the initial load): this
   // tracks live reachability so a banner can warn the operator the moment a
@@ -1581,6 +1586,18 @@ export default function ServiceDesk() {
   // keep seeing the old screens (and missing new fields) until a manual
   // reload. Compare our build id with the server's and offer a reload.
   useEffect(() => {
+    const mark = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.matches?.("input,textarea,select") && !t.closest(".searchBox")) typedRef.current = true;
+    };
+    document.addEventListener("input", mark, true);
+    return () => document.removeEventListener("input", mark, true);
+  }, []);
+  // A new screen or a closed form starts clean: whatever was typed there is gone or saved.
+  useEffect(() => {
+    typedRef.current = false;
+  }, [active, modal]);
+  useEffect(() => {
     const mine = process.env.NEXT_PUBLIC_BUILD_ID;
     if (!mine) return;
     const check = async (comingBack = false) => {
@@ -1590,7 +1607,7 @@ export default function ServiceDesk() {
         if (j?.build && j.build !== mine) {
           // Coming back to the tab while nothing is being edited: just load
           // the new version quietly instead of nagging.
-          if (comingBack && idleRef.current) window.location.reload();
+          if (comingBack && idleRef.current && !typedRef.current) window.location.reload();
           else setNewVersion(true);
         }
       } catch {
@@ -2148,6 +2165,14 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       tindakan: ticket.serviceAction?.trim() || "perbaikan sesuai hasil pengecekan",
       estimasi: money(ticket.estimate),
       rincian: costItemsWaText(parseCostItems(ticket.costItems), ticket.estimate, money),
+      rincian_akhir: costItemsWaText(parseCostItems(ticket.costItems), finalPrice(ticket), money),
+      // "Detail pengerjaan" block of the ready message; left out entirely when the technician wrote nothing.
+      detail: (() => {
+        const act = ticket.serviceAction?.trim();
+        const items = costItemsWaText(parseCostItems(ticket.costItems), finalPrice(ticket), money);
+        if (!act && !items) return "";
+        return `Detail pengerjaan:\n${act || "-"}${items}\n\n`;
+      })(),
       garansi:
         ticket.warrantyDays && ticket.warrantyDays > 0
           ? `\n\nGaransi servis: ${warrantyLabel(ticket.warrantyDays)}, berlaku sampai ${printDateLabel(warrantyEndDate(ticket))}.`
@@ -2179,7 +2204,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 ? shop.waFollowUp || WA_TEMPLATE_DEFAULTS.waFollowUp
                 : shop.waCostOptions;
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
-    return `${base}?text=${encodeURIComponent(message)}`;
+    return `${base}&text=${encodeURIComponent(message)}`;
   }
   function startWarrantyClaim(original: Ticket) {
     setWarrantyClaim(original);
