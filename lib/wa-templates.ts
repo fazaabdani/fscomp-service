@@ -10,7 +10,9 @@ export type WaTemplateKey =
   | "waCostOptions"
   | "waReady"
   | "waPickedUp"
-  | "waFollowUp";
+  | "waFollowUp"
+  | "waNotFixed"
+  | "waNotFixedFollowUp";
 
 export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
   waSalutation: "Assalamu'alaikum warahmatullahi wabarakatuh, Kak {nama}",
@@ -27,6 +29,10 @@ export const WA_TEMPLATE_DEFAULTS: Record<WaTemplateKey, string> = {
     "Terima kasih sudah mempercayakan servis {perangkat} kepada *{toko}*. Unit dengan nomor servis *{nomor_servis}* sudah diambil.{garansi}\n\nJika ada kendala, pertanyaan, atau hal yang kurang berkenan, mohon kabari kami lebih dulu lewat chat WhatsApp ini. Insya Allah segera kami bantu dan carikan solusinya. Masukan Kakak sangat berarti untuk perbaikan layanan kami.",
   waFollowUp:
     "Kami dari *{toko}*. Unit {perangkat} (no. servis {nomor_servis}) sudah beberapa hari kembali ke Kakak, apakah berfungsi dengan baik?\n\nJika masih ada kendala atau ada yang kurang berkenan, kabari kami lewat chat ini ya. Insya Allah kami bantu secepatnya.",
+  waNotFixed:
+    "Mohon maaf, servis {perangkat} Kakak dengan nomor *{nomor_servis}* {hasil}.\n\n{detail}{biaya_cek}\n\nUnit sudah dapat diambil di *{toko}* dengan membawa tanda terima atau menunjukkan nomor servis. Detail dan status servis dapat dicek kapan saja di:\n{link_tracking}\n\nJika ada pertanyaan, silakan balas chat ini, insya Allah kami bantu jelaskan. Terima kasih atas kepercayaannya.",
+  waNotFixedFollowUp:
+    "Kami dari *{toko}*. Unit {perangkat} (no. servis {nomor_servis}) beberapa hari lalu sudah kembali ke Kakak. Kami ingin memastikan penjelasan dan penanganan dari kami sudah jelas.\n\nJika masih ada yang ingin ditanyakan atau ada yang kurang berkenan, kabari kami lewat chat ini ya. Insya Allah kami bantu secepatnya.",
 };
 
 export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
@@ -38,6 +44,8 @@ export const WA_TEMPLATE_LABELS: Record<WaTemplateKey, string> = {
   waReady: "Servis Selesai — Siap Diambil",
   waPickedUp: "Servis Diambil — Terima Kasih & Jalur Komplain",
   waFollowUp: "Tindak Lanjut Setelah Diambil (H+2)",
+  waNotFixed: "Servis Tidak Bisa / Dibatalkan — Unit Bisa Diambil",
+  waNotFixedFollowUp: "Tindak Lanjut Servis Tidak Bisa / Dibatalkan (H+2)",
 };
 
 export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: string }[]> = {
@@ -82,6 +90,21 @@ export const WA_PLACEHOLDERS: Record<WaTemplateKey, { token: string; label: stri
     { token: "{link_tracking}", label: "Link tracking" },
   ],
   waFollowUp: [
+    { token: "{toko}", label: "Nama toko" },
+    { token: "{perangkat}", label: "Perangkat" },
+    { token: "{nomor_servis}", label: "Nomor servis" },
+    { token: "{link_tracking}", label: "Link tracking" },
+  ],
+  waNotFixed: [
+    { token: "{toko}", label: "Nama toko" },
+    { token: "{perangkat}", label: "Perangkat" },
+    { token: "{nomor_servis}", label: "Nomor servis" },
+    { token: "{hasil}", label: "Hasil: tidak dapat kami perbaiki / dibatalkan" },
+    { token: "{detail}", label: "Keterangan teknisi + rincian biaya (kosong jika belum diisi)" },
+    { token: "{biaya_cek}", label: "Biaya pengecekan / gratis, otomatis dari Biaya final" },
+    { token: "{link_tracking}", label: "Link tracking" },
+  ],
+  waNotFixedFollowUp: [
     { token: "{toko}", label: "Nama toko" },
     { token: "{perangkat}", label: "Perangkat" },
     { token: "{nomor_servis}", label: "Nomor servis" },

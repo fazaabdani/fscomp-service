@@ -35,6 +35,7 @@ import {
   BarChart3,
   Bell,
   CheckCircle2,
+  XCircle,
   ChevronRight,
   CircleDollarSign,
   Clock3,
@@ -232,6 +233,9 @@ const statuses: Status[] = [
 // deliberately NOT in `statuses` (the linear progress timeline) nor in
 // `processStatuses`, so it drops out of the active/ready/receivable views.
 const CANCELLED: Status = "Dibatalkan";
+// A job that ended without a repair: the "servis selesai" wording would be wrong for it.
+const isNotFixed = (t: Pick<Ticket, "condition" | "status">) =>
+  t.condition === "Tidak Bisa" || t.condition === "Dibatalkan" || t.status === "Dibatalkan";
 const selectableStatuses: Status[] = [...statuses, CANCELLED];
 const defaultServices: ServiceItem[] = [
   {
@@ -2227,7 +2231,9 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
     renderWaTemplate(shop.waSalutation, {
       nama: name.replace(/^\s*(bapak|pak|ibu|bu|mas|mbak|mba|kak|bang|abang|om|tante|haji|hj\.?|h\.)\s+/i, "").trim() || name,
     });
-  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready" | "picked" | "followup") {
+  // "ready" follows the ticket's condition; "ready-ok" / "ready-no" force one wording
+  // (chat picker), because staff may message before the condition is filled in.
+  function whatsappUrl(ticket: Ticket, kind: "empty" | "received" | "cost" | "cost-options" | "ready" | "ready-ok" | "ready-no" | "picked" | "followup") {
     const base = waLink(ticket.phone);
     if (kind === "empty") return base;
     const tracking = `${location.origin}/track?id=${encodeURIComponent(ticket.id)}`;
@@ -2260,6 +2266,27 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         return q ? qcFindingsText(q.items) || "tidak ditemukan masalah lain" : "";
       })(),
       sisa: money(Math.max(0, finalPrice(ticket) - ticket.downPayment)),
+      hasil:
+        ticket.condition === "Dibatalkan" || ticket.status === "Dibatalkan"
+          ? "dibatalkan"
+          : ticket.condition === "Tidak Bisa"
+            ? "tidak dapat kami perbaiki"
+            : "tidak dilanjutkan",
+      // Only a confirmed final cost counts: an unconfirmed one falls back to the repair
+      // estimate, which a failed job must never quote as if it were owed.
+      biaya_cek: (() => {
+        if (!ticket.costConfirmed) return "Biaya pengecekan (jika ada) kami konfirmasikan saat pengambilan.";
+        const fin = finalPrice(ticket);
+        const dp = ticket.downPayment;
+        if (fin === 0)
+          return dp > 0
+            ? `Tidak ada biaya untuk servis ini. Uang muka *${money(dp)}* akan kami kembalikan saat pengambilan.`
+            : "Untuk servis ini *tidak ada biaya* (gratis).";
+        if (fin - dp <= 0) return `Biaya pengecekan *${money(fin)}* sudah *lunas*.`;
+        return dp > 0
+          ? `Biaya pengecekan *${money(fin)}*, uang muka *${money(dp)}*, sisa pembayaran *${money(fin - dp)}*.`
+          : `Biaya pengecekan sebesar *${money(fin)}*.`;
+      })(),
       pembayaran:
         ticket.warrantyOf && finalPrice(ticket) === 0 && ticket.downPayment === 0
           ? "Servis ini klaim garansi, *tanpa biaya*."
@@ -2274,12 +2301,16 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
         ? shop.waReceived
         : kind === "cost"
           ? shop.waCost
-          : kind === "ready"
-            ? shop.waReady
+          : kind === "ready" || kind === "ready-ok" || kind === "ready-no"
+            ? kind === "ready-no" || (kind === "ready" && isNotFixed(ticket))
+              ? shop.waNotFixed || WA_TEMPLATE_DEFAULTS.waNotFixed
+              : shop.waReady
             : kind === "picked"
               ? shop.waPickedUp || WA_TEMPLATE_DEFAULTS.waPickedUp
               : kind === "followup"
-                ? shop.waFollowUp || WA_TEMPLATE_DEFAULTS.waFollowUp
+                ? isNotFixed(ticket)
+                  ? shop.waNotFixedFollowUp || WA_TEMPLATE_DEFAULTS.waNotFixedFollowUp
+                  : shop.waFollowUp || WA_TEMPLATE_DEFAULTS.waFollowUp
                 : shop.waCostOptions;
     const message = `${salutation(ticket.customer)},\n\n${renderWaTemplate(body, vars)}\n\n${shop.waClosing}`;
     return `${base}&text=${encodeURIComponent(message)}`;
@@ -3875,7 +3906,8 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="chatChoices">
                 <a target="_blank" href={whatsappUrl(selected, "empty")}><MessageCircle/><span><b>Chat WhatsApp Kosong</b><small>Hanya membuka percakapan pelanggan tanpa isi pesan.</small></span></a>
                 <a target="_blank" data-ticket={selected.id} data-wa-kind="RECEIVED" href={whatsappUrl(selected, "received")}><PackageCheck/><span><b>Konfirmasi Servis Diterima</b><small>Salam, data barang, nomor servis, dan link tracking.</small></span></a>
-                <a target="_blank" data-ticket={selected.id} data-wa-kind="READY" href={whatsappUrl(selected, "ready")}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
+                <a target="_blank" data-ticket={selected.id} data-wa-kind="READY" href={whatsappUrl(selected, "ready-ok")} className={isNotFixed(selected) ? "" : "recommended"}><CheckCircle2/><span><b>Servis Selesai — Siap Diambil</b><small>Kabari pelanggan beserta sisa pembayaran.</small></span></a>
+                <a target="_blank" data-ticket={selected.id} data-wa-kind="READY" href={whatsappUrl(selected, "ready-no")} className={isNotFixed(selected) ? "recommended" : ""}><XCircle/><span><b>Servis Tidak Bisa / Dibatalkan — Unit Bisa Diambil</b><small>Mohon maaf, penjelasan teknisi, biaya cek atau gratis (sesuai Biaya final){!selected.costConfirmed && " — Biaya final belum dikonfirmasi, isi dulu (Rp0 = gratis)."}</small></span></a>
                 <a target="_blank" data-ticket={selected.id} data-wa-kind="PICKED" href={whatsappUrl(selected, "picked")}><ShieldCheck/><span><b>Servis Diambil — Terima Kasih</b><small>Ucapan terima kasih, info garansi, dan ajakan chat WA dulu jika ada kendala.</small></span></a>
                 <div className="chatCostGroup"><CircleDollarSign/><span><b>Konfirmasi Biaya Servis</b><small>Pilih format pesan sesuai hasil pengecekan.{!selected.serviceAction?.trim() && " Tindakan teknisi belum diisi — isi dulu di detail servis agar pesan lebih jelas."}</small><span className="costChatVariants"><a target="_blank" data-ticket={selected.id} data-wa-kind="COST" href={whatsappUrl(selected, "cost")}>Satu nominal</a><a target="_blank" data-ticket={selected.id} data-wa-kind="COST" href={whatsappUrl(selected, "cost-options")}>Beberapa pilihan</a></span></span></div>
               </div>

@@ -47,3 +47,10 @@ Pernah terlewat mengabari pelanggan saat servis diterima dan saat pengambilan, s
   Tidak berlaku untuk nomor HP, nama staf, password, template pesan WhatsApp, dan pengaturan toko. Data lama tidak diubah.
 - **Kelengkapan** dipilih lewat chip (TAS, CHARGER, ADAPTOR, MOUSE, KABEL POWER, KABEL DATA, KARDUS, BATERAI, FLASHDISK,
   HARDISK EKSTERNAL) + kolom "Lainnya"; setiap item tetap mendapat label QR sendiri. Tanpa pilihan = "Unit only".
+
+## Servis tidak bisa / dibatalkan (28 Okt 2026)
+Keluhan staf: servis berkondisi **Tidak Bisa/Dibatalkan** tetap dikabari dengan kalimat "servis sudah selesai". Sekarang:
+- Template baru `waNotFixed` ("Servis Tidak Bisa / Dibatalkan — Unit Bisa Diambil") dan `waNotFixedFollowUp` (H+2), bisa diedit di menu Pesan WhatsApp.
+- Dipakai otomatis (kartu "Kabar ke pelanggan", jendela wajib-kabar, Tindak Lanjut) bila `condition` = Tidak Bisa/Dibatalkan atau status Dibatalkan (`isNotFixed` di `service-desk.tsx`). Log chat tetap `READY`, jadi aturan wajib-kabar tidak berubah.
+- Menu Chat WhatsApp menampilkan kedua pilihan ("Selesai" dan "Tidak Bisa/Dibatalkan"); yang sesuai kondisi diberi tanda "Disarankan".
+- `{biaya_cek}` otomatis dari **Biaya final** yang sudah dikonfirmasi: Rp0 = "tidak ada biaya (gratis)" (jika ada DP, ditulis akan dikembalikan), >Rp0 = biaya pengecekan + sisa. Biaya final belum dikonfirmasi = kalimat netral (estimasi perbaikan tidak pernah disebut sebagai tagihan).

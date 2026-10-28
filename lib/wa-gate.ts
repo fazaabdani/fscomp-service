@@ -12,7 +12,7 @@ export const WA_GATE: Record<string, "READY" | "PICKED"> = {
 
 export const WA_GATE_LABEL: Record<string, string> = {
   RECEIVED: "konfirmasi servis diterima",
-  READY: "kabar servis selesai / siap diambil",
+  READY: "kabar siap diambil (servis selesai, tidak bisa, atau dibatalkan)",
   PICKED: "ucapan terima kasih setelah diambil",
 };
 
