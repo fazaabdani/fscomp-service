@@ -3734,43 +3734,46 @@ textarea {
   .receiptCopyPage.compact .printFooterBrand small {
     font-size: 5.2pt;
   }
+  /* Labels are printed at half their old size: 4 per row instead of 2. */
   .accessorySheetHead {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 6mm;
-    padding-bottom: 3mm;
+    margin-bottom: 3mm;
+    padding-bottom: 1.5mm;
     border-bottom: 1px solid #94a3b8;
-    font-size: 10pt;
+    font-size: 7pt;
   }
   .accessoryLabelGrid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5mm;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2.5mm;
   }
   .accessoryLabel {
     display: grid;
-    grid-template-columns: 30mm 1fr;
+    min-width: 0;
+    grid-template-columns: 15mm minmax(0, 1fr);
     align-items: center;
-    gap: 4mm;
-    min-height: 42mm;
-    padding: 4mm;
-    border: 1.5px dashed #475569;
-    border-radius: 2mm;
+    gap: 2mm;
+    min-height: 21mm;
+    padding: 2mm;
+    border: 0.75px dashed #475569;
+    border-radius: 1mm;
     break-inside: avoid;
   }
   .accessoryLabel svg {
-    width: 28mm;
-    height: 28mm;
+    width: 14mm;
+    height: 14mm;
   }
   .accessoryLabel div > * {
     display: block;
+    overflow-wrap: anywhere;
   }
-  .accessoryLabel small { color: #64748b; font-size: 6pt; font-weight: 700; }
-  .accessoryLabel h2 { margin: 1mm 0 2mm; font-size: 14pt; line-height: 1.05; }
-  .accessoryLabel b { font-size: 9pt; }
-  .accessoryLabel span { margin-top: 1mm; color: #475569; font-size: 8pt; }
-  .accessoryLabel strong { margin-top: 2mm; font-size: 9pt; }
-  .accessoryLabel em { margin-top: 1mm; color: #64748b; font-size: 6pt; }
+  .accessoryLabel small { color: #64748b; font-size: 3.5pt; font-weight: 700; }
+  .accessoryLabel h2 { margin: 0.5mm 0 1mm; font-size: 7.5pt; line-height: 1.05; }
+  .accessoryLabel b { font-size: 4.8pt; }
+  .accessoryLabel span { margin-top: 0.5mm; color: #475569; font-size: 4.2pt; }
+  .accessoryLabel strong { margin-top: 1mm; font-size: 4.8pt; }
+  .accessoryLabel em { margin-top: 0.5mm; color: #64748b; font-size: 3.5pt; }
   /* Navy/blue "tanda terima" theme — matches the shop's provided design ref */
   .printHeader {
     display: grid;
@@ -7214,4 +7217,15 @@ textarea {
   .headerActions .newButton { min-height: 34px; padding: 0 13px; font-size: 13px; border-radius: 10px; }
   /* the service list uses the full width instead of a centred 1500px column */
   .serviceContent:has(.ticketTable) { max-width: none; padding: 12px 20px 36px; }
+}
+
+/* ===== Tighter list header and search row (desktop) ===== */
+@media (min-width: 761px) {
+  .panelTop { padding: 8px 16px; gap: 12px; }
+  .panelTop > div:first-child { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .panelTop h3 { font-size: 15px; }
+  .panelTop p { margin-top: 0; font-size: 12px; }
+  .searchBox { min-height: 32px; border-radius: 8px; }
+  .panelTools select { min-height: 32px; border-radius: 8px; }
+  .panelTools button { min-height: 32px; padding: 0 11px; border-radius: 8px; font-size: 12.5px; }
 }
