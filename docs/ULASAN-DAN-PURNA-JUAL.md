@@ -37,3 +37,13 @@ Pernah terlewat mengabari pelanggan saat servis diterima dan saat pengambilan, s
 - Tidak berlaku surut: hanya perpindahan status baru yang diperiksa; peringatan "Belum Dikabari" hanya untuk servis
   yang diterima mulai 24 Okt 2026 (`lib/wa-gate.ts`).
 - Detail servis menampilkan kartu **Kabar ke pelanggan** (Diterima / Siap diambil / Sudah diambil) dengan tombol kirim.
+
+## Tampilan daftar, huruf kapital, kelengkapan (28 Okt 2026)
+- Daftar Proses Servis: satu baris per servis, kolom terpisah: **Tanggal** (tebal, jam di sebelahnya) · No. Servis (kecil,
+  abu-abu) · Pelanggan · Perangkat · Keluhan · Tindakan · Teknisi · **Status** · **Lama** · Biaya. Teks panjang dipotong
+  satu baris (isi lengkap muncul saat kursor diarahkan). Tampilan HP tetap kartu bertumpuk.
+- **Huruf kapital**: nama pelanggan, alamat, nama barang, serial, keluhan, tindakan, catatan, pengambil, nama item rincian
+  biaya, dan kelengkapan diketik/disimpan KAPITAL (`data-upper` di layar + `lib/upper.ts` di server, jadi API pun konsisten).
+  Tidak berlaku untuk nomor HP, nama staf, password, template pesan WhatsApp, dan pengaturan toko. Data lama tidak diubah.
+- **Kelengkapan** dipilih lewat chip (TAS, CHARGER, ADAPTOR, MOUSE, KABEL POWER, KABEL DATA, KARDUS, BATERAI, FLASHDISK,
+  HARDISK EKSTERNAL) + kolom "Lainnya"; setiap item tetap mendapat label QR sendiri. Tanpa pilihan = "Unit only".

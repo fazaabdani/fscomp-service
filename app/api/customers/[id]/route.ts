@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 import { normalizePhone } from "@/lib/phone";
 import { clientIp } from "@/lib/audit";
+import { up } from "@/lib/upper";
 
 const FIELDS = new Set(["name", "category", "phone", "address", "rating"]);
 
@@ -27,6 +28,8 @@ export async function PATCH(
   for (const [k, v] of Object.entries(body)) {
     if (FIELDS.has(k)) data[k] = v;
   }
+  if (typeof data.name === "string") data.name = up(data.name);
+  if (typeof data.address === "string") data.address = up(data.address);
   if (typeof data.phone === "string") {
     const phone = data.phone.replace(/\D/g, "");
     if (phone.length < 9 || phone.length > 15)

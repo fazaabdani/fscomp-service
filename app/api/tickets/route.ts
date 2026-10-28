@@ -6,6 +6,7 @@ import { currentSession } from "@/lib/session";
 import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
+import { up, upAccessories } from "@/lib/upper";
 
 export async function GET() {
   const session = await currentSession();
@@ -36,11 +37,11 @@ export async function POST(request: Request) {
   const b = await request.json().catch(() => null);
   if (!b)
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
-  const customer = str(b.customer).trim();
+  const customer = up(str(b.customer).trim());
   const phone = str(b.phone).replace(/\D/g, "");
-  const device = str(b.device).trim();
-  const brand = str(b.brand).trim(); // optional: the single "Nama barang" field carries the full name
-  const issue = str(b.issue).trim();
+  const device = up(str(b.device).trim());
+  const brand = up(str(b.brand).trim()); // optional: the single "Nama barang" field carries the full name
+  const issue = up(str(b.issue).trim());
   if (!customer || phone.length < 9 || phone.length > 15 || !device || !issue)
     return NextResponse.json(
       { error: "Data servis tidak lengkap atau nomor WhatsApp tidak valid" },
@@ -94,9 +95,9 @@ export async function POST(request: Request) {
             device,
             deviceType: str(b.deviceType).trim().slice(0, 40) || null,
             brand,
-            serial: str(b.serial, "-").trim() || "-",
+            serial: up(str(b.serial, "-").trim()) || "-",
             issue,
-            accessories: str(b.accessories, "Unit only").trim() || "Unit only",
+            accessories: upAccessories(str(b.accessories, "Unit only")) || "Unit only",
             technician: str(b.technician),
             receivedBy: str(b.receivedBy).trim() || session.name,
             status: "Belum Cek",
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
             customerConfirmed: false,
             costConfirmed: false,
             category: str(b.category, "User"),
-            address: str(b.address, "-"),
+            address: up(str(b.address, "-")),
             paymentTermDays: num(b.paymentTermDays),
             warrantyOf: warrantyOf || null,
             paymentMethod: downPayment > 0 ? dpMethod : null,

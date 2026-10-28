@@ -748,6 +748,7 @@ function CostItemsPanel({
           <input
             value={r.name}
             maxLength={80}
+            data-upper
             placeholder="Nama item, mis. Keyboard Acer Aspire 5"
             onChange={(e) => setRow(i, { name: e.target.value })}
           />
@@ -974,6 +975,60 @@ function DeviceTypeField({
         </span>
       )}
     </label>
+  );
+}
+
+// Common things a customer leaves with the unit, as one-tap chips. Anything else
+// can be typed and becomes its own chip; each item gets its own QR label.
+const ACCESSORY_CHOICES = ["TAS", "CHARGER", "ADAPTOR", "MOUSE", "KABEL POWER", "KABEL DATA", "KARDUS", "BATERAI", "FLASHDISK", "HARDISK EKSTERNAL"];
+
+function AccessoryPicker({ defaultValue }: { defaultValue?: string | null }) {
+  const [items, setItems] = useState<string[]>(() =>
+    Array.from(new Set(accessoryItems(defaultValue || "").map((x) => x.toLocaleUpperCase("id-ID")))),
+  );
+  const [draft, setDraft] = useState("");
+  const toggle = (name: string) => setItems((old) => (old.includes(name) ? old.filter((x) => x !== name) : [...old, name]));
+  const addDraft = () => {
+    const name = draft.trim().toLocaleUpperCase("id-ID");
+    if (name && !items.includes(name)) setItems((old) => [...old, name]);
+    setDraft("");
+  };
+  const custom = items.filter((x) => !ACCESSORY_CHOICES.includes(x));
+  return (
+    <div className="accessoryPicker">
+      <input type="hidden" name="accessories" value={items.join(", ")} />
+      <div className="accessoryChips">
+        {ACCESSORY_CHOICES.map((c) => (
+          <button key={c} type="button" className={items.includes(c) ? "on" : ""} aria-pressed={items.includes(c)} onClick={() => toggle(c)}>
+            {c}
+          </button>
+        ))}
+        {custom.map((c) => (
+          <button key={c} type="button" className="on custom" title="Klik untuk menghapus" onClick={() => toggle(c)}>
+            {c} ×
+          </button>
+        ))}
+      </div>
+      <div className="accessoryAdd">
+        <input
+          data-upper
+          value={draft}
+          maxLength={40}
+          placeholder="Lainnya, ketik lalu Enter"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addDraft();
+            }
+          }}
+        />
+        <button type="button" className="deviceTypeAdd" disabled={!draft.trim()} onClick={addDraft}>
+          + Tambah
+        </button>
+      </div>
+      {items.length === 0 && <small className="fieldHint">Belum ada yang dipilih = tanpa kelengkapan (unit saja).</small>}
+    </div>
   );
 }
 
@@ -1585,6 +1640,29 @@ export default function ServiceDesk() {
   // An open tab keeps running the JS it loaded; after a deploy staff would
   // keep seeing the old screens (and missing new fields) until a manual
   // reload. Compare our build id with the server's and offer a reload.
+  // Fields flagged data-upper are forced to capitals as they are typed (caret kept).
+  // The value goes through the native setter and a second input event so React's
+  // own state for controlled fields follows along.
+  useEffect(() => {
+    const force = (e: Event) => {
+      const el = e.target as HTMLInputElement | HTMLTextAreaElement | null;
+      if (!el || !el.matches?.("[data-upper]")) return;
+      const upper = el.value.toLocaleUpperCase("id-ID");
+      if (upper === el.value) return;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, upper);
+      try {
+        if (start !== null && end !== null) el.setSelectionRange(start, end);
+      } catch {
+        /* some input types have no selection */
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    document.addEventListener("input", force, true);
+    return () => document.removeEventListener("input", force, true);
+  }, []);
   useEffect(() => {
     const mark = (e: Event) => {
       const t = e.target as HTMLElement | null;
@@ -2862,11 +2940,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         })}
                       />
                     </span>
+                    <span>Tanggal</span>
                     <span>No. Servis</span>
-                    <span>Pelanggan & Perangkat</span>
-                    <span>Keluhan / Tindakan</span>
+                    <span>Pelanggan</span>
+                    <span>Perangkat</span>
+                    <span>Keluhan</span>
+                    <span>Tindakan</span>
                     <span>Teknisi</span>
-                    <span>Status & Lama</span>
+                    <span>Status</span>
+                    <span>Lama</span>
                     <span>Biaya</span>
                     <span />
                   </div>
@@ -2881,7 +2963,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === "Enter") openDetail(t); }}
                       >
-                        <span className="jobCheck" onClick={(e) => e.stopPropagation()}>
+                        <span className="jobCheck tChk" onClick={(e) => e.stopPropagation()}>
                           <input
                             aria-label={`Pilih servis ${t.id}`}
                             type="checkbox"
@@ -2889,65 +2971,53 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                             onChange={() => toggleJob(t.id)}
                           />
                         </span>
-                        <span>
-                          <b>{t.id}</b>
-                          <small>
-                            <Clock3 size={12} />
-                            {t.receivedAt}
-                          </small>
+                        <span className="tDate" title={t.receivedAt}>
+                          <b>{fmtTglSingkat(t.receivedAt).replace("Tgl. ", "")}</b>
+                          {t.receivedTime && <em>{t.receivedTime}</em>}
+                        </span>
+                        <span className="tNo" title={t.id}>{t.id}</span>
+                        <span className="tCust" title={t.customer}>
                           {t.warrantyOf && (
-                            <small className="claimTag">
-                              <Shield size={11} /> Klaim garansi
-                            </small>
+                            <i className="claimTag" title={`Klaim garansi dari ${t.warrantyOf}`}>
+                              <Shield size={11} /> KLAIM
+                            </i>
                           )}
-                        </span>
-                        <span>
                           <b>{t.customer}</b>
-                          <small>{t.device}</small>
-                          <span className="starsMini">
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <Star
-                                key={n}
-                                size={10}
-                                fill={
-                                  (t.rating || 0) >= n ? "currentColor" : "none"
-                                }
-                              />
-                            ))}
-                          </span>
                         </span>
-                        <span>
-                          <b>{t.issue}</b>
-                          {t.serviceAction?.trim() ? (
-                            <small className="actionLine">Tindakan: {t.serviceAction}</small>
-                          ) : qcByTicket.get(t.id) && !qcByTicket.get(t.id)!.reviewedAt ? (
-                            <small className="actionLine qcLine">
-                              QC selesai oleh {qcByTicket.get(t.id)!.checkedBy} · {qcByTicket.get(t.id)!.badCount} bermasalah — tinjau
-                            </small>
-                          ) : (
-                            <small>{t.accessories}</small>
-                          )}
+                        <span className="tDev" title={t.device}>{t.device}</span>
+                        <span className="tIssue" title={t.issue}>{t.issue}</span>
+                        <span
+                          className={`tAct ${!t.serviceAction?.trim() && qcByTicket.get(t.id) && !qcByTicket.get(t.id)!.reviewedAt ? "qcLine" : ""}`}
+                          title={t.serviceAction?.trim() || ""}
+                        >
+                          {t.serviceAction?.trim()
+                            ? t.serviceAction
+                            : qcByTicket.get(t.id) && !qcByTicket.get(t.id)!.reviewedAt
+                              ? `QC selesai oleh ${qcByTicket.get(t.id)!.checkedBy} · ${qcByTicket.get(t.id)!.badCount} bermasalah — tinjau`
+                              : "—"}
                         </span>
-                        <span>
+                        <span className="tTech">
                           <span className="avatarMini">
                             {(t.technician || "?").slice(0, 2).toUpperCase()}
                           </span>
-                          {t.technician || "—"}
+                          <em>{t.technician || "—"}</em>
                         </span>
-                        <span>
+                        <span className="tStatus">
                           <i className={`statusBadge ${tone(t.status)}`}>
                             {t.status}
                           </i>
+                        </span>
+                        <span className="tAge">
                           <small className={`ageBadge ${ageTone(days)}`}>
                             <CalendarDays size={11} />
                             {days === 0 ? "Hari ini" : `${days} hari`}
                           </small>
                         </span>
-                        <span>
+                        <span className="tCost">
                           <b>{money(finalPrice(t))}</b>
                           <small>DP {money(t.downPayment)}</small>
                         </span>
-                        <span>
+                        <span className="tGo">
                           <ChevronRight />
                         </span>
                       </div>
@@ -3005,6 +3075,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   Nama pemilik barang
                   <input
                     name="customer"
+                    data-upper
                     required
                     autoFocus
                     autoComplete="off"
@@ -3057,7 +3128,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 </label>
                 <label>
                   Alamat pelanggan
-                  <input name="address" defaultValue={warrantyClaim?.address && warrantyClaim.address !== "-" ? warrantyClaim.address : ""} placeholder="Desa / kecamatan / kota" />
+                  <input name="address" data-upper defaultValue={warrantyClaim?.address && warrantyClaim.address !== "-" ? warrantyClaim.address : ""} placeholder="Desa / kecamatan / kota" />
                 </label>
                 <DeviceTypeField
                   types={deviceTypeList(shop)}
@@ -3068,6 +3139,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   Nama barang
                   <input
                     name="device"
+                    data-upper
                     required
                     defaultValue={warrantyClaim ? `${warrantyClaim.device}${warrantyClaim.brand ? ` ${warrantyClaim.brand}` : ""}` : ""}
                     placeholder="Contoh: Laptop Lenovo ThinkPad T14"
@@ -3075,23 +3147,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 </label>
                 <label>
                   Serial number
-                  <input name="serial" defaultValue={warrantyClaim && warrantyClaim.serial !== "-" ? warrantyClaim.serial : ""} placeholder="Opsional" />
+                  <input name="serial" data-upper defaultValue={warrantyClaim && warrantyClaim.serial !== "-" ? warrantyClaim.serial : ""} placeholder="Opsional" />
                 </label>
-                <label>
-                  Kelengkapan untuk label QR
-                  <input
-                    name="accessories"
-                    defaultValue={warrantyClaim && warrantyClaim.accessories !== "Unit only" ? warrantyClaim.accessories : ""}
-                    placeholder="Contoh: Charger, tas, mouse"
-                  />
-                  <small className="fieldHint">
-                    Pisahkan dengan koma atau tanda +. Setiap barang mendapat QR sendiri.
-                  </small>
-                </label>
+                <div className="accessoryField">
+                  <span>Kelengkapan untuk label QR</span>
+                  <AccessoryPicker defaultValue={warrantyClaim && warrantyClaim.accessories !== "Unit only" ? warrantyClaim.accessories : ""} />
+                  <small className="fieldHint">Pilih yang dibawa pelanggan. Setiap barang mendapat QR sendiri.</small>
+                </div>
                 <label className="full">
                   Keluhan pelanggan (saat unit masuk)
                   <textarea
                     name="issue"
+                    data-upper
                     required
                     placeholder="Tuliskan gejala atau keluhan sesuai yang disampaikan pelanggan"
                   />
@@ -3344,6 +3411,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   <span>Apa yang dikerjakan / diganti. Tampil juga di halaman cek status pelanggan.</span>
                   <textarea
                     key={`action-${selected.id}-${selected.version}`}
+                    data-upper
                     defaultValue={selected.serviceAction || ""}
                     placeholder="Contoh: Ganti panel LCD 14 inch, kalibrasi baterai, install ulang Windows"
                     onBlur={(e) => {
@@ -3703,16 +3771,16 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
               <div className="formGridService editServiceGrid">
                 <label>Tanggal terima<input name="receivedAt" type="date" required defaultValue={selected.receivedAt}/></label>
                 <label>Jam terima<input name="receivedTime" type="time" defaultValue={selected.receivedTime || ""}/></label>
-                <label>Nama pemilik<input name="customer" required defaultValue={selected.customer}/></label>
+                <label>Nama pemilik<input name="customer" data-upper required defaultValue={selected.customer}/></label>
                 <label>Nomor WhatsApp<input name="phone" required defaultValue={selected.phone}/></label>
                 <DeviceTypeField types={deviceTypeList(shop)} defaultValue={selected.deviceType} onAdd={addDeviceType} optional />
-                <label>Nama barang<input name="device" required defaultValue={selected.device}/></label>
-                                <label>Serial number<input name="serial" defaultValue={selected.serial}/></label>
-                <label>Kelengkapan<input name="accessories" defaultValue={selected.accessories}/></label>
-                <label className="full">Keluhan pelanggan (saat unit masuk)<textarea name="issue" required defaultValue={selected.issue}/></label>
+                <label>Nama barang<input name="device" data-upper required defaultValue={selected.device}/></label>
+                                <label>Serial number<input name="serial" data-upper defaultValue={selected.serial}/></label>
+                <div className="accessoryField"><span>Kelengkapan</span><AccessoryPicker defaultValue={selected.accessories} /></div>
+                <label className="full">Keluhan pelanggan (saat unit masuk)<textarea name="issue" data-upper required defaultValue={selected.issue}/></label>
                 <label>Kondisi servis<select name="condition" defaultValue={selected.condition || ""}><option value="">Belum ditentukan</option><option>Sudah Jadi</option><option>Tidak Bisa</option><option>Dibatalkan</option></select></label>
                 <label>Teknisi<select name="technician" defaultValue={selected.technician || ""}><option value="">— belum ditentukan —</option>{nameOptions(staff.map((p) => p.name), selected.technician).map((n) => <option key={n}>{n}</option>)}</select></label>
-                <label className="full">Tindakan teknisi<textarea name="serviceAction" defaultValue={selected.serviceAction}/></label>
+                <label className="full">Tindakan teknisi<textarea name="serviceAction" data-upper defaultValue={selected.serviceAction}/></label>
                 <label>DP / uang muka<input name="downPayment" type="number" min="0" defaultValue={selected.downPayment}/></label>
                 {currentUser?.role === "ADMIN" && (
                   <label>
@@ -3743,12 +3811,12 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Biaya servis final<input name="finalCost" type="number" min="0" defaultValue={selected.finalCost || 0}/></label>
                 <label>Tanggal ditangani<input name="handledAt" type="date" defaultValue={selected.handledAt || ""}/></label>
                 <label>Jam ditangani<input name="handledTime" type="time" defaultValue={selected.handledTime || ""}/></label>
-                <label className="full">Catatan<textarea name="notes" defaultValue={selected.notes}/></label>
+                <label className="full">Catatan<textarea name="notes" data-upper defaultValue={selected.notes}/></label>
                 <label>Tanggal ambil<input name="pickedUpAt" type="date" defaultValue={selected.pickedUpAt || ""}/></label>
                 <label>Jam ambil<input name="pickedUpTime" type="time" defaultValue={selected.pickedUpTime || ""}/></label>
                 <label>Cara pembayaran<select name="paymentMethod" defaultValue={selected.paymentMethod || "Tunai - Cash"}>{[...paymentMethods, ...tempoMethods, ...(selected.paymentMethod && ![...paymentMethods, ...tempoMethods].includes(selected.paymentMethod) ? [selected.paymentMethod] : [])].map((m) => <option key={m}>{m}</option>)}</select></label>
                 <label>Garansi servis<select name="warrantyDays" defaultValue={warrantyCanon(selected.warrantyDays || 0)}>{warrantyOptions.map(([d, label]) => <option key={d} value={d}>{label}</option>)}{!warrantyOptions.some(([d]) => d === warrantyCanon(selected.warrantyDays || 0)) && <option value={selected.warrantyDays}>{warrantyLabel(selected.warrantyDays)}</option>}</select></label>
-                <label>Pengambil<input name="pickupBy" defaultValue={selected.pickupBy || selected.customer}/></label>
+                <label>Pengambil<input name="pickupBy" data-upper defaultValue={selected.pickupBy || selected.customer}/></label>
                 <label>Penyerah<input name="handedBy" defaultValue={selected.handedBy || currentUser?.name || "Admin"}/></label>
               </div>
               <div className="modalFoot"><button type="button" className="ghost" onClick={() => setModal("detail")}>Batal</button><button className="newButton"><CheckCircle2 size={17}/> Simpan Perubahan</button></div>
@@ -4358,6 +4426,7 @@ function CustomersPanel({
                 Nama pelanggan
                 <input
                   name="name"
+                  data-upper
                   required
                   autoFocus
                   defaultValue={editing?.name}
@@ -4397,6 +4466,7 @@ function CustomersPanel({
                 Alamat pelanggan
                 <textarea
                   name="address"
+                  data-upper
                   required
                   defaultValue={editing?.address}
                 />

@@ -7,6 +7,7 @@ import { pushPaymentToDashboard } from "@/lib/dashboard-sync";
 import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
 import { serializeCostItems } from "@/lib/cost-items";
+import { TICKET_UPPER_FIELDS, up, upAccessories } from "@/lib/upper";
 import { WA_GATE, WA_GATE_LABEL, canMessage } from "@/lib/wa-gate";
 
 const FIELDS = new Set([
@@ -55,6 +56,16 @@ export async function PATCH(
   }
   // The editor sends a list; it is stored as normalised JSON text.
   if ("costItems" in data) data.costItems = serializeCostItems(data.costItems);
+  // Customer/job text is always stored in capitals.
+  for (const f of TICKET_UPPER_FIELDS) if (typeof data[f] === "string") data[f] = up(data[f]);
+  if (typeof data.accessories === "string") data.accessories = upAccessories(data.accessories) || "Unit only";
+  if (data.costItems) {
+    try {
+      data.costItems = JSON.stringify(JSON.parse(data.costItems as string).map((r: { name: string; amount: number }) => ({ ...r, name: up(r.name) })));
+    } catch {
+      /* serializeCostItems already produced valid JSON or null */
+    }
+  }
   if (Object.keys(data).length === 0)
     return NextResponse.json({ error: "Tidak ada field yang diubah" }, { status: 400 });
 

@@ -2847,7 +2847,7 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ticketRow > span:nth-child(5) {
+.ticketRow > .tTech {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -2858,7 +2858,7 @@ textarea {
   height: 25px;
   font-size: 11px;
 }
-.ticketRow > span:last-child {
+.ticketRow > .tGo {
   color: #a4aec0;
 }
 .statusBadge {
@@ -5865,23 +5865,29 @@ textarea {
     min-width: 0;
     grid-template-columns: 28px minmax(0, 1fr) auto;
     grid-template-areas:
-      "chk id status"
+      "chk date status"
+      "chk no age"
       "chk cust cost"
+      "chk dev cost"
       "chk issue issue"
+      "chk act act"
       "chk tech tech";
     gap: 5px 12px;
     align-items: start;
     padding: 14px 15px;
   }
-  .ticketRow > span:nth-child(1) { grid-area: chk; align-self: start; }
-  .ticketRow > span:nth-child(2) { grid-area: id; min-width: 0; }
-  .ticketRow > span:nth-child(3) { grid-area: cust; min-width: 0; }
-  .ticketRow > span:nth-child(4) { grid-area: issue; min-width: 0; }
-  .ticketRow > span:nth-child(5) { grid-area: tech; }
-  .ticketRow > span:nth-child(6) { grid-area: status; justify-self: end; text-align: right; }
-  .ticketRow > span:nth-child(6) small { justify-content: flex-end; }
-  .ticketRow > span:nth-child(7) { grid-area: cost; justify-self: end; text-align: right; }
-  .ticketRow > span:nth-child(8) { display: none; }
+  .ticketRow > .tChk { grid-area: chk; align-self: start; }
+  .ticketRow > .tDate { grid-area: date; min-width: 0; }
+  .ticketRow > .tNo { grid-area: no; min-width: 0; }
+  .ticketRow > .tCust { grid-area: cust; min-width: 0; }
+  .ticketRow > .tDev { grid-area: dev; min-width: 0; }
+  .ticketRow > .tIssue { grid-area: issue; min-width: 0; white-space: normal; }
+  .ticketRow > .tAct { grid-area: act; min-width: 0; white-space: normal; }
+  .ticketRow > .tTech { grid-area: tech; }
+  .ticketRow > .tStatus { grid-area: status; justify-self: end; text-align: right; }
+  .ticketRow > .tAge { grid-area: age; justify-self: end; }
+  .ticketRow > .tCost { grid-area: cost; justify-self: end; text-align: right; }
+  .ticketRow > .tGo { display: none; }
 }
 .formGridService.single {
   grid-template-columns: 1fr;
@@ -6810,29 +6816,44 @@ textarea {
 /* Compact service list (desktop): about 50px per row instead of ~77px, so a
    screen shows many more jobs. Rating stars are hidden here (still in detail). */
 @media (min-width: 761px) {
+  /* One line per field: date, number, customer, device, complaint, action,
+     technician, status, age and cost each get their own column. */
   .ticketHead,
   .ticketRow {
-    grid-template-columns: 28px 140px minmax(170px, 1.2fr) minmax(190px, 1.4fr) 140px 250px 120px 28px;
-    min-width: 1210px;
-  }
-  .ticketRow > span:nth-child(6) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 6px;
-  }
-  .ticketRow > span:nth-child(6) small {
-    margin-top: 0;
+    grid-template-columns: 24px 118px 126px minmax(120px, 1fr) minmax(100px, 0.8fr) minmax(140px, 1.3fr) minmax(120px, 1fr) 112px 128px 70px 98px 20px;
+    min-width: 1310px;
+    gap: 8px;
   }
   .ticketHead {
     min-height: 34px;
   }
   .ticketRow {
-    min-height: 50px;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    gap: 12px;
+    min-height: 42px;
+    padding-top: 4px;
+    padding-bottom: 4px;
   }
+  .ticketRow > .tDate,
+  .ticketRow > .tNo,
+  .ticketRow > .tCust,
+  .ticketRow > .tDev,
+  .ticketRow > .tIssue,
+  .ticketRow > .tAct {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ticketRow > .tDate b { display: inline; font-size: 13.5px; color: #1f2a44; }
+  .ticketRow > .tDate em { margin-left: 6px; font-style: normal; font-size: 11px; color: #8d98aa; }
+  .ticketRow > .tNo { font-size: 11.5px; color: #8d98aa; letter-spacing: 0.01em; }
+  .ticketRow > .tDev,
+  .ticketRow > .tIssue { font-size: 12.5px; color: #4a566b; }
+  .ticketRow > .tAct { font-size: 12px; color: #2f43b0; }
+  .ticketRow > .tAct.qcLine { color: #9a5b00; font-weight: 700; }
+  .ticketRow > .tCust { display: flex; align-items: center; gap: 6px; }
+  .ticketRow > .tCust .claimTag { flex: none; margin: 0; font-style: normal; }
+  .ticketRow > .tTech em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: normal; }
+  .ticketRow > .tAge small { margin-top: 0; }
   .ticketRow .starsMini {
     display: none !important;
   }
@@ -7163,3 +7184,20 @@ textarea {
 .waGateModal { width: min(460px, 100%); }
 .waGateLink { display: inline-flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
 .skipSop.waNeed { color: #b3261e; font-weight: 700; cursor: default; text-decoration: none; }
+
+/* ===== Accessories picker, forced capitals ===== */
+[data-upper] { text-transform: uppercase; }
+.accessoryField { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: #3f4d68; }
+.accessoryPicker { display: grid; gap: 8px; }
+.accessoryChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.accessoryChips button {
+  padding: 6px 12px; border: 1px solid #cfd6e4; border-radius: 999px; background: #fff;
+  font: inherit; font-size: 12px; font-weight: 700; color: #44526b; cursor: pointer;
+}
+.accessoryChips button.on { background: #1d4fd8; border-color: #1d4fd8; color: #fff; }
+.accessoryChips button.custom { background: #2b3a63; border-color: #2b3a63; }
+.accessoryAdd { display: flex; gap: 8px; }
+.accessoryAdd input {
+  flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid #cfd6e4; border-radius: 8px;
+  background: #fff; font: inherit; font-size: 13px;
+}

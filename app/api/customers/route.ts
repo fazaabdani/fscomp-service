@@ -4,6 +4,7 @@ import { currentSession } from "@/lib/session";
 import { normalizePhone } from "@/lib/phone";
 import { isShopLocked } from "@/lib/shop-lock";
 import { clientIp } from "@/lib/audit";
+import { up } from "@/lib/upper";
 
 export async function GET() {
   const session = await currentSession();
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const b = await request.json().catch(() => null);
   if (!b)
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
-  const name = String(b.name || "").trim();
+  const name = up(String(b.name || "").trim());
   const phone = String(b.phone || "").replace(/\D/g, "");
   if (!name || phone.length < 9 || phone.length > 15)
     return NextResponse.json(
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
         category: String(b.category || "User"),
         phone,
         phoneNormalized: normalizePhone(phone) || null,
-        address: String(b.address || "-").trim() || "-",
+        address: up(String(b.address || "-").trim()) || "-",
         rating: Number.isFinite(b.rating) ? Math.round(b.rating) : 0,
         createdAt: typeof b.createdAt === "string" ? b.createdAt : localDate,
       },
