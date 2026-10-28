@@ -7202,3 +7202,16 @@ textarea {
 }
 
 .serviceAge .receivedAt { margin-left: 10px; padding-left: 10px; border-left: 1px solid #d5ddee; font-size: 13px; font-weight: 600; color: #44526b; }
+
+/* ===== Slimmer top bar, wider list area (desktop) ===== */
+@media (min-width: 761px) {
+  .serviceHeader { min-height: 48px; padding: 6px 24px; gap: 14px; }
+  .serviceHeader h1 { font-size: 17px; }
+  .serviceHeader p { display: none; }
+  .headerActions { gap: 8px; }
+  .headerActions .iconCircle { width: 34px; height: 34px; border-radius: 10px; }
+  .headerActions .scanButton,
+  .headerActions .newButton { min-height: 34px; padding: 0 13px; font-size: 13px; border-radius: 10px; }
+  /* the service list uses the full width instead of a centred 1500px column */
+  .serviceContent:has(.ticketTable) { max-width: none; padding: 12px 20px 36px; }
+}
