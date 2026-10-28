@@ -2973,7 +2973,6 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         </span>
                         <span className="tDate" title={t.receivedAt}>
                           <b>{fmtTglSingkat(t.receivedAt).replace("Tgl. ", "")}</b>
-                          {t.receivedTime && <em>{t.receivedTime}</em>}
                         </span>
                         <span className="tNo" title={t.id}>{t.id}</span>
                         <span className="tCust" title={t.customer}>
@@ -3295,6 +3294,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         ? "Diterima hari ini"
                         : `${ageDays(selected.receivedAt)} hari dalam servis`}
                     </strong>
+                    <span className="receivedAt">
+                      Masuk {fmtTglSingkat(selected.receivedAt).replace("Tgl. ", "")}
+                      {selected.receivedTime ? ` · ${selected.receivedTime} WIB` : ""}
+                    </span>
                   </div>
                   <div className="detailMoney">
                     <span>

@@ -6844,7 +6844,6 @@ textarea {
     white-space: nowrap;
   }
   .ticketRow > .tDate b { display: inline; font-size: 13.5px; color: #1f2a44; }
-  .ticketRow > .tDate em { margin-left: 6px; font-style: normal; font-size: 11px; color: #8d98aa; }
   .ticketRow > .tNo { font-size: 11.5px; color: #8d98aa; letter-spacing: 0.01em; }
   .ticketRow > .tDev,
   .ticketRow > .tIssue { font-size: 12.5px; color: #4a566b; }
@@ -7201,3 +7200,5 @@ textarea {
   flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid #cfd6e4; border-radius: 8px;
   background: #fff; font: inherit; font-size: 13px;
 }
+
+.serviceAge .receivedAt { margin-left: 10px; padding-left: 10px; border-left: 1px solid #d5ddee; font-size: 13px; font-weight: 600; color: #44526b; }
