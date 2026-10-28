@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardCheck, KeyRound, LogOut, X } from "lucide-react";
+import { AskHost, askConfirm } from "./ask-dialog";
 import {
   QC_RESULTS,
   QC_TEMPLATES,
@@ -95,8 +96,16 @@ export function QcForm({
   const setItem = (id: string, patch: Partial<QcItem>) =>
     setItems((old) => old.map((i) => (i.id === id ? { ...i, ...patch } : i)));
 
-  function changeTemplate(next: string) {
-    if (answered > 0 && !window.confirm("Mengganti jenis checklist akan mengosongkan jawaban. Lanjutkan?")) return;
+  async function changeTemplate(next: string) {
+    if (
+      answered > 0 &&
+      !(await askConfirm("Mengganti jenis checklist akan mengosongkan jawaban. Lanjutkan?", {
+        title: "Ganti jenis checklist?",
+        okLabel: "Ya, kosongkan jawaban",
+        danger: true,
+      }))
+    )
+      return;
     setTemplate(next);
     setItems(blankItems(next));
   }
@@ -310,6 +319,7 @@ export default function QcDesk({ userName, shopName, enabled: enabledAtLoad }: {
 
   return (
     <div className="qcxPage">
+      <AskHost />
       <header className="qcxTop">
         <div>
           <strong>{shopName || "FS COMP"}</strong>

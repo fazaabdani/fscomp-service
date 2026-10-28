@@ -7,6 +7,7 @@ import { PasswordModal } from "./password-modal";
 import { QcForm, type QcCheckData } from "./qc-desk";
 import { qcFindingsText } from "@/lib/qc-templates";
 import { canMessage, WA_GATE_LABEL } from "@/lib/wa-gate";
+import { AskHost, askConfirm, askPrompt } from "./ask-dialog";
 import { costItemsWaText, costLines, parseCostItems, sumCostItems, type CostItem } from "@/lib/cost-items";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
@@ -1675,6 +1676,33 @@ export default function ServiceDesk() {
     document.addEventListener("input", mark, true);
     return () => document.removeEventListener("input", mark, true);
   }, []);
+  // Every dialog announces itself to screen readers, and Esc closes the top one -
+  // unless something was typed (a stray Esc must not throw input away; the X still works).
+  useEffect(() => {
+    const mark = () =>
+      document.querySelectorAll<HTMLElement>(".serviceModal:not([role])").forEach((m) => {
+        m.setAttribute("role", "dialog");
+        m.setAttribute("aria-modal", "true");
+        const h = m.querySelector(".modalHead h2");
+        if (h) {
+          if (!h.id) h.id = `dlg-${Math.random().toString(36).slice(2, 8)}`;
+          m.setAttribute("aria-labelledby", h.id);
+        }
+      });
+    mark();
+    const mo = new MutationObserver(mark);
+    mo.observe(document.body, { childList: true, subtree: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || typedRef.current) return;
+      if (document.querySelector(".askBackdrop")) return;
+      Array.from(document.querySelectorAll<HTMLElement>(".modalBackdrop .modalHead button")).pop()?.click();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      mo.disconnect();
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
   // A new screen or a closed form starts clean: whatever was typed there is gone or saved.
   useEffect(() => {
     typedRef.current = false;
@@ -2030,7 +2058,7 @@ export default function ServiceDesk() {
     setSelected(ticket);
     setModal("detail");
   }
-  function updateStatus(id: string, status: Status) {
+  async function updateStatus(id: string, status: Status) {
     const before = tickets.find((t) => t.id === id);
     if (status === CANCELLED && before) {
       if (before.status === "Sudah Diambil") {
@@ -2040,15 +2068,24 @@ export default function ServiceDesk() {
       const dp = before.downPayment > 0 ? `
 
 DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secara manual jika perlu.` : "";
-      if (!window.confirm(`Batalkan servis ${before.id} (${before.customer})? Servis tidak lagi dihitung sebagai pekerjaan aktif maupun piutang.${dp}`)) return;
+      if (
+        !(await askConfirm(`Batalkan servis ${before.id} (${before.customer})? Servis tidak lagi dihitung sebagai pekerjaan aktif maupun piutang.${dp}`, {
+          title: "Batalkan servis?",
+          okLabel: "Ya, batalkan servis",
+          cancelLabel: "Jangan batalkan",
+          danger: true,
+        }))
+      )
+        return;
     }
     if (status === "Sudah Diambil" && before) {
       const remaining = Math.max(0, finalPrice(before) - before.downPayment);
       if (
         remaining > 0 &&
-        !window.confirm(
+        !(await askConfirm(
           `Masih ada sisa pembayaran ${money(remaining)}. Tetap serahkan perangkat ke pelanggan?\n\nSisa ini akan tercatat sebagai piutang.`,
-        )
+          { title: "Masih ada sisa pembayaran", okLabel: "Tetap serahkan", cancelLabel: "Kembali" },
+        ))
       )
         return;
     }
@@ -2173,8 +2210,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
   const waWaived = !!selected && !canMessage(selected.phone);
   async function skipReceivedChat() {
     if (!selected) return;
-    const reason = window.prompt("Alasan tidak mengirim chat konfirmasi (dicatat):", "");
-    if (!reason || !reason.trim()) return;
+    const reason = await askPrompt("Alasan tidak mengirim chat konfirmasi. Alasan ini dicatat.", {
+      title: "Lewati chat konfirmasi",
+      okLabel: "Catat & lewati",
+    });
+    if (!reason) return;
     const r = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -2579,6 +2619,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
 
   return (
     <div className="serviceApp">
+      <AskHost />
       {newVersion && !versionDismissed && (
         <div className="versionPill" role="status">
           <span>Versi baru tersedia</span>
@@ -3045,7 +3086,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         </span>
                         <span className="tCost">
                           <b>{money(finalPrice(t))}</b>
-                          <small>DP {money(t.downPayment)}</small>
+                          {t.downPayment > 0 && <small>DP {money(t.downPayment)}</small>}
                         </span>
                         <span className="tGo">
                           <ChevronRight />
@@ -3056,8 +3097,23 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   {visible.length === 0 && (
                     <div className="noData">
                       <Search />
-                      <strong>Data tidak ditemukan</strong>
-                      <p>Coba ubah kata pencarian atau filter status.</p>
+                      {query.trim() || filter !== "Semua" || technicianFilter !== "Semua Teknisi" ? (
+                        <>
+                          <strong>Data tidak ditemukan</strong>
+                          <p>Coba ubah kata pencarian atau filter, atau hapus filter untuk melihat semua.</p>
+                        </>
+                      ) : (
+                        <>
+                          <strong>
+                            {active === "Bisa Diambil"
+                              ? "Belum ada servis yang siap diambil"
+                              : active === "Sudah Diambil"
+                                ? "Belum ada servis yang sudah diambil"
+                                : "Belum ada servis yang sedang diproses"}
+                          </strong>
+                          <p>Servis yang masuk ke tahap ini akan muncul di sini.</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4000,8 +4056,11 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     type="button"
                     className="ghost"
                     onClick={async () => {
-                      const reason = window.prompt("Alasan tidak mengirim chat (dicatat):", "");
-                      if (!reason || !reason.trim()) return;
+                      const reason = await askPrompt("Alasan tidak mengirim chat. Alasan ini dicatat.", {
+                        title: "Lewati kabar ke pelanggan",
+                        okLabel: "Catat & lewati",
+                      });
+                      if (!reason) return;
                       const r = await fetch("/api/chat", {
                         method: "POST",
                         headers: { "content-type": "application/json" },
@@ -5543,6 +5602,13 @@ function TechnicianReport({ tickets, shopName }: { tickets: Ticket[]; shopName: 
             </button>
           </div>
         </div>
+        {rep.names.length === 0 && (
+          <div className="noData">
+            <Users />
+            <strong>Belum ada servis yang ditangani teknisi bulan ini</strong>
+            <p>Laporan terisi setelah servis diselesaikan dan dicatat atas nama teknisi.</p>
+          </div>
+        )}
         <div className="techReportTable">
           <div className="techReportHead" style={{ display: "grid", gridTemplateColumns: cols }}>
             <span>Tanggal</span>
