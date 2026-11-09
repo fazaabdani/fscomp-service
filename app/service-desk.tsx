@@ -1532,6 +1532,8 @@ export default function ServiceDesk() {
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [technicianFilter, setTechnicianFilter] = useState("Semua Teknisi");
+  // Helps monthly reporting: which jobs already have the parts cost (modal) filled in.
+  const [modalFilter, setModalFilter] = useState<"Semua Modal" | "Modal terisi" | "Modal kosong">("Semua Modal");
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
   const scanStopRef = useRef<(() => void) | null>(null);
@@ -1940,7 +1942,8 @@ export default function ServiceDesk() {
                   processStatuses.includes(t.status) || filter === t.status
                 : true;
         const technicianMatch = technicianFilter === "Semua Teknisi" || t.technician === technicianFilter;
-        return matches && statusMatch && sectionMatch && technicianMatch;
+        const modalMatch = modalFilter === "Semua Modal" || ((t.partCost || 0) > 0) === (modalFilter === "Modal terisi");
+        return matches && statusMatch && sectionMatch && technicianMatch && modalMatch;
       }).sort((a, b) => {
         // Newest first by the date that matters for the section: when a unit was
         // collected / finished, otherwise when it came in.
@@ -1953,13 +1956,13 @@ export default function ServiceDesk() {
         return key(b).localeCompare(key(a)) || b.id.localeCompare(a.id);
       });
     },
-    [tickets, query, filter, active, technicianFilter],
+    [tickets, query, filter, active, technicianFilter, modalFilter],
   );
 
   // Back to the first page whenever the list is narrowed or switched.
   useEffect(() => {
     setListPage(1);
-  }, [query, filter, active, technicianFilter]);
+  }, [query, filter, active, technicianFilter, modalFilter]);
 
   const stats = {
     process: tickets.filter((t) => processStatuses.includes(t.status)).length,
@@ -2988,6 +2991,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                       <option>Semua Teknisi</option>
                       {nameOptions([...staff.map((p) => p.name), ...Array.from(new Set(tickets.map((t) => t.technician).filter(Boolean)))]).map((n) => <option key={n}>{n}</option>)}
                     </select>
+                    <select
+                      aria-label="Filter modal sparepart"
+                      value={modalFilter}
+                      onChange={(e) => {
+                        setModalFilter(e.target.value as typeof modalFilter);
+                        setSelectedJobs(new Set());
+                      }}
+                    >
+                      <option>Semua Modal</option>
+                      <option>Modal terisi</option>
+                      <option>Modal kosong</option>
+                    </select>
                     <button className="copyWorkList" onClick={copyServiceList}>
                       <Copy size={17} />
                       <span>Copy WA {selectedJobs.size ? `(${selectedJobs.size})` : ""}</span>
@@ -3028,7 +3043,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     const days = ageDays(t.receivedAt);
                     return (
                       <div
-                        className="ticketRow"
+                        className={`ticketRow${(t.partCost || 0) > 0 ? " hasModal" : ""}`}
                         key={t.id}
                         onClick={() => openDetail(t)}
                         role="button"
@@ -3085,7 +3100,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           </small>
                         </span>
                         <span className="tCost">
-                          <b>{money(finalPrice(t))}</b>
+                          <b>
+                            {(t.partCost || 0) > 0 && (
+                              <span className="modalMark" title="Modal sparepart sudah diisi">
+                                <CheckCircle2 size={13} aria-hidden="true" />
+                                <span className="srOnly">Modal terisi</span>
+                              </span>
+                            )}
+                            {money(finalPrice(t))}
+                          </b>
                           {t.downPayment > 0 && <small>DP {money(t.downPayment)}</small>}
                         </span>
                         <span className="tGo">
@@ -3097,7 +3120,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   {visible.length === 0 && (
                     <div className="noData">
                       <Search />
-                      {query.trim() || filter !== "Semua" || technicianFilter !== "Semua Teknisi" ? (
+                      {query.trim() || filter !== "Semua" || technicianFilter !== "Semua Teknisi" || modalFilter !== "Semua Modal" ? (
                         <>
                           <strong>Data tidak ditemukan</strong>
                           <p>Coba ubah kata pencarian atau filter, atau hapus filter untuk melihat semua.</p>

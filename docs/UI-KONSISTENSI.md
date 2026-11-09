@@ -35,3 +35,6 @@
 - Tabel Pelanggan (13 kolom, 1450 px) masih perlu digeser di layar < 1500 px.
 - Fokus-jebak (focus trap) di dalam modal belum ada.
 - Kata campuran Inggris/Indonesia ("Export", "Scan QR", "Copy WA") dibiarkan karena sudah dikenal staf.
+
+## Penanda modal di daftar servis (9 Nov 2026)
+Untuk memudahkan laporan bulanan, servis yang **modal sparepart-nya sudah diisi (> Rp0)** ditandai di Daftar Servis: baris berlatar hijau tipis dengan garis hijau di tepi kiri, dan centang hijau di depan angka biaya. Angka modal tetap tidak tampil (tetap di balik tombol mata). Ada filter baru **Semua Modal / Modal terisi / Modal kosong** di toolbar daftar untuk mencari servis yang modalnya belum diisi sebelum menutup laporan. Servis dengan modal memang Rp0 (misalnya cek saja) ikut terhitung "Modal kosong".

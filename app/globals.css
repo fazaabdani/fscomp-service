@@ -7490,3 +7490,41 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Servis yang modal sparepart-nya sudah diisi: tanda centang hijau di kolom Biaya,
+   garis hijau di tepi kiri, dan latar hijau tipis (angka modal tetap tersembunyi). */
+.ticketRow.hasModal {
+  background: #f3faf6;
+  box-shadow: inset 3px 0 0 #1fa86f;
+}
+.ticketRow.hasModal:hover {
+  background: #e9f6ef;
+}
+.modalMark {
+  display: inline-flex;
+  margin-right: 4px;
+  color: #1b7a47;
+  vertical-align: -2px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (min-width: 761px) {
+  .ticketHead,
+  .ticketRow {
+    grid-template-columns: 24px 98px 128px minmax(90px, 1fr) minmax(88px, 0.7fr) minmax(84px, 1.2fr) minmax(90px, 1fr) 104px 128px 74px 108px 20px;
+    min-width: 1120px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1439px) {
+  .ticketHead,
+  .ticketRow {
+    grid-template-columns: 24px 98px 128px minmax(90px, 1fr) minmax(88px, 0.7fr) minmax(84px, 1.2fr) 104px 128px 74px 108px 20px;
+    min-width: 1025px;
+  }
+}
