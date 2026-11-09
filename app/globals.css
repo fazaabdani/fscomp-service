@@ -7540,3 +7540,11 @@ textarea {
   font-weight: 800;
   white-space: nowrap;
 }
+
+/* Tab "Sudah Diambil": tanggal ambil di atas, status di bawahnya. */
+.ticketRow.pickRow > .tStatus {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}

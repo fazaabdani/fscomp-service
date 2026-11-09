@@ -3099,11 +3099,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                             <b className="pickDate" title={t.pickedUpAt ? `Diambil ${t.pickedUpAt}${t.pickedUpTime ? ` ${t.pickedUpTime}` : ""}` : "Tanggal ambil belum tercatat"}>
                               {t.pickedUpAt ? fmtTglSingkat(t.pickedUpAt).replace("Tgl. ", "") : "—"}
                             </b>
-                          ) : (
-                            <i className={`statusBadge ${tone(t.status)}`}>
-                              {t.status}
-                            </i>
-                          )}
+                          ) : null}
+                          <i className={`statusBadge ${tone(t.status)}`}>
+                            {t.status}
+                          </i>
                         </span>
                         <span className="tAge">
                           <small className={`ageBadge ${ageTone(days)}`}>

@@ -1,14 +1,14 @@
-# Audit & konsistensi UI/UX (28 Okt 2026)
+﻿# Audit & konsistensi UI/UX (28 Okt 2026)
 
 ## Temuan audit (sebelum)
 | Area | Temuan |
 |---|---|
-| Tombol | 16 ukuran tinggi berbeda (18–45 px); `.ghost` hanya bergaya di dalam `.actionGrid`/`.modalFoot`, di tempat lain tampil polos (radius 0, huruf 15px) |
+| Tombol | 16 ukuran tinggi berbeda (18â€“45 px); `.ghost` hanya bergaya di dalam `.actionGrid`/`.modalFoot`, di tempat lain tampil polos (radius 0, huruf 15px) |
 | Kolom isian | tinggi 41/45 px, huruf 12 vs 15 px dalam satu halaman |
-| Huruf | 27 ukuran berbeda; banyak teks 10–11 px |
+| Huruf | 27 ukuran berbeda; banyak teks 10â€“11 px |
 | Sudut | 20 nilai radius berbeda |
-| Warna teks | puluhan abu-abu pucat dengan kontras 2,2–4,4:1 (batas baca 4,5:1) |
-| Daftar servis | lebar minimum 1310 px: di laptop 1366–1440 px kolom Biaya/Lama terpotong dan harus digeser |
+| Warna teks | puluhan abu-abu pucat dengan kontras 2,2â€“4,4:1 (batas baca 4,5:1) |
+| Daftar servis | lebar minimum 1310 px: di laptop 1366â€“1440 px kolom Biaya/Lama terpotong dan harus digeser |
 | Tabel Pembayaran | min 1300 px, kolom "Cara Bayar" dan "Aksi" terpotong di 1440 px |
 | Tabel Pelanggan | header biru muda dan tombol Export abu-abu, berbeda dari semua tabel lain |
 | Aksesibilitas | tidak ada `role="dialog"`, tidak ada fokus keyboard yang terlihat, Esc tidak menutup dialog |
@@ -24,14 +24,14 @@
 - **Fokus keyboard**: cincin biru 2 px di semua kontrol (`:focus-visible`).
 - **Skala huruf**: 12 / 13 / 14 / 15 / 16 / 18 / 20 / 24 / 28 / 32 px. Minimum 12 px. Aturan cetak (`@media print`: nota, label) tidak diubah.
 - **Skala radius**: 6 / 8 / 12 / 16 / 20 px dan pil (999).
-- **Teks abu-abu**: seluruh abu-abu pucat di tema terang dinaikkan ke `#5f6c84` (±5,3:1). Sidebar gelap dan tema lama tidak diubah.
+- **Teks abu-abu**: seluruh abu-abu pucat di tema terang dinaikkan ke `#5f6c84` (Â±5,3:1). Sidebar gelap dan tema lama tidak diubah.
 - **Dialog**: `app/ask-dialog.tsx` (`askConfirm`, `askPrompt`, `<AskHost/>`) menggantikan `confirm`/`prompt`. Esc = batal; konfirmasi berbahaya mulai di tombol "Batal". Tanpa host, kembali ke dialog bawaan browser.
 - **Modal**: `role="dialog"`, `aria-modal`, `aria-labelledby` dipasang otomatis; Esc menutup modal teratas **kecuali** sudah ada yang diketik (supaya input tidak hilang tanpa sengaja; tombol X tetap bisa).
 - **Daftar servis**: kolom lebih ramping + padding baris dihitung dalam lebar minimum (1102 px); di bawah 1440 px kolom *Tindakan* disembunyikan (ada di detail servis), min 1007 px.
 - Status "kosong" kontekstual per halaman; Laporan Teknisi punya pesan kosong; kartu ringkasan laporan memakai `auto-fit`.
 
 ## Belum dikerjakan (saran lanjutan)
-- ±350 warna heksa lain di CSS belum disatukan jadi token (hanya abu-abu teks yang diseragamkan).
+- Â±350 warna heksa lain di CSS belum disatukan jadi token (hanya abu-abu teks yang diseragamkan).
 - Tabel Pelanggan (13 kolom, 1450 px) masih perlu digeser di layar < 1500 px.
 - Fokus-jebak (focus trap) di dalam modal belum ada.
 - Kata campuran Inggris/Indonesia ("Export", "Scan QR", "Copy WA") dibiarkan karena sudah dikenal staf.
@@ -40,4 +40,5 @@
 Untuk memudahkan laporan bulanan, servis yang **modal sparepart-nya sudah diisi (> Rp0)** ditandai di Daftar Servis: baris berlatar hijau tipis dengan garis hijau di tepi kiri, dan centang hijau di depan angka biaya. Angka modal tetap tidak tampil (tetap di balik tombol mata). Ada filter baru **Semua Modal / Modal terisi / Modal kosong** di toolbar daftar untuk mencari servis yang modalnya belum diisi sebelum menutup laporan. Servis dengan modal memang Rp0 (misalnya cek saja) ikut terhitung "Modal kosong".
 
 ## Tab "Sudah Diambil" (9 Nov 2026)
-Di tab ini kolom **Status** (isinya sama untuk semua baris) diganti **Tgl. Ambil** (tebal), kolom tanggal pertama menjadi **Tgl. Masuk** (lebih redup), dan **Lama** (hari sejak masuk, terus bertambah) menjadi **Durasi** = hari dari masuk sampai diambil. Servis lama tanpa tanggal ambil tercatat menampilkan "—". Tab lain tidak berubah.
+Di tab ini kolom **Status** menjadi **Tgl. Ambil**: tanggal ambil tebal di atas, badge status tetap tampil di bawahnya, kolom tanggal pertama menjadi **Tgl. Masuk** (lebih redup), dan **Lama** (hari sejak masuk, terus bertambah) menjadi **Durasi** = hari dari masuk sampai diambil. Servis lama tanpa tanggal ambil tercatat menampilkan "â€”". Tab lain tidak berubah.
+
