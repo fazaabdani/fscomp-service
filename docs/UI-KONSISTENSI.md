@@ -38,3 +38,6 @@
 
 ## Penanda modal di daftar servis (9 Nov 2026)
 Untuk memudahkan laporan bulanan, servis yang **modal sparepart-nya sudah diisi (> Rp0)** ditandai di Daftar Servis: baris berlatar hijau tipis dengan garis hijau di tepi kiri, dan centang hijau di depan angka biaya. Angka modal tetap tidak tampil (tetap di balik tombol mata). Ada filter baru **Semua Modal / Modal terisi / Modal kosong** di toolbar daftar untuk mencari servis yang modalnya belum diisi sebelum menutup laporan. Servis dengan modal memang Rp0 (misalnya cek saja) ikut terhitung "Modal kosong".
+
+## Tab "Sudah Diambil" (9 Nov 2026)
+Di tab ini kolom **Status** (isinya sama untuk semua baris) diganti **Tgl. Ambil** (tebal), kolom tanggal pertama menjadi **Tgl. Masuk** (lebih redup), dan **Lama** (hari sejak masuk, terus bertambah) menjadi **Durasi** = hari dari masuk sampai diambil. Servis lama tanpa tanggal ambil tercatat menampilkan "—". Tab lain tidak berubah.

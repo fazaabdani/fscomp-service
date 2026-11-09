@@ -7528,3 +7528,15 @@ textarea {
     min-width: 1025px;
   }
 }
+
+/* Tab "Sudah Diambil": tanggal ambil yang menonjol, tanggal masuk lebih redup. */
+.ticketRow.pickRow > .tDate b {
+  color: var(--ui-muted, #5f6c84);
+  font-weight: 600;
+}
+.ticketRow > .tStatus .pickDate {
+  color: #1f2a44;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}

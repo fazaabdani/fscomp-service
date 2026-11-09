@@ -3027,23 +3027,29 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                         })}
                       />
                     </span>
-                    <span>Tanggal</span>
+                    <span>{active === "Sudah Diambil" ? "Tgl. Masuk" : "Tanggal"}</span>
                     <span>No. Servis</span>
                     <span>Pelanggan</span>
                     <span>Perangkat</span>
                     <span>Keluhan</span>
                     <span>Tindakan</span>
                     <span>Teknisi</span>
-                    <span>Status</span>
-                    <span>Lama</span>
+                    <span>{active === "Sudah Diambil" ? "Tgl. Ambil" : "Status"}</span>
+                    <span>{active === "Sudah Diambil" ? "Durasi" : "Lama"}</span>
                     <span>Biaya</span>
                     <span />
                   </div>
                   {visible.slice((listPage - 1) * PAGE_SIZE, listPage * PAGE_SIZE).map((t) => {
-                    const days = ageDays(t.receivedAt);
+                    // In "Sudah Diambil" the status is the same for every row and the age since
+                    // intake only grows, so show the pickup date and how long the job took instead.
+                    const pickTab = active === "Sudah Diambil";
+                    const days =
+                      pickTab && t.pickedUpAt
+                        ? Math.max(0, Math.round((new Date(`${t.pickedUpAt}T00:00:00`).getTime() - new Date(`${t.receivedAt}T00:00:00`).getTime()) / 86400000))
+                        : ageDays(t.receivedAt);
                     return (
                       <div
-                        className={`ticketRow${(t.partCost || 0) > 0 ? " hasModal" : ""}`}
+                        className={`ticketRow${(t.partCost || 0) > 0 ? " hasModal" : ""}${pickTab ? " pickRow" : ""}`}
                         key={t.id}
                         onClick={() => openDetail(t)}
                         role="button"
@@ -3089,14 +3095,20 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           <em>{t.technician || "—"}</em>
                         </span>
                         <span className="tStatus">
-                          <i className={`statusBadge ${tone(t.status)}`}>
-                            {t.status}
-                          </i>
+                          {pickTab ? (
+                            <b className="pickDate" title={t.pickedUpAt ? `Diambil ${t.pickedUpAt}${t.pickedUpTime ? ` ${t.pickedUpTime}` : ""}` : "Tanggal ambil belum tercatat"}>
+                              {t.pickedUpAt ? fmtTglSingkat(t.pickedUpAt).replace("Tgl. ", "") : "—"}
+                            </b>
+                          ) : (
+                            <i className={`statusBadge ${tone(t.status)}`}>
+                              {t.status}
+                            </i>
+                          )}
                         </span>
                         <span className="tAge">
                           <small className={`ageBadge ${ageTone(days)}`}>
                             <CalendarDays size={11} />
-                            {days === 0 ? "Hari ini" : `${days} hari`}
+                            {days === 0 ? (pickTab ? "Hari itu" : "Hari ini") : `${days} hari`}
                           </small>
                         </span>
                         <span className="tCost">
