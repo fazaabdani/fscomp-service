@@ -107,3 +107,25 @@ puluhan pelanggan pertama tanpa menambah server.
 - Login lama `admin/admin123` diuji: 401, dan tidak membuat akun baru. Akun `zume` (Admin) dan teknisi tidak berubah.
 - Cadangan database sebelum perubahan: `fs-service_2026-11-13_02-33-51.004.db` di volume backup container.
 - Perubahan kode: `app/api/auth/login/route.ts` (bootstrap hanya bila `user.count()==0`), Next 15.5.18 -> 15.5.29, override `postcss/nanoid/source-map-js/sharp` di `pnpm-workspace.yaml`.
+
+## 8. REVISI (13 Nov 2026): target ratusan toko, dibagikan lewat broadcast ke sesama penjual laptop
+Tujuan pemilik: ratusan pelanggan, dipasarkan lewat broadcast ke rekan penjual laptop dkk. Ini **mengubah rekomendasi arsitektur** di bagian 4.
+
+**Jalur A (satu container per toko) tidak cocok untuk ratusan:** ±223 MB × 200 toko ≈ 45 GB RAM, banyak server, pembaruan harus diulang ke tiap container.
+
+**Rekomendasi baru: B′ = satu aplikasi, satu file database per toko** (database-per-tenant).
+- Satu proses aplikasi melayani semua toko; tiap toko tetap punya file SQLite sendiri (`data/tenants/<slug>.db`). Isolasi data tetap kuat (tidak ada `tenantId` yang bisa lupa difilter), backup/ekspor/hapus per toko tetap satu berkas.
+- Satu kali pembaruan untuk semua toko; satu Panel Kontrol (daftar toko disimpan di database induk).
+- **Diuji nyata (13 Nov 2026, spike lokal):** 100 database toko terbuka sekaligus hanya menambah **±56 MB** RSS (±0,56 MB per toko), membuka satu toko ±7 ms, 300 query ke 100 toko berbeda 40 ms. Ukuran database: FS Comp 2,5 MB untuk 1.367 servis, jadi 300 toko ≈ 1 GB. Satu VPS 8 GB cukup untuk ratusan toko; batas nyatanya CPU saat banyak toko aktif bersamaan (atasi dengan 2–4 proses di belakang Traefik, SQLite mode WAL aman untuk itu).
+- **Titik sentuh kode kecil:** seluruh akses DB lewat `lib/prisma.ts` (27 berkas, 71 panggilan). Perubahan: klien DB dipilih per permintaan dari subdomain (tabel `Host` -> toko), tanda toko ikut ditandatangani di cookie sesi, dan runner migrasi menerapkan skema ke semua file toko. `$transaction` mengharuskan memakai klien yang sama, jadi tiap handler mengambil `const prisma = await tenantPrisma()` di awal (mekanis, bisa dibantu tes).
+- Risiko yang harus ditangani: satu toko yang menjalankan ekspor besar bisa menahan proses (pakai beberapa proses + batas ukuran ekspor); migrasi skema ke ratusan file harus bisa dijalankan bertahap dan dilaporkan; batas laju (rate limit) harus per toko + IP.
+
+**Syarat sebelum broadcast** (urutan penting):
+1. Merek/data FS Comp bersih dari kode dan nilai awal (K4), layar setup awal, unggah logo.
+2. Keamanan dasar: pelacakan publik (T2), CSP, kunci akun, `db push --accept-data-loss` diganti migrasi aman (K3).
+3. **Pendaftaran mandiri + masa uji coba** (30 hari): form daftar toko, pilih subdomain, Admin dibuat otomatis, batasi satu uji coba per nomor WhatsApp. Dengan ratusan toko, pembuatan manual tidak mungkin.
+4. Halaman depan (landing) + panduan singkat/video + saluran dukungan WhatsApp; syarat layanan dan kebijakan privasi sederhana.
+5. Penagihan tahunan: awal manual (transfer/QRIS + konfirmasi di Panel Kontrol), otomatis menyusul.
+6. **Beta tertutup 5-10 teman dulu**, perbaiki temuan, baru broadcast luas.
+
+**Peta jalan revisi (perkiraan kerja, bukan janji):** 1a inti multi-toko ±1-1,5 minggu (di cabang git terpisah; produksi FS Comp tidak disentuh sampai lolos uji, lalu FS Comp dipindah sebagai toko pertama) -> 1b white-label + keamanan ±1 minggu -> 2 pendaftaran mandiri + Panel Kontrol ±1-2 minggu -> 3 penagihan + pembaruan + pemantauan ±1-2 minggu -> beta tertutup -> broadcast.
