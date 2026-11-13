@@ -16,7 +16,8 @@ export async function POST(request:Request){
   const {username,password}=body;
   if(typeof username!=="string"||typeof password!=="string")return NextResponse.json({error:"Data login tidak valid"},{status:400});
   let user=await prisma.user.findUnique({where:{username}});
-  if(!user&&username===process.env.ADMIN_USERNAME&&password===process.env.ADMIN_PASSWORD){user=await prisma.user.create({data:{id:randomUUID(),name:"Administrator",username,passwordHash:makePasswordHash(password),role:"ADMIN"}})}
+  // First-run bootstrap only: with any account present, the .env credentials never create or revive an Admin.
+  if(!user&&username===process.env.ADMIN_USERNAME&&password===process.env.ADMIN_PASSWORD&&(await prisma.user.count())===0){user=await prisma.user.create({data:{id:randomUUID(),name:"Administrator",username,passwordHash:makePasswordHash(password),role:"ADMIN"}})}
   if(!user||!user.active)return NextResponse.json({error:"Username atau password salah"},{status:401});
   if(!verifyPassword(password,user.passwordHash))return NextResponse.json({error:"Username atau password salah"},{status:401});
   const response=NextResponse.json({user:{id:user.id,name:user.name,username:user.username,role:user.role}});response.cookies.set("fs_session",signSession({id:user.id,name:user.name,username:user.username,role:user.role}),{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production",maxAge:8*60*60,path:"/"});return response;
