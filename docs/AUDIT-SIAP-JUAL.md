@@ -87,7 +87,7 @@ puluhan pelanggan pertama tanpa menambah server.
 ## 5. Peta jalan yang disarankan (perkiraan kerja, bukan janji)
 | Fase | Isi | Perkiraan |
 |---|---|---|
-| **0. Segera** (tanpa menunggu keputusan) | Ganti password admin produksi + hapus `ADMIN_*` dari `.env`; naik `next >= 15.5.27`; verifikasi backup off-site | 0,5–1 hari |
+| **0. Segera** (tanpa menunggu keputusan; **SELESAI 13 Nov 2026**: password admin produksi diganti, `ADMIN_*` dihapus dari `.env`, login `.env` hanya untuk database kosong, `next 15.5.29` + dependensi transitif ditambal, `pnpm audit` bersih; **sisa: verifikasi backup off-site**) | Ganti password admin produksi + hapus `ADMIN_*` dari `.env`; naik `next >= 15.5.27`; verifikasi backup off-site | 0,5–1 hari |
 | **1. Siap dibagikan** | K3 dan K4: nilai awal kosong, layar setup awal, unggah logo/nama/warna, bawaan netral, skrip buat-pelanggan satu perintah, migrasi aman, T2 (pelacakan), T6 (CSP, kunci akun), paginasi (T5), tes ujung ke ujung masuk repo | ±1 minggu |
 | **2. Panel Kontrol MVP** | Daftar pelanggan, status/kesehatan, tangguhkan/aktifkan, buat pelanggan, backup/ekspor | ±1–2 minggu |
 | **3. Penagihan & operasi** | Catat pembayaran, pengingat WA, laporan pemasukan, pembaruan massal + rollback, pemantauan galat ke Telegram | ±1–2 minggu |
@@ -100,3 +100,10 @@ puluhan pelanggan pertama tanpa menambah server.
 3. **Harga dan penagihan:** harga per bulan, ada masa uji coba atau tidak, tagih manual dulu atau langsung otomatis.
 4. **FS Comp tetap instance sendiri** (data nyata tidak dipakai/dibagi ke pelanggan lain); saya asumsikan ya.
 5. **Cakupan Fase 0:** boleh langsung dikerjakan dan di-deploy ke produksi FS Comp?
+
+## 7. Catatan pelaksanaan Fase 0 (13 Nov 2026)
+- Akun Admin pemilik: username diganti menjadi `adminfscomp` (akun yang sama, riwayat audit tetap menempel) dan password diganti sesuai permintaan pemilik. Password **tidak** dicatat di berkas mana pun.
+- `.env` server dibersihkan dari `ADMIN_USERNAME/ADMIN_PASSWORD` (cadangan `.env.bak-*` di `/opt/fscomp-service/`, hapus bila tidak diperlukan karena memuat nilai lama).
+- Login lama `admin/admin123` diuji: 401, dan tidak membuat akun baru. Akun `zume` (Admin) dan teknisi tidak berubah.
+- Cadangan database sebelum perubahan: `fs-service_2026-11-13_02-33-51.004.db` di volume backup container.
+- Perubahan kode: `app/api/auth/login/route.ts` (bootstrap hanya bila `user.count()==0`), Next 15.5.18 -> 15.5.29, override `postcss/nanoid/source-map-js/sharp` di `pnpm-workspace.yaml`.

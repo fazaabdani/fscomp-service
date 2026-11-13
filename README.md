@@ -45,4 +45,4 @@ Data utama tersimpan pada database server SQLite; `localStorage` browser dipakai
 
 Aplikasi sekarang memakai SQLite server-side dengan fallback `localStorage`, login berbasis sesi HTTP-only, role Admin/Teknisi, audit log, riwayat pembayaran, log WhatsApp, tracking publik, notifikasi operasional, health check, dan backup otomatis.
 
-Login awal mengikuti `.env` (`admin` / `admin123`). Baca `DEPLOYMENT.md` untuk konfigurasi `servis.fscomp.id`, persistent volume, backup, dan checklist go-live.
+Login awal mengikuti `ADMIN_USERNAME/ADMIN_PASSWORD` di `.env` (hanya bila database masih kosong; lihat `DEPLOYMENT.md`). Baca `DEPLOYMENT.md` untuk konfigurasi `servis.fscomp.id`, persistent volume, backup, dan checklist go-live.

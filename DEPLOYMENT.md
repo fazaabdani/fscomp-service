@@ -29,8 +29,9 @@ Environment yang dipakai (isi nilai sesuai server, jangan pakai default berikut 
 ```env
 DATABASE_URL=file:./data/fs-service.db
 SESSION_SECRET=ganti-dengan-random-minimal-32-karakter
+# Hanya untuk instalasi PERTAMA di database kosong; hapus kedua baris ini setelah login pertama
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+ADMIN_PASSWORD=isi-password-sementara-yang-kuat
 TZ=Asia/Jakarta
 NEXT_PUBLIC_APP_URL=https://servis.fscomp.id
 APP_PORT=3216
@@ -43,10 +44,14 @@ OWNER_INGEST_TOKEN=
 akan menolak membuat/memverifikasi sesi kalau env ini kosong, alih-alih diam-diam memakai secret
 bawaan yang tidak aman.
 
-Login default saat instalasi pertama: `admin / admin123`. **Wajib diganti sebelum aplikasi
-dipakai untuk transaksi nyata** — bukan sekadar "setelah stabil". Ganti lewat menu Akun (Reset
-Password) begitu login pertama berhasil, lalu simpan password baru di pengelola kata sandi, bukan
-di dokumen ini.
+Admin pertama dibuat otomatis dari `ADMIN_USERNAME/ADMIN_PASSWORD` **hanya bila database belum
+punya akun sama sekali** (sejak 13 Nov 2026; sebelumnya kredensial itu bisa menghidupkan lagi akun
+Admin kapan pun akunnya tidak ada). Setelah login pertama: ganti password lewat menu Akun, lalu
+**hapus kedua variabel itu dari `.env`** dan buat ulang container (`docker compose up -d`). Simpan
+password di pengelola kata sandi, bukan di dokumen ini.
+
+**Status produksi FS Comp (13 Nov 2026):** akun Admin pemilik sudah diganti nama dan password-nya,
+`ADMIN_*` sudah dihapus dari `.env` server, dan login lama `admin/admin123` ditolak.
 
 ## Integrasi dashboard (Owner Command Center)
 
