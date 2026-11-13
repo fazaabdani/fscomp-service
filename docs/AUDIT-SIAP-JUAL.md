@@ -128,4 +128,12 @@ Tujuan pemilik: ratusan pelanggan, dipasarkan lewat broadcast ke rekan penjual l
 5. Penagihan tahunan: awal manual (transfer/QRIS + konfirmasi di Panel Kontrol), otomatis menyusul.
 6. **Beta tertutup 5-10 teman dulu**, perbaiki temuan, baru broadcast luas.
 
-**Peta jalan revisi (perkiraan kerja, bukan janji):** 1a inti multi-toko ±1-1,5 minggu (di cabang git terpisah; produksi FS Comp tidak disentuh sampai lolos uji, lalu FS Comp dipindah sebagai toko pertama) -> 1b white-label + keamanan ±1 minggu -> 2 pendaftaran mandiri + Panel Kontrol ±1-2 minggu -> 3 penagihan + pembaruan + pemantauan ±1-2 minggu -> beta tertutup -> broadcast.
+**Peta jalan revisi (perkiraan kerja, bukan janji):** 1a inti multi-toko ±1-1,5 minggu (di cabang git terpisah; produksi FS Comp tidak disentuh sampai lolos uji, FS Comp TIDAK dipindah: lihat keputusan di bawah) -> 1b white-label + keamanan ±1 minggu -> 2 pendaftaran mandiri + Panel Kontrol ±1-2 minggu -> 3 penagihan + pembaruan + pemantauan ±1-2 minggu -> beta tertutup -> broadcast.
+
+
+### Keputusan pemilik (13 Nov 2026)
+- **servis.fscomp.id tetap milik pribadi pemilik dan tetap berjalan seperti sekarang** (instance sendiri di server toko, data nyata, tidak ikut platform).
+- **Platform jual terpisah di domain produk** (kandidat utama `servisku.id`, belum dibeli; `.com`-nya sudah dimiliki pihak lain, cek dulu merek/usahanya): `servisku.id` = halaman depan + daftar, `panel.servisku.id` = Panel Kontrol pemilik, `namatoko.servisku.id` = tiap toko.
+- **Satu basis kode, dua mode**: `TENANT_MODE=single` (FS Comp, perilaku identik seperti sekarang, dijaga tes) dan `TENANT_MODE=multi` (platform, database per toko). Perbaikan bug cukup sekali; pembaruan dicoba di platform dulu, lalu ke FS Comp.
+- **Hosting platform jangan di server toko**: semua aplikasi di sana mati +-45 menit tiap Minggu 01.30 (job Image SSD) dan bergantung pada Cloudflare Tunnel. Untuk pelanggan berbayar pakai VPS (VPS 1 Hostinger untuk awal, atau VPS khusus). DNS `*.servisku.id` wildcard + HTTPS lewat Cloudflare (satu tingkat subdomain tercakup gratis) atau Traefik DNS-challenge.
+- Opsi masa depan (tidak wajib): FS Comp ikut sebagai toko di platform dengan domain khusus `servis.fscomp.id`.
