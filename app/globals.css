@@ -3764,16 +3764,45 @@ textarea {
     width: 14mm;
     height: 14mm;
   }
+  /* Order: item type (boxed, with n/m) > customer name (largest) > device > service number.
+     The item box uses a border, not a fill: browsers skip background colours when printing. */
   .accessoryLabel div > * {
     display: block;
     overflow-wrap: anywhere;
   }
-  .accessoryLabel small { color: #64748b; font-size: 3.5pt; font-weight: 700; }
-  .accessoryLabel h2 { margin: 0.5mm 0 1mm; font-size: 7.5pt; line-height: 1.05; }
-  .accessoryLabel b { font-size: 4.8pt; }
-  .accessoryLabel span { margin-top: 0.5mm; color: #475569; font-size: 4.2pt; }
-  .accessoryLabel strong { margin-top: 1mm; font-size: 4.8pt; }
-  .accessoryLabel em { margin-top: 0.5mm; color: #64748b; font-size: 3.5pt; }
+  .accessoryLabel header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1mm;
+  }
+  .accessoryLabel i {
+    padding: 0.2mm 1.2mm;
+    border: 0.6pt solid #0f172a;
+    border-radius: 0.8mm;
+    color: #0f172a;
+    font-size: 5.2pt;
+    font-style: normal;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+  }
+  .accessoryLabel small { color: #475569; font-size: 4.2pt; font-weight: 700; }
+  .accessoryLabel h2 {
+    display: -webkit-box;
+    margin: 1.2mm 0 0.8mm;
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 9.5pt;
+    font-weight: 900;
+    line-height: 1.05;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .accessoryLabel h2.nameL { font-size: 8pt; }
+  .accessoryLabel h2.nameXL { font-size: 6.6pt; }
+  .accessoryLabel span { color: #475569; font-size: 4.6pt; line-height: 1.15; }
+  .accessoryLabel strong { margin-top: 0.8mm; color: #0f172a; font-size: 4.8pt; }
   /* Navy/blue "tanda terima" theme — matches the shop's provided design ref */
   .printHeader {
     display: grid;

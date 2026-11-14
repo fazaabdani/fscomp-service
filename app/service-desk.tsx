@@ -4212,12 +4212,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   level="H"
                 />
                 <div>
-                  <small>PERLENGKAPAN {index + 1}/{items.length}</small>
-                  <h2>{item}</h2>
-                  <b>Atas nama: {selected.customer}</b>
+                  <header>
+                    <i>{item}</i>
+                    <small>{index + 1}/{items.length}</small>
+                  </header>
+                  <h2 className={selected.customer.length > 26 ? "nameXL" : selected.customer.length > 15 ? "nameL" : ""}>
+                    {selected.customer}
+                  </h2>
                   <span>{selected.device}</span>
                   <strong>{selected.id}</strong>
-                  <em>Scan untuk identifikasi servis</em>
                 </div>
               </article>
             ))}
