@@ -7424,10 +7424,7 @@ textarea {
     grid-template-columns: 24px 98px 128px minmax(90px, 1fr) minmax(88px, 0.7fr) minmax(84px, 1.2fr) 104px 128px 74px 90px 20px;
     min-width: 1007px;
   }
-  .ticketHead > :nth-child(7),
-  .ticketRow > .tAct {
-    display: none;
-  }
+  /* (aturan sembunyikan Tindakan dipindah ke blok "Jenis Barang + Seri / Model" di akhir berkas) */
 }
 
 /* HP: sasaran sentuh minimal 44px. */
@@ -7576,4 +7573,58 @@ textarea {
   flex-direction: column;
   align-items: flex-start;
   gap: 3px;
+}
+
+/* Daftar servis: kolom Jenis Barang + Seri / Model di samping Pelanggan.
+   Tab Proses Servis tidak menampilkan Tindakan, Teknisi, dan Biaya.
+   (Awalan .ticketTable membuat aturan ini menang atas template lama tanpa urutan.) */
+.devTypeInline { display: none; }
+.ticketRow > .tJenis {
+  min-width: 0;
+  overflow: hidden;
+  color: #4a566b;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (min-width: 761px) {
+  /* Semua tab selain Proses Servis: 13 kolom */
+  .ticketTable:not(.procTab) .ticketHead,
+  .ticketTable:not(.procTab) .ticketRow {
+    grid-template-columns: 24px 98px 128px minmax(100px, 1fr) 96px minmax(100px, 1fr) minmax(110px, 1.1fr) minmax(100px, 1fr) 104px 128px 74px 90px 20px;
+    min-width: 1260px;
+    gap: 5px;
+  }
+  /* Proses Servis: tanpa Tindakan, Teknisi, Biaya */
+  .ticketTable.procTab .ticketHead,
+  .ticketTable.procTab .ticketRow {
+    grid-template-columns: 24px 98px 128px minmax(110px, 1fr) 96px minmax(110px, 1fr) minmax(120px, 1.4fr) 128px 74px 20px;
+    min-width: 980px;
+    gap: 5px;
+  }
+}
+/* Laptop 1440-1599px: Tindakan disembunyikan (isinya ada di detail servis) */
+@media (min-width: 761px) and (max-width: 1599px) {
+  .ticketTable:not(.procTab) .ticketHead,
+  .ticketTable:not(.procTab) .ticketRow {
+    grid-template-columns: 24px 98px 128px minmax(84px, 1fr) 96px minmax(90px, 1fr) minmax(80px, 1fr) 104px 128px 74px 90px 20px;
+    min-width: 1099px;
+  }
+  .ticketTable:not(.procTab) .ticketHead > :nth-child(8),
+  .ticketTable:not(.procTab) .ticketRow > .tAct {
+    display: none;
+  }
+}
+/* Laptop 1366px: kolom dirapatkan sedikit */
+@media (min-width: 761px) and (max-width: 1439px) {
+  .ticketTable:not(.procTab) .ticketHead,
+  .ticketTable:not(.procTab) .ticketRow {
+    grid-template-columns: 24px 94px 124px minmax(84px, 1fr) 96px minmax(90px, 1fr) minmax(80px, 1fr) 88px 128px 70px 86px 20px;
+    min-width: 1065px;
+  }
+}
+@media (max-width: 760px) {
+  .ticketRow > .tJenis { display: none; }
+  .devTypeInline { display: inline; color: #5f6c84; font-style: normal; font-weight: 700; }
 }

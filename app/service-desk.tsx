@@ -3013,7 +3013,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     </button>
                   </div>
                 </div>
-                <div className="ticketTable">
+                <div className={`ticketTable${active === "Proses Servis" ? " procTab" : ""}`}>
                   <div className="ticketHead">
                     <span className="jobCheck">
                       <input
@@ -3030,13 +3030,14 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                     <span>{active === "Sudah Diambil" ? "Tgl. Masuk" : "Tanggal"}</span>
                     <span>No. Servis</span>
                     <span>Pelanggan</span>
-                    <span>Perangkat</span>
+                    <span>Jenis Barang</span>
+                    <span>Seri / Model</span>
                     <span>Keluhan</span>
-                    <span>Tindakan</span>
-                    <span>Teknisi</span>
+                    {active !== "Proses Servis" && <span>Tindakan</span>}
+                    {active !== "Proses Servis" && <span>Teknisi</span>}
                     <span>{active === "Sudah Diambil" ? "Tgl. Ambil" : "Status"}</span>
                     <span>{active === "Sudah Diambil" ? "Durasi" : "Lama"}</span>
-                    <span>Biaya</span>
+                    {active !== "Proses Servis" && <span>Biaya</span>}
                     <span />
                   </div>
                   {visible.slice((listPage - 1) * PAGE_SIZE, listPage * PAGE_SIZE).map((t) => {
@@ -3076,8 +3077,13 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           )}
                           <b>{t.customer}</b>
                         </span>
-                        <span className="tDev" title={t.device}>{t.device}</span>
+                        <span className="tJenis" title={t.deviceType || ""}>{t.deviceType || "—"}</span>
+                        <span className="tDev" title={t.device}>
+                          {t.deviceType && <i className="devTypeInline">{t.deviceType} · </i>}
+                          {t.device}
+                        </span>
                         <span className="tIssue" title={t.issue}>{t.issue}</span>
+                        {active !== "Proses Servis" && (
                         <span
                           className={`tAct ${!t.serviceAction?.trim() && qcByTicket.get(t.id) && !qcByTicket.get(t.id)!.reviewedAt ? "qcLine" : ""}`}
                           title={t.serviceAction?.trim() || ""}
@@ -3088,12 +3094,15 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                               ? `QC selesai oleh ${qcByTicket.get(t.id)!.checkedBy} · ${qcByTicket.get(t.id)!.badCount} bermasalah — tinjau`
                               : "—"}
                         </span>
+                        )}
+                        {active !== "Proses Servis" && (
                         <span className="tTech">
                           <span className="avatarMini">
                             {(t.technician || "?").slice(0, 2).toUpperCase()}
                           </span>
                           <em>{t.technician || "—"}</em>
                         </span>
+                        )}
                         <span className="tStatus">
                           {pickTab ? (
                             <b className="pickDate" title={t.pickedUpAt ? `Diambil ${t.pickedUpAt}${t.pickedUpTime ? ` ${t.pickedUpTime}` : ""}` : "Tanggal ambil belum tercatat"}>
@@ -3110,6 +3119,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                             {days === 0 ? (pickTab ? "Hari itu" : "Hari ini") : `${days} hari`}
                           </small>
                         </span>
+                        {active !== "Proses Servis" && (
                         <span className="tCost">
                           <b>
                             {(t.partCost || 0) > 0 && (
@@ -3122,6 +3132,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                           </b>
                           {t.downPayment > 0 && <small>DP {money(t.downPayment)}</small>}
                         </span>
+                        )}
                         <span className="tGo">
                           <ChevronRight />
                         </span>
@@ -3256,13 +3267,13 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   onAdd={addDeviceType}
                 />
                 <label>
-                  Nama barang
+                  Seri / Model
                   <input
                     name="device"
                     data-upper
                     required
                     defaultValue={warrantyClaim ? `${warrantyClaim.device}${warrantyClaim.brand ? ` ${warrantyClaim.brand}` : ""}` : ""}
-                    placeholder="Contoh: Laptop Lenovo ThinkPad T14"
+                    placeholder="Contoh: ThinkPad T14 / ASUS X441B / Epson L3210"
                   />
                 </label>
                 <label>
@@ -3898,7 +3909,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                 <label>Nama pemilik<input name="customer" data-upper required defaultValue={selected.customer}/></label>
                 <label>Nomor WhatsApp<input name="phone" required defaultValue={selected.phone}/></label>
                 <DeviceTypeField types={deviceTypeList(shop)} defaultValue={selected.deviceType} onAdd={addDeviceType} optional />
-                <label>Nama barang<input name="device" data-upper required defaultValue={selected.device}/></label>
+                <label>Seri / Model<input name="device" data-upper required defaultValue={selected.device}/></label>
                                 <label>Serial number<input name="serial" data-upper defaultValue={selected.serial}/></label>
                 <div className="accessoryField"><span>Kelengkapan</span><AccessoryPicker defaultValue={selected.accessories} /></div>
                 <label className="full">Keluhan pelanggan (saat unit masuk)<textarea name="issue" data-upper required defaultValue={selected.issue}/></label>
