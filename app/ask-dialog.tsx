@@ -7,9 +7,11 @@ import { useEffect, useRef, useState } from "react";
 // (Esc = cancel, Enter = OK). Mount <AskHost /> once per screen; without a host
 // the browser's own dialogs are used, so nothing ever silently resolves.
 type Opts = { title?: string; okLabel?: string; cancelLabel?: string; danger?: boolean; placeholder?: string; defaultValue?: string };
+export type Choice = { label: string; value: string; kind?: "primary" };
 type Req =
   | ({ kind: "confirm"; message: string; resolve: (v: boolean) => void } & Opts)
-  | ({ kind: "prompt"; message: string; resolve: (v: string | null) => void } & Opts);
+  | ({ kind: "prompt"; message: string; resolve: (v: string | null) => void } & Opts)
+  | ({ kind: "choice"; message: string; choices: Choice[]; resolve: (v: string | null) => void } & Opts);
 
 let push: ((r: Req) => void) | null = null;
 
@@ -22,6 +24,13 @@ export function askConfirm(message: string, opts: Opts = {}): Promise<boolean> {
 export function askPrompt(message: string, opts: Opts = {}): Promise<string | null> {
   if (!push) return Promise.resolve(window.prompt(message, opts.defaultValue ?? ""));
   return new Promise((resolve) => push!({ kind: "prompt", message, resolve, ...opts }));
+}
+
+/** Several answers instead of yes/no. Resolves to the chosen value, or null when cancelled (Esc, backdrop, Batal). */
+export function askChoice(message: string, choices: Choice[], opts: Opts = {}): Promise<string | null> {
+  const last = choices[choices.length - 1];
+  if (!push) return Promise.resolve(window.confirm(`${message}\n\nOK = ${last.label}`) ? last.value : null);
+  return new Promise((resolve) => push!({ kind: "choice", message, choices, resolve, ...opts }));
 }
 
 export function AskHost() {
@@ -53,7 +62,12 @@ export function AskHost() {
 
   const finish = (ok: boolean) => {
     if (current.kind === "confirm") current.resolve(ok);
+    else if (current.kind === "choice") current.resolve(null);
     else current.resolve(ok && text.trim() ? text.trim() : null);
+    setQueue((q) => q.slice(1));
+  };
+  const pick = (value: string) => {
+    if (current.kind === "choice") current.resolve(value);
     setQueue((q) => q.slice(1));
   };
 
@@ -89,15 +103,29 @@ export function AskHost() {
           <button type="button" ref={cancelRef} className="askCancel" onClick={() => finish(false)}>
             {current.cancelLabel ?? "Batal"}
           </button>
-          <button
-            type="button"
-            ref={okRef}
-            className={`askOk${current.danger ? " danger" : ""}`}
-            disabled={current.kind === "prompt" && !text.trim()}
-            onClick={() => finish(true)}
-          >
-            {current.okLabel ?? "Ya, lanjutkan"}
-          </button>
+          {current.kind === "choice" ? (
+            current.choices.map((c) =>
+              c.kind === "primary" ? (
+                <button key={c.value} type="button" ref={okRef} className="askOk" onClick={() => pick(c.value)}>
+                  {c.label}
+                </button>
+              ) : (
+                <button key={c.value} type="button" className="askCancel" onClick={() => pick(c.value)}>
+                  {c.label}
+                </button>
+              ),
+            )
+          ) : (
+            <button
+              type="button"
+              ref={okRef}
+              className={`askOk${current.danger ? " danger" : ""}`}
+              disabled={current.kind === "prompt" && !text.trim()}
+              onClick={() => finish(true)}
+            >
+              {current.okLabel ?? "Ya, lanjutkan"}
+            </button>
+          )}
         </div>
       </div>
     </div>

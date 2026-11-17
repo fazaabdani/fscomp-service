@@ -7,7 +7,7 @@ import { PasswordModal } from "./password-modal";
 import { QcForm, type QcCheckData } from "./qc-desk";
 import { qcFindingsText } from "@/lib/qc-templates";
 import { canMessage, WA_GATE_LABEL } from "@/lib/wa-gate";
-import { AskHost, askConfirm, askPrompt } from "./ask-dialog";
+import { AskHost, askChoice, askConfirm, askPrompt } from "./ask-dialog";
 import { costItemsWaText, costLines, parseCostItems, sumCostItems, type CostItem } from "@/lib/cost-items";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
@@ -2061,12 +2061,12 @@ export default function ServiceDesk() {
     setSelected(ticket);
     setModal("detail");
   }
-  async function updateStatus(id: string, status: Status) {
+  async function updateStatus(id: string, status: Status): Promise<boolean> {
     const before = tickets.find((t) => t.id === id);
     if (status === CANCELLED && before) {
       if (before.status === "Sudah Diambil") {
         notify("Servis yang sudah diambil tidak bisa dibatalkan");
-        return;
+        return false;
       }
       const dp = before.downPayment > 0 ? `
 
@@ -2079,7 +2079,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           danger: true,
         }))
       )
-        return;
+        return false;
     }
     if (status === "Sudah Diambil" && before) {
       const remaining = Math.max(0, finalPrice(before) - before.downPayment);
@@ -2090,7 +2090,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           { title: "Masih ada sisa pembayaran", okLabel: "Tetap serahkan", cancelLabel: "Kembali" },
         ))
       )
-        return;
+        return false;
     }
     const nowHm = new Date().toTimeString().slice(0, 5);
     const patch: Partial<Ticket> = {
@@ -2118,7 +2118,35 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           }
         : {}),
     };
-    patchTicket(id, patch, `Status diperbarui: ${status}`);
+    return patchTicket(id, patch, `Status diperbarui: ${status}`);
+  }
+  // "Print nota lunas": a paid job that has not been collected yet asks whether the unit is
+  // being handed over now. "Ya" goes through the normal status change (so the mandatory
+  // WhatsApp step still applies) and prints only once the job really is "Sudah Diambil".
+  async function printPaidNota() {
+    const t = selected;
+    if (!t) return;
+    if (!isFullyPaid(t) || t.status === "Sudah Diambil" || t.status === CANCELLED) {
+      printTicket("paid");
+      return;
+    }
+    const choice = await askChoice(
+      `Apakah ${t.device} milik ${t.customer} sekalian diambil sekarang?\n\nJika ya, status servis menjadi Sudah Diambil dan tanggal ambil (hari ini) tercatat di nota.`,
+      [
+        { label: "Belum, cetak nota saja", value: "print" },
+        { label: "Ya, sudah diambil", value: "pickup", kind: "primary" },
+      ],
+      { title: "Nota lunas: unit diambil sekarang?" },
+    );
+    if (!choice) return;
+    if (choice === "pickup") {
+      const ok = await updateStatus(t.id, "Sudah Diambil");
+      if (!ok) {
+        notify("Nota belum dicetak: selesaikan langkah yang diminta, lalu klik Print nota lunas lagi");
+        return;
+      }
+    }
+    printTicket("paid");
   }
   async function deleteTicket() {
     if (!selected || deleting) return;
@@ -2143,18 +2171,18 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       setDeleting(false);
     }
   }
-  async function patchTicket(id: string, patch: Partial<Ticket>, message: string) {
+  async function patchTicket(id: string, patch: Partial<Ticket>, message: string): Promise<boolean> {
     writeEpoch.current++;
     pendingWrites.current++;
     try {
-      await patchTicketInner(id, patch, message);
+      return await patchTicketInner(id, patch, message);
     } finally {
       pendingWrites.current--;
     }
   }
-  async function patchTicketInner(id: string, patch: Partial<Ticket>, message: string) {
+  async function patchTicketInner(id: string, patch: Partial<Ticket>, message: string): Promise<boolean> {
     const before = tickets.find((t) => t.id === id);
-    if (!before) return;
+    if (!before) return false;
     const updatedAt = localDateStr();
     const fullPatch = { ...patch, updatedAt };
     setTickets((old) => old.map((t) => (t.id === id ? { ...t, ...fullPatch } : t)));
@@ -2185,7 +2213,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       setSelected((old) => (old?.id === id ? before : old));
       setServerOnline(false);
       notify("Tidak terhubung ke server — perubahan TIDAK tersimpan, coba lagi");
-      return;
+      return false;
     }
     setServerOnline(true);
     const data = await res.json().catch(() => null);
@@ -2193,21 +2221,23 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
       setSelected((old) => (old?.id === id ? data.ticket : old));
       notify("Tiket ini baru saja diubah pengguna lain — ulangi perubahan Anda");
-      return;
+      return false;
     }
     if (res.ok && data?.ticket) {
       setTickets((old) => old.map((t) => (t.id === id ? data.ticket : t)));
       setSelected((old) => (old?.id === id ? data.ticket : old));
+      return true;
     } else if (!res.ok) {
       setTickets((old) => old.map((t) => (t.id === id ? before : t)));
       setSelected((old) => (old?.id === id ? before : old));
       if (data?.code === "WA_REQUIRED" && patch.status) {
         // Not an error: the customer has to be messaged first.
         setWaGate({ id, kind: data.kind, status: patch.status as Status });
-        return;
+        return false;
       }
       notify(data?.error ? `Gagal menyimpan: ${data.error}` : "Gagal menyimpan perubahan ke server");
     }
+    return false;
   }
   // A job with an unusable WhatsApp number can't be messaged, so nothing is required.
   const waWaived = !!selected && !canMessage(selected.phone);
@@ -3839,7 +3869,7 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
                   className="ghost"
                   disabled={!isFullyPaid(selected)}
                   title={isFullyPaid(selected) ? undefined : selected.costConfirmed ? "Tandai lunas dulu — saldo masih tersisa" : "Konfirmasi biaya dulu"}
-                  onClick={() => printTicket("paid")}
+                  onClick={() => void printPaidNota()}
                 >
                   <Banknote size={17} /> Print nota lunas
                 </button>
