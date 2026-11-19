@@ -54,3 +54,12 @@ Keluhan staf: servis berkondisi **Tidak Bisa/Dibatalkan** tetap dikabari dengan 
 - Dipakai otomatis (kartu "Kabar ke pelanggan", jendela wajib-kabar, Tindak Lanjut) bila `condition` = Tidak Bisa/Dibatalkan atau status Dibatalkan (`isNotFixed` di `service-desk.tsx`). Log chat tetap `READY`, jadi aturan wajib-kabar tidak berubah.
 - Menu Chat WhatsApp menampilkan kedua pilihan ("Selesai" dan "Tidak Bisa/Dibatalkan"); yang sesuai kondisi diberi tanda "Disarankan".
 - `{biaya_cek}` otomatis dari **Biaya final** yang sudah dikonfirmasi: Rp0 = "tidak ada biaya (gratis)" (jika ada DP, ditulis akan dikembalikan), >Rp0 = biaya pengecekan + sisa. Biaya final belum dikonfirmasi = kalimat netral (estimasi perbaikan tidak pernah disebut sebagai tagihan).
+
+## Biaya part wajib diisi sebelum Siap Diambil (20 Nov 2026)
+Agar laporan bulanan (profit) tidak menghitung servis tanpa modal, saat status diubah ke **Bisa Diambil** (atau langsung ke Sudah Diambil dari status awal) aplikasi menanyakan **biaya part (modal sparepart)** lewat popup:
+- Angka diketik tersamar (mengikuti aturan modal disembunyikan), bisa dilihat dengan tombol "Tampilkan angka". Hanya angka yang diterima.
+- Servis tanpa part (cleaning, instal ulang) memilih **Tanpa part (Rp0)**: itu jawaban sah dan tersimpan sebagai 0.
+- Batal/Esc = status tidak berubah.
+- Yang dibedakan: kosong (belum pernah dijawab, `null`) vs 0 (dijawab tanpa part). Servis lama berisi angka nyata atau 0, jadi tidak ditanya ulang. Servis yang sudah Bisa Diambil tidak ditanya lagi saat diambil.
+- **Ditegakkan di server** (`lib/part-cost-gate.ts`, 409 `PART_COST_REQUIRED`), bukan hanya di layar. Berlaku untuk semua peran (Admin dan teknisi); teknisi mengisi angka tetapi tetap tidak melihat modal/profit.
+- Bila langkah kabar WhatsApp wajib ikut menahan perubahan status, jawaban biaya part diingat sehingga tidak ditanya dua kali.

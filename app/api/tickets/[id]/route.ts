@@ -9,6 +9,7 @@ import { clientIp } from "@/lib/audit";
 import { serializeCostItems } from "@/lib/cost-items";
 import { TICKET_UPPER_FIELDS, up, upAccessories } from "@/lib/upper";
 import { WA_GATE, WA_GATE_LABEL, canMessage } from "@/lib/wa-gate";
+import { partCostRequired } from "@/lib/part-cost-gate";
 
 const FIELDS = new Set([
   "customer", "phone", "device", "deviceType", "brand", "serial", "issue", "accessories",
@@ -85,6 +86,7 @@ export async function PATCH(
   let conflict = false;
   let cancelBlocked = false;
   let waBlocked: string | null = null;
+  let partBlocked = false;
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.ticket.findUnique({ where: { id } });
@@ -97,6 +99,13 @@ export async function PATCH(
 
     if (data.status === "Dibatalkan" && existing.status === "Sudah Diambil") {
       cancelBlocked = true;
+      return;
+    }
+
+    // The parts cost must be answered (Rp0 counts) before the job is announced as ready.
+    const nextPart = data.partCost !== undefined ? (data.partCost as number) : existing.partCost;
+    if (partCostRequired(existing.status, data.status as string | undefined, nextPart)) {
+      partBlocked = true;
       return;
     }
 
@@ -164,6 +173,14 @@ export async function PATCH(
     ticket = updated;
   });
 
+  if (partBlocked)
+    return NextResponse.json(
+      {
+        error: "Biaya part (modal sparepart) wajib diisi sebelum servis ditandai siap diambil. Isi Rp0 bila tanpa part.",
+        code: "PART_COST_REQUIRED",
+      },
+      { status: 409 },
+    );
   if (waBlocked)
     return NextResponse.json(
       {

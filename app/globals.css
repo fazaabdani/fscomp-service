@@ -7628,3 +7628,30 @@ textarea {
   .ticketRow > .tJenis { display: none; }
   .devTypeInline { display: inline; color: #5f6c84; font-style: normal; font-weight: 700; }
 }
+
+/* Dialog angka (biaya part): kolom isian disamarkan seperti kolom Modal sparepart. */
+.askAmount {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.askAmount input {
+  width: 100%;
+  min-height: 44px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.askAmount input.askMasked {
+  -webkit-text-security: disc;
+}
+.askEye {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #5268e9;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}

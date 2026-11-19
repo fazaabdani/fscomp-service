@@ -7,7 +7,8 @@ import { PasswordModal } from "./password-modal";
 import { QcForm, type QcCheckData } from "./qc-desk";
 import { qcFindingsText } from "@/lib/qc-templates";
 import { canMessage, WA_GATE_LABEL } from "@/lib/wa-gate";
-import { AskHost, askChoice, askConfirm, askPrompt } from "./ask-dialog";
+import { AskHost, askAmount, askChoice, askConfirm, askPrompt } from "./ask-dialog";
+import { partCostRequired } from "@/lib/part-cost-gate";
 import { costItemsWaText, costLines, parseCostItems, sumCostItems, type CostItem } from "@/lib/cost-items";
 import { extractServiceCode, oldStyleNumber } from "@/lib/service-code";
 import { monthlyDaily, technicianMonthly, monthsPresent, handledDate } from "@/lib/reports";
@@ -1479,6 +1480,8 @@ export default function ServiceDesk() {
   // toward the customer while the receipt is made. Revealed on request, and
   // hidden again on any modal change or after a minute.
   const [showCost, setShowCost] = useState(false);
+  // Parts cost already answered for a job whose status change is still waiting (e.g. on the WhatsApp step).
+  const partAnswers = useRef<Record<string, number>>({});
   // Which required WhatsApp messages were logged per job (RECEIVED / READY / PICKED ...).
   const [chatKinds, setChatKinds] = useState<Record<string, string[]>>({});
   // Message links opened this session ("ticket:KIND"), to enable "continue" in the gate.
@@ -2092,9 +2095,22 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
       )
         return false;
     }
+    // The parts cost (modal) must be answered before a job is announced as ready. Anyone moving the
+    // job may answer; the number is typed masked and never shown back to staff. Rp0 = no parts.
+    let partCost: number | undefined = partAnswers.current[id];
+    if (before && partCost === undefined && partCostRequired(before.status, status, before.partCost ?? null)) {
+      const answer = await askAmount(
+        `Berapa biaya part (modal sparepart) untuk ${before.device} milik ${before.customer}?\n\nIsi total harga beli part yang dipakai. Untuk servis tanpa part (cleaning, instal ulang), pilih "Tanpa part".`,
+        { title: "Biaya part wajib diisi", zeroLabel: "Tanpa part (Rp0)", okLabel: "Simpan & lanjut" },
+      );
+      if (answer === null) return false;
+      partCost = answer;
+      partAnswers.current[id] = answer;
+    }
     const nowHm = new Date().toTimeString().slice(0, 5);
     const patch: Partial<Ticket> = {
       status,
+      ...(partCost !== undefined ? { partCost } : {}),
       statusChangedAt: localDateStr(),
       // Finishing the job stamps when it was handled and by whom (the old
       // app's "Tgl. Selesai Ditangani" / "Teknisi") unless already set.
@@ -2118,7 +2134,10 @@ DP ${money(before.downPayment)} sudah tercatat — kembalikan ke pelanggan secar
           }
         : {}),
     };
-    return patchTicket(id, patch, `Status diperbarui: ${status}`);
+    const saved = await patchTicket(id, patch, `Status diperbarui: ${status}`);
+    // Kept across a blocked attempt (e.g. the WhatsApp step) so the question is not asked twice.
+    if (saved) delete partAnswers.current[id];
+    return saved;
   }
   // "Print nota lunas": a paid job that has not been collected yet asks whether the unit is
   // being handed over now. "Ya" goes through the normal status change (so the mandatory
