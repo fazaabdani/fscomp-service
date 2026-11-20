@@ -9,3 +9,9 @@ tsconfig.tsbuildinfo
 .claude/
 prod-backups/
 .tmp-preview/
+
+# multi-shop platform data
+/data/master.db*
+/data/tenants/
+/data/template-tenant.db*
+backups/

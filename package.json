@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "backup": "node scripts/backup.mjs"
+    "backup": "node scripts/backup.mjs",
+    "tenant": "node scripts/tenant.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

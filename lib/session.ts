@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
+import { MULTI_TENANT, currentTenantSlug, prisma } from "@/lib/prisma";
 
 export type SessionUser = {
   id: string;
@@ -8,6 +8,8 @@ export type SessionUser = {
   username: string;
   role: string;
   exp: number;
+  /** Shop the session belongs to (multi mode). A cookie is never valid for another shop. */
+  t?: string;
 };
 const secret = () => {
   const configured = process.env.SESSION_SECRET;
@@ -29,7 +31,7 @@ export function signSession(user: Omit<SessionUser, "exp">) {
     .digest("base64url");
   return `${payload}.${sig}`;
 }
-export function verifySession(token?: string | null): SessionUser | null {
+export function verifySession(token?: string | null, tenant?: string | null): SessionUser | null {
   try {
     if (!token) return null;
     const [payload, sig] = token.split(".");
@@ -40,6 +42,7 @@ export function verifySession(token?: string | null): SessionUser | null {
     const data = JSON.parse(
       Buffer.from(payload, "base64url").toString(),
     ) as SessionUser;
+    if (MULTI_TENANT && (!tenant || data.t !== tenant)) return null;
     return data.exp > Date.now() ? data : null;
   } catch {
     return null;
@@ -47,7 +50,7 @@ export function verifySession(token?: string | null): SessionUser | null {
 }
 export async function currentSession() {
   const store = await cookies();
-  const claimed = verifySession(store.get("fs_session")?.value);
+  const claimed = verifySession(store.get("fs_session")?.value, await currentTenantSlug());
   if (!claimed) return null;
   // The signed cookie is stateless and can't be revoked on its own, so
   // deactivating a user or changing their role wouldn't take effect until

@@ -226,3 +226,36 @@ model QcCheck {
   createdAt   DateTime  @default(now())
   @@index([ticketId])
 }
+
+// ===== Platform tables (multi-shop mode) =====
+// Used ONLY in the master database (data/master.db). Every shop keeps its own SQLite file with the
+// same schema; these three tables stay empty there (and in single-shop mode).
+model Tenant {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  status      String         @default("TRIAL") // TRIAL | ACTIVE | SUSPENDED | CLOSED
+  plan        String         @default("tahunan")
+  trialEndsAt DateTime?
+  paidUntil   DateTime?
+  note        String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  domains     TenantDomain[]
+}
+
+model TenantDomain {
+  host      String   @id
+  tenantId  String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
+}
+
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

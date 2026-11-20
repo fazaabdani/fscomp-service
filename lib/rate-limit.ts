@@ -26,7 +26,8 @@ export function isRateLimited(
 
 export function clientKey(request: Request): string {
   const h = request.headers;
-  return (
+  const host = h.get("host") || "";
+  return host + "|" + (
     h.get("cf-connecting-ip") ||
     h.get("x-real-ip") ||
     h.get("x-forwarded-for")?.split(",")[0]?.trim() ||

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { MULTI_TENANT, masterClient, prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    // Multi-shop mode has no "current shop" here (health checks come from the server itself).
+    await (MULTI_TENANT ? masterClient() : prisma).$queryRaw`SELECT 1`;
     return NextResponse.json(
       {
         status: "ok",
